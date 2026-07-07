@@ -1,0 +1,196 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Tenancy & auth ────────────────────────────────────────────
+
+model Organization {
+  id                String   @id @default(cuid())
+  name              String
+  slug              String   @unique
+  address           String?
+  phone             String?
+  email             String?
+  website           String?
+  logoUrl           String?
+  defaultRegion     String   @default("CI-ABIDJAN")
+  defaultCurrency   String   @default("XOF")
+  defaultFgPct      Float    @default(15)
+  defaultBenefitPct Float    @default(10)
+  primaryColor      String  @default("#1E3A5F")
+  secondaryColor    String  @default("#1E40AF")
+  pdfFooterText     String?
+  planTier          String   @default("TRIAL") // TRIAL, STARTER, PRO, BUSINESS
+  trialEndsAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  memberships   Membership[]
+  contacts      Contact[]
+  projects      Project[]
+  priceCategories PriceCategory[]
+  priceItems    PriceItem[]
+  exchangeRates ExchangeRate[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+
+  memberships Membership[]
+}
+
+model Membership {
+  id             String   @id @default(cuid())
+  role           String   @default("OWNER") // OWNER, ADMIN, MEMBER
+  createdAt      DateTime @default(now())
+
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+}
+
+// ── Contacts (carnet d'adresses BTP) ─────────────────────────
+
+model Contact {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  type           String   @default("client") // client, entreprise, architecte, fournisseur
+  name           String
+  companyName    String?
+  phone          String?
+  email          String?
+  address        String?
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  projects Project[]
+}
+
+// ── Projects (chantiers) ──────────────────────────────────────
+
+model Project {
+  id               String   @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name             String
+  reference        String?
+  city             String?
+  contactId        String?
+  contact          Contact? @relation(fields: [contactId], references: [id])
+  status           String   @default("actif") // actif, termine, brouillon
+  estimatedBudget  Float    @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  quotes Quote[]
+}
+
+// ── Bibliothèque de prix (par lot / corps d'état) ────────────
+
+model PriceCategory {
+  id             String   @id @default(cuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  code           String   // ex: "01", "02"
+  name           String   // ex: "Gros oeuvre - Maçonnerie"
+  colorHex       String   @default("#1E293B")
+  position       Int      @default(0)
+  region         String   @default("CI-ABIDJAN")
+
+  items PriceItem[]
+}
+
+model PriceItem {
+  id              String   @id @default(cuid())
+  organizationId  String?  // null = catalogue global par défaut (fourni par la plateforme)
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  categoryId      String
+  category        PriceCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  designation     String
+  displayLabel    String?  // libellé affiché sur les exports, remplace la désignation si renseigné
+  unit            String   // m2, m3, ml, u, kg, ff...
+  laborHours      Float    @default(0)
+  laborRateXof    Float    @default(0)
+  materialsXof    Float    @default(0)
+  equipmentXof    Float    @default(0)
+  region          String   @default("CI-ABIDJAN")
+  position        Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  quoteLines QuoteLine[]
+}
+
+// ── Devis (DQE) ────────────────────────────────────────────
+
+model Quote {
+  id             String   @id @default(cuid())
+  organizationId String
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name           String
+  status         String   @default("brouillon") // brouillon, envoye, accepte, refuse
+  currency       String   @default("XOF")
+  fgPct          Float    @default(15)
+  benefitPct     Float    @default(10)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  lots QuoteLot[]
+}
+
+model QuoteLot {
+  id       String @id @default(cuid())
+  quoteId  String
+  quote    Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  code     String
+  name     String
+  colorHex String @default("#1E293B")
+  position Int    @default(0)
+
+  lines QuoteLine[]
+}
+
+model QuoteLine {
+  id           String   @id @default(cuid())
+  quoteLotId   String
+  quoteLot     QuoteLot @relation(fields: [quoteLotId], references: [id], onDelete: Cascade)
+  priceItemId  String?
+  priceItem    PriceItem? @relation(fields: [priceItemId], references: [id])
+  designation  String
+  unit         String
+  quantity     Float    @default(0)
+  laborHours   Float    @default(0)
+  laborRateXof Float    @default(0)
+  materialsXof Float    @default(0)
+  equipmentXof Float    @default(0)
+  position     Int      @default(0)
+}
+
+// ── Devises ────────────────────────────────────────────────
+
+model ExchangeRate {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  currencyCode   String   // EUR, USD, GBP, XAF, MAD, GNF, NGN...
+  rateToXof      Float
+
+  @@unique([organizationId, currencyCode])
+}
