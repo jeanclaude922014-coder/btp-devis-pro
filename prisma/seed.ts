@@ -228,6 +228,23 @@ const CATALOG: CategorySeed[] = [
       { designation: "Dallage extérieur béton balayé ép. 10cm", unit: "m2", laborHours: 0.5, laborRateXof: MO.macon, materialsXof: 8500, equipmentXof: 500 },
     ],
   },
+  {
+    code: "15",
+    name: "Clôtures lourdes (fondation profonde + élévation)",
+    colorHex: "#0e7490",
+    items: [
+      { designation: "Fouille en rigole pour fondations filantes (prof. 1,00m)", unit: "m3", laborHours: 1.2, laborRateXof: MO.manoeuvreQualifie, materialsXof: 0, equipmentXof: 900 },
+      { designation: "Semelle filante béton armé 350 kg/m3 (l=0,50 x ép=0,15) avec treillis soudé HA8", unit: "ml", laborHours: 0.8, laborRateXof: MO.coffreur, materialsXof: 9000, equipmentXof: 650 },
+      { designation: "Treillis soudé HA8 pour semelle filante (façonnage et pose)", unit: "kg", laborHours: 0.12, laborRateXof: MO.ferrailleur, materialsXof: 850, equipmentXof: 0 },
+      { designation: "Semelle isolée béton armé 350 kg/m3 (0,50x0,50x0,20) sous poteaux", unit: "u", laborHours: 1.5, laborRateXof: MO.coffreur, materialsXof: 7500, equipmentXof: 1000 },
+      { designation: "Poteau raidisseur béton armé 15x15cm, hauteur 4,00m (béton + coffrage)", unit: "u", laborHours: 2, laborRateXof: MO.coffreur, materialsXof: 14500, equipmentXof: 1000 },
+      { designation: "Ferraillage HA6/HA8/HA10 façonné et posé (poteaux, semelles isolées, chaînages)", unit: "kg", laborHours: 0.12, laborRateXof: MO.ferrailleur, materialsXof: 850, equipmentXof: 0 },
+      { designation: "Maçonnerie agglos 15 pleins (soubassement de fondation)", unit: "m2", laborHours: 0.9, laborRateXof: MO.macon, materialsXof: 8500, equipmentXof: 0 },
+      { designation: "Chaînage bas béton armé 15x15cm (4HA10 + cadres HA6)", unit: "ml", laborHours: 1, laborRateXof: MO.coffreur, materialsXof: 4200, equipmentXof: 500 },
+      { designation: "Élévation agglos 15 creux (hauteur 3,00m)", unit: "m2", laborHours: 0.9, laborRateXof: MO.macon, materialsXof: 8500, equipmentXof: 0 },
+      { designation: "Chaînage haut béton armé 15x15cm avec béquet (casquette anti-pluie)", unit: "ml", laborHours: 1.2, laborRateXof: MO.coffreur, materialsXof: 5200, equipmentXof: 600 },
+    ],
+  },
 ];
 
 async function main() {
