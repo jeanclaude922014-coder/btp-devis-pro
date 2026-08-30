@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notre Amour — Moulo &amp; Bibiche</title>
+<style>
+  :root{
+    --gold:#d4af37;
+    --gold-light:#f0d98c;
+    --wine:#3a0d1a;
+    --wine-2:#4a1220;
+    --pink:#e94f7c;
+    --pink-2:#c2185b;
+    --cream:#fdf6ea;
+    --ink:#2a0e15;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:radial-gradient(1200px 800px at 50% -200px, #5a1826 0%, var(--wine) 45%, #240509 100%);
+    color:var(--cream);
+    font-family: Georgia, "Times New Roman", serif;
+    min-height:100vh;
+    padding:24px 12px 80px;
+  }
+  .wrap{max-width:960px;margin:0 auto;}
+  .frame{
+    border:2px solid var(--gold);
+    outline:6px solid var(--wine-2);
+    outline-offset:-10px;
+    border-radius:6px;
+    padding:22px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.15));
+  }
+  header{
+    text-align:center;
+    border:2px solid var(--gold);
+    border-radius:10px;
+    padding:22px 16px;
+    background:var(--wine-2);
+    margin-bottom:22px;
+  }
+  h1{
+    margin:0;
+    font-size:2.4rem;
+    color:var(--gold-light);
+    letter-spacing:1px;
+  }
+  header .sub{
+    margin-top:8px;
+    color:var(--pink);
+    font-style:italic;
+    font-size:1.05rem;
+  }
+  .divider{
+    text-align:center;
+    color:var(--pink-2);
+    margin:22px 0;
+    letter-spacing:6px;
+    font-size:1.2rem;
+  }
+  h2.section-title{
+    color:var(--gold-light);
+    text-align:center;
+    font-size:1.5rem;
+    margin:0 0 4px;
+  }
+  p.section-caption{
+    text-align:center;
+    color:var(--pink);
+    font-style:italic;
+    margin:0 0 18px;
+  }
+
+  /* Gallery */
+  .gallery{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(210px,1fr));
+    gap:16px;
+    margin-bottom:26px;
+  }
+  .card{
+    border:2px solid var(--gold);
+    border-radius:8px;
+    background:var(--wine-2);
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    position:relative;
+  }
+  .card .photo{
+    aspect-ratio:4/3;
+    background:#1c0509 url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22><rect width=%22100%22 height=%22100%22 fill=%22%231c0509%22/></svg>') center/cover;
+    background-size:cover;
+    background-position:center;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:var(--pink);
+    font-size:2.2rem;
+    position:relative;
+  }
+  .card .photo.has-img{color:transparent;}
+  .card .photo .hint{
+    position:absolute;
+    bottom:0;left:0;right:0;
+    background:rgba(0,0,0,0.55);
+    color:var(--gold-light);
+    font-family:Arial,sans-serif;
+    font-size:0.7rem;
+    text-align:center;
+    padding:4px 2px;
+    opacity:0;
+    transition:opacity .15s;
+  }
+  .card .photo:hover .hint{opacity:1;}
+  .card .caption{
+    padding:10px 10px 8px;
+    text-align:center;
+    font-style:italic;
+    color:var(--gold-light);
+    font-size:0.95rem;
+    outline:none;
+    min-height:1.4em;
+  }
+  .card .caption:focus{background:rgba(255,255,255,0.05);}
+  .card .del{
+    position:absolute;
+    top:6px;right:6px;
+    background:rgba(0,0,0,0.5);
+    color:#ffb3c1;
+    border:1px solid var(--pink-2);
+    border-radius:50%;
+    width:24px;height:24px;
+    line-height:22px;
+    text-align:center;
+    cursor:pointer;
+    font-family:Arial,sans-serif;
+    font-size:0.9rem;
+    z-index:2;
+  }
+  .card .del:hover{background:var(--pink-2);}
+  .add-card{
+    border:2px dashed var(--gold);
+    border-radius:8px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    min-height:150px;
+    cursor:pointer;
+    color:var(--gold-light);
+    font-family:Arial,sans-serif;
+    gap:6px;
+    background:rgba(255,255,255,0.02);
+  }
+  .add-card:hover{background:rgba(255,255,255,0.06);}
+  .add-card .plus{font-size:2rem;line-height:1;color:var(--pink);}
+
+  /* Text blocks */
+  .letter{
+    border:2px solid var(--pink-2);
+    background:var(--wine-2);
+    border-radius:10px;
+    padding:20px 22px;
+    margin-bottom:26px;
+  }
+  .letter h3{
+    text-align:center;
+    color:var(--gold-light);
+    margin:0 0 4px;
+    font-size:1.3rem;
+  }
+  .letter .by{
+    text-align:center;
+    color:var(--pink);
+    font-style:italic;
+    font-size:0.9rem;
+    margin-bottom:14px;
+  }
+  .letter .body{
+    outline:none;
+    line-height:1.7;
+    white-space:pre-wrap;
+    color:var(--cream);
+  }
+  .letter .body:focus{background:rgba(255,255,255,0.04);border-radius:6px;}
+  .letter .sign{
+    text-align:right;
+    margin-top:12px;
+    color:var(--pink);
+    font-style:italic;
+  }
+
+  /* Timeline */
+  .timeline{margin-bottom:10px;}
+  .stop{
+    border-left:3px solid var(--gold);
+    padding:2px 0 18px 18px;
+    margin-left:6px;
+    position:relative;
+  }
+  .stop::before{
+    content:"❤";
+    position:absolute;
+    left:-13px;top:0;
+    color:var(--pink);
+    background:var(--wine);
+    font-size:0.9rem;
+  }
+  .stop h4{
+    margin:0 0 4px;
+    color:var(--gold-light);
+  }
+  .stop .txt{
+    outline:none;
+    line-height:1.6;
+    color:var(--cream);
+  }
+  .stop .txt:focus{background:rgba(255,255,255,0.04);border-radius:6px;}
+
+  /* Toolbar */
+  .toolbar{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    justify-content:center;
+    margin:26px 0 6px;
+  }
+  .btn{
+    font-family:Arial,sans-serif;
+    font-size:0.85rem;
+    background:var(--wine-2);
+    color:var(--gold-light);
+    border:1px solid var(--gold);
+    border-radius:20px;
+    padding:8px 16px;
+    cursor:pointer;
+  }
+  .btn:hover{background:#5a1826;}
+  .btn.danger{border-color:var(--pink-2);color:#ffb3c1;}
+  footer{
+    text-align:center;
+    color:var(--gold);
+    font-style:italic;
+    margin-top:30px;
+    font-size:0.9rem;
+    opacity:0.85;
+  }
+  .hidden-input{display:none;}
+
+  /* Lightbox */
+  #lightbox{
+    position:fixed;inset:0;
+    background:rgba(0,0,0,0.85);
+    display:none;
+    align-items:center;justify-content:center;
+    z-index:50;
+    padding:20px;
+  }
+  #lightbox.open{display:flex;}
+  #lightbox img{max-width:100%;max-height:90vh;border:3px solid var(--gold);border-radius:6px;}
+
+  @media print{
+    body{background:#fff;color:#000;}
+    .toolbar, .add-card, .del, .hint{display:none !important;}
+    .frame{outline:none;border-color:#333;}
+    .card, .letter, .stop{break-inside:avoid;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="frame">
+
+    <header>
+      <h1>❧ Notre Amour ❧</h1>
+      <div class="sub">✦ Pour toujours, Moulo &amp; Bibiche ✦</div>
+    </header>
+
+    <h2 class="section-title">Nos souvenirs</h2>
+    <p class="section-caption">— Clique sur une photo pour l'ajouter ou la changer —</p>
+    <div class="gallery" id="gallery"></div>
+
+    <div class="divider">❤ ♥ ❤</div>
+
+    <div class="letter">
+      <h3>Déclaration d'Amour</h3>
+      <div class="by">De Moulo Jean Claude à sa Bibiche</div>
+      <div class="body" contenteditable="true" data-key="declaration">Ma Bibiche, mon amour, ma vie…
+
+Depuis le premier jour où nos regards se sont croisés, j'ai su que tu étais la femme de ma vie. Ton sourire illumine mes journées les plus sombres, ta présence me donne la force d'avancer chaque matin.
+
+Tu es ma complice, ma confidente, mon équilibre. Avec toi, chaque instant devient précieux, chaque moment partagé devient un souvenir que je garderai éternellement dans mon cœur.
+
+Je t'aime non seulement pour ce que tu es, mais pour ce que je deviens quand je suis avec toi. Tu es mon rayon de soleil, ma douceur dans la tempête, mon port d'attache dans cette vie.
+
+Promesse solennelle : Je serai toujours là pour toi, dans la joie comme dans la peine, pour te protéger, te chérir et t'aimer… pour toujours.
+
+Toi et moi, contre vents et marées. ❤</div>
+      <div class="sign">— Avec tout mon amour, Moulo Jean Claude —</div>
+    </div>
+
+    <div class="letter">
+      <h3>Pour toi, Ange Larissa</h3>
+      <div class="by">Ma Bibiche, mon tout</div>
+      <div class="body" contenteditable="true" data-key="poeme">Tu sais, je pourrais chercher les plus beaux mots,
+Les aligner comme des étoiles dans le ciel d'Abidjan,
+Mais avec toi, bibiche, tout est simple et beau —
+T'aimer, c'est ce que je fais de mieux depuis longtemps.
+
+Un regard de toi et tout le reste disparaît,
+Les chantiers, la fatigue, les journées qui s'étirent —
+Tu es mon coin de paix, mon seul endroit parfait,
+Celle que mon cœur a choisie pour ne plus partir.
+
+Tu portes la vie avec une grâce que je n'oublierai jamais,
+Ta voix, ton rire — ce sont mes plus belles mélodies.
+Même les jours durs, tu transformes tout en lumière,
+Et je remercie Dieu chaque soir pour cette vie partagée.
+
+On a construit quelque chose de rare, toi et moi,
+Solide comme le béton, mais doux comme ta peau —
+Dans chaque projet, dans chaque espoir, tu es ma foi,
+Ma boussole, mon ancre, mon plus grand cadeau.
+
+Je ne suis pas un chanteur, je n'ai pas cette voix,
+Mais ce que je ressens pour toi, les mots le disent mieux —
+Il n'y a pas une seule femme qui vaille autant que toi,
+Madame Moulo, tu es tout ce que j'avais rêvé de mieux.
+
+Alors ce soir, laisse-moi juste te dire —
+Merci d'être là, merci d'être toi.
+Avec toi, bibiche, j'ai tout ce qu'il faut pour sourire.</div>
+      <div class="sign">— Ton Jean Claude ❤ —</div>
+    </div>
+
+    <div class="divider">❤ ♥ ❤</div>
+
+    <h2 class="section-title">Notre Histoire</h2>
+    <p class="section-caption">Jean Claude &amp; Ange Larissa</p>
+    <div class="timeline" id="timeline">
+      <div class="stop">
+        <h4>Andé, le pays d'or</h4>
+        <div class="txt" contenteditable="true" data-key="ande">Tout a commencé là. Dans cette terre qui t'a vu grandir, Jean Claude — ton village, ta base, ta racine. Andé. Et c'est là que tu as trouvé ton or. Pas dans le sol, pas sur un chantier. En elle, Ange Larissa. Avril 2020 : « Mon or — et je l'ai trouvé dans mon propre pays. »</div>
+      </div>
+      <div class="stop">
+        <h4>Bouaké, ville de labeur et de vie</h4>
+        <div class="txt" contenteditable="true" data-key="bouake">Vous avez posé vos valises à Bouaké. Lui sur ses chantiers, elle à ses côtés. On travaille, on rentre, on mange ensemble, on dort côte à côte — c'est là que la vie commune prend vraiment corps.</div>
+      </div>
+      <div class="stop">
+        <h4>Brobo, les racines enfoncées</h4>
+        <div class="txt" contenteditable="true" data-key="brobo">Petite ville, grandes habitudes. Vous y avez vécu, vous y avez travaillé. Ces endroits qu'on n'oublie jamais, parce que c'est là qu'on a été simples, vrais, sans décor.</div>
+      </div>
+      <div class="stop">
+        <h4>Bocanda, le réveillon de 2022</h4>
+        <div class="txt" contenteditable="true" data-key="bocanda">2021 qui laisse place à 2022, et vous deux qui levez le verre ensemble à Bocanda. Un moment de joie, de bruit, de musique — et ce sentiment que ce qui est entre vous n'est pas un hasard.</div>
+      </div>
+      <div class="stop">
+        <h4>Yamoussoukro, la capitale du rêve</h4>
+        <div class="txt" contenteditable="true" data-key="yakro">La ville de la basilique et des grands espaces. Vous y avez vécu. Yamoussoukro, qui donne l'impression que tout est possible, que les projets peuvent être aussi grands que ses avenues.</div>
+      </div>
+      <div class="stop">
+        <h4>Bonoua, mon village</h4>
+        <div class="txt" contenteditable="true" data-key="bonoua">Jean Claude revient toujours à Bonoua. Là où sont les siens, là où la terre lui appartient. Et maintenant, Ange Larissa fait partie de ce retour. Elle est devenue une pièce de ce village sans même y être née.</div>
+      </div>
+      <div class="stop">
+        <h4>Et puis, Espérance</h4>
+        <div class="txt" contenteditable="true" data-key="esperance">Espérance Chemaelle Dorine. Un prénom qui dit tout — l'espérance de deux êtres qui ont cru l'un en l'autre depuis un avril de pandémie. Elle est venue confirmer ce que vous saviez déjà : ce que vous avez bâti est solide, comme le béton bien dosé.</div>
+      </div>
+    </div>
+
+    <p style="text-align:center;color:var(--pink);font-style:italic;">« C'est toi, Bibiche. C'est toi, Ange Larissa. Mon or — et je l'ai trouvé dans mon propre pays. »</p>
+
+    <div class="toolbar">
+      <button class="btn" id="btnExport">⬇ Exporter (sauvegarde)</button>
+      <button class="btn" id="btnImportTrigger">⬆ Importer une sauvegarde</button>
+      <input type="file" id="importFile" class="hidden-input" accept="application/json">
+      <button class="btn" id="btnPrint">🖨 Imprimer / Enregistrer en PDF</button>
+      <button class="btn danger" id="btnReset">↺ Réinitialiser tout</button>
+    </div>
+
+    <footer>✦ Moulo Jean Claude · Abidjan &amp; Andé, Côte d'Ivoire ✦</footer>
+  </div>
+</div>
+
+<div id="lightbox"><img id="lightboxImg" src="" alt=""></div>
+<input type="file" id="photoInput" class="hidden-input" accept="image/*">
+
+<script>
+(function(){
+  var STORAGE_KEY = 'notreAmourAlbum_v1';
+  var TEXT_KEY = 'notreAmourTexts_v1';
+
+  var defaultPhotos = [
+    {caption:"Ensemble à l'église", img:null},
+    {caption:"Sortie nuit", img:null},
+    {caption:"Pâques 2023", img:null},
+    {caption:"Moments doux", img:null},
+    {caption:"Ma belle", img:null},
+    {caption:"Portrait d'artiste", img:null},
+    {caption:"En soirée", img:null},
+    {caption:"Au grand cœur", img:null},
+    {caption:"Mon soleil", img:null},
+    {caption:"Mon homme", img:null},
+    {caption:"Notre coucher de soleil", img:null},
+    {caption:"Notre voyage", img:null}
+  ];
+
+  var photos = loadPhotos();
+  var gallery = document.getElementById('gallery');
+  var photoInput = document.getElementById('photoInput');
+  var activeCardIndex = null;
+
+  function loadPhotos(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(raw) return JSON.parse(raw);
+    }catch(e){}
+    return defaultPhotos.slice();
+  }
+
+  function savePhotos(){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(photos)); }
+    catch(e){ alert("Stockage plein : essaie d'exporter puis de réduire le nombre/poids des photos."); }
+  }
+
+  function renderGallery(){
+    gallery.innerHTML = '';
+    photos.forEach(function(p, idx){
+      var card = document.createElement('div');
+      card.className = 'card';
+
+      var del = document.createElement('div');
+      del.className = 'del';
+      del.textContent = '✕';
+      del.title = 'Supprimer';
+      del.onclick = function(){
+        if(confirm('Supprimer ce souvenir ?')){
+          photos.splice(idx,1);
+          savePhotos();
+          renderGallery();
+        }
+      };
+      card.appendChild(del);
+
+      var photoDiv = document.createElement('div');
+      photoDiv.className = 'photo' + (p.img ? ' has-img' : '');
+      if(p.img){
+        photoDiv.style.backgroundImage = "url('" + p.img + "')";
+      } else {
+        photoDiv.textContent = '❤';
+      }
+      var hint = document.createElement('div');
+      hint.className = 'hint';
+      hint.textContent = p.img ? 'Cliquer pour changer' : 'Cliquer pour ajouter une photo';
+      photoDiv.appendChild(hint);
+      photoDiv.onclick = function(e){
+        if(p.img && e.detail === 1 && e.target === photoDiv){
+          // simple click on existing image opens lightbox; use a small delay-free approach
+        }
+        openPickerOrLightbox(idx, p);
+      };
+      card.appendChild(photoDiv);
+
+      var cap = document.createElement('div');
+      cap.className = 'caption';
+      cap.contentEditable = true;
+      cap.textContent = p.caption || '';
+      cap.oninput = function(){
+        photos[idx].caption = cap.textContent;
+        savePhotos();
+      };
+      card.appendChild(cap);
+
+      gallery.appendChild(card);
+    });
+
+    var addCard = document.createElement('div');
+    addCard.className = 'add-card';
+    addCard.innerHTML = '<div class="plus">＋</div><div>Ajouter un souvenir</div>';
+    addCard.onclick = function(){
+      photos.push({caption:'Nouveau souvenir', img:null});
+      savePhotos();
+      renderGallery();
+    };
+    gallery.appendChild(addCard);
+  }
+
+  function openPickerOrLightbox(idx, p){
+    if(p.img){
+      var choice = confirm("Cliquer sur OK pour voir la photo en grand,\nou sur Annuler pour la remplacer.");
+      if(choice){
+        showLightbox(p.img);
+        return;
+      }
+    }
+    activeCardIndex = idx;
+    photoInput.click();
+  }
+
+  photoInput.onchange = function(){
+    var file = photoInput.files && photoInput.files[0];
+    if(!file || activeCardIndex === null) return;
+    var reader = new FileReader();
+    reader.onload = function(e){
+      photos[activeCardIndex].img = e.target.result;
+      savePhotos();
+      renderGallery();
+    };
+    reader.readAsDataURL(file);
+    photoInput.value = '';
+  };
+
+  function showLightbox(src){
+    document.getElementById('lightboxImg').src = src;
+    document.getElementById('lightbox').classList.add('open');
+  }
+  document.getElementById('lightbox').onclick = function(){
+    this.classList.remove('open');
+  };
+
+  renderGallery();
+
+  // ---- Editable texts persistence ----
+  var textNodes = document.querySelectorAll('[data-key]');
+  var savedTexts = {};
+  try{ savedTexts = JSON.parse(localStorage.getItem(TEXT_KEY) || '{}'); }catch(e){}
+  textNodes.forEach(function(node){
+    var key = node.getAttribute('data-key');
+    if(savedTexts[key] !== undefined){
+      node.textContent = savedTexts[key];
+    }
+    node.addEventListener('input', function(){
+      savedTexts[key] = node.textContent;
+      localStorage.setItem(TEXT_KEY, JSON.stringify(savedTexts));
+    });
+  });
+
+  // ---- Export / Import / Print / Reset ----
+  document.getElementById('btnExport').onclick = function(){
+    var data = {photos: photos, texts: savedTexts};
+    var blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'notre-amour-sauvegarde.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  document.getElementById('btnImportTrigger').onclick = function(){
+    document.getElementById('importFile').click();
+  };
+  document.getElementById('importFile').onchange = function(){
+    var file = this.files && this.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e){
+      try{
+        var data = JSON.parse(e.target.result);
+        if(data.photos){ photos = data.photos; savePhotos(); renderGallery(); }
+        if(data.texts){
+          savedTexts = data.texts;
+          localStorage.setItem(TEXT_KEY, JSON.stringify(savedTexts));
+          textNodes.forEach(function(node){
+            var key = node.getAttribute('data-key');
+            if(savedTexts[key] !== undefined) node.textContent = savedTexts[key];
+          });
+        }
+        alert('Sauvegarde importée avec succès ❤');
+      }catch(err){
+        alert("Fichier invalide.");
+      }
+    };
+    reader.readAsText(file);
+    this.value = '';
+  };
+
+  document.getElementById('btnPrint').onclick = function(){ window.print(); };
+
+  document.getElementById('btnReset').onclick = function(){
+    if(confirm('Réinitialiser toutes les photos et tous les textes ajoutés/modifiés ?')){
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(TEXT_KEY);
+      location.reload();
+    }
+  };
+})();
+</script>
+</body>
+</html>
