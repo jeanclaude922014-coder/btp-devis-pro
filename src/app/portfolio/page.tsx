@@ -193,10 +193,13 @@ const skillGroups = [
       "Stabilisation au ciment",
       "Étude de prix et métré des travaux",
       "Entretien de route en terre",
+      "Relevé de schéma itinéraire",
+      "Contrôle et suivi de chantier",
       "Bâtiment",
       "Hydraulique et forage d'eau",
       "Construction métallique",
       "Construction en BTC",
+      "Construction de bâtiment et réhabilitation tout corps d'état",
     ],
   },
   {
