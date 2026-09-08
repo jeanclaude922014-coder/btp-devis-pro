@@ -39,6 +39,7 @@ model Organization {
   priceCategories PriceCategory[]
   priceItems    PriceItem[]
   exchangeRates ExchangeRate[]
+  tenders       TenderAnalysis[]
 }
 
 model User {
@@ -181,6 +182,93 @@ model QuoteLine {
   materialsXof Float    @default(0)
   equipmentXof Float    @default(0)
   position     Int      @default(0)
+}
+
+// ── Analyse d'Appels d'Offres (dépouillement rapide DAO) ─────
+
+model TenderAnalysis {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String   // nom interne du dossier, ex: "AO Bacs à traille - Lot 1"
+
+  maitreOuvrage         String?
+  maitreOuvrageDelegue  String?
+  objet                 String?
+  financement           String?
+  modePassation         String?
+  referenceAao          String?
+  nombreLots            Int?
+  montantEstime         Float?
+  prixDossier           Float?
+  plateformeDepot       String?
+  contactNom            String?
+  contactTelephone      String?
+
+  dateLimiteDepot         DateTime?
+  dateOuverturePlis       DateTime?
+  delaiValiditeOffreJours Int?
+  delaiExecutionJours     Int?
+
+  garantieSoumissionXof     Float?
+  garantieBonneExecutionPct Float?
+  retenueGarantiePct        Float?
+  avanceDemarragePct        Float?
+
+  decision     String?  // GO, NOGO, CONDITIONNEL
+  decisionNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  documents      TenderDocument[]
+  personnel      TenderPersonnel[]
+  materiels      TenderMateriel[]
+  qualifications TenderQualification[]
+}
+
+model TenderDocument {
+  id       String   @id @default(cuid())
+  tenderId String
+  tender   TenderAnalysis @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  label    String
+  status   String   @default("manquant") // manquant, en_cours, fourni
+  comment  String?
+  position Int      @default(0)
+}
+
+model TenderPersonnel {
+  id               String   @id @default(cuid())
+  tenderId         String
+  tender           TenderAnalysis @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  poste            String
+  nbExige          Int      @default(1)
+  formationExigee  String?
+  experienceExigee String?
+  nbDisponible     Int      @default(0)
+  position         Int      @default(0)
+}
+
+model TenderMateriel {
+  id          String   @id @default(cuid())
+  tenderId    String
+  tender      TenderAnalysis @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  designation String
+  nbExige     Int      @default(1)
+  nbPropre    Int      @default(0)
+  nbLocation  Int      @default(0)
+  position    Int      @default(0)
+}
+
+model TenderQualification {
+  id             String   @id @default(cuid())
+  tenderId       String
+  tender         TenderAnalysis @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  critere        String
+  exigenceLabel  String?  // texte libre de l'exigence, ex: "240 000 000 FCFA" ou "1 marché similaire"
+  exigenceValeur Float?   // valeur numérique comparable, optionnelle
+  valeurReelle   Float?
+  position       Int      @default(0)
 }
 
 // ── Devises ────────────────────────────────────────────────
