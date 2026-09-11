@@ -39,6 +39,7 @@ model Organization {
   priceCategories PriceCategory[]
   priceItems    PriceItem[]
   exchangeRates ExchangeRate[]
+  floorPlans    FloorPlan[]
 }
 
 model User {
@@ -193,4 +194,29 @@ model ExchangeRate {
   rateToXof      Float
 
   @@unique([organizationId, currencyCode])
+}
+
+// ── Générateur de plan IA (module indépendant) ────────────────
+
+model FloorPlan {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  scale          String   @default("1/100") // 1/50, 1/100
+  status         String   @default("brouillon") // brouillon, valide
+  spec           Json     // FloorPlanSpec : étages, pièces, dimensions (voir src/lib/floor-plan/types.ts)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  messages FloorPlanMessage[]
+}
+
+model FloorPlanMessage {
+  id          String   @id @default(cuid())
+  floorPlanId String
+  floorPlan   FloorPlan @relation(fields: [floorPlanId], references: [id], onDelete: Cascade)
+  role        String   // user, assistant
+  content     String
+  createdAt   DateTime @default(now())
 }
