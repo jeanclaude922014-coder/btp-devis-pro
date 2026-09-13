@@ -73,6 +73,7 @@ const CATALOG: CategorySeed[] = [
       { designation: "Dalle pleine coulée en place (ép. 15cm)", unit: "m2", laborHours: 1.6, laborRateXof: MO.coffreur, materialsXof: 21000, equipmentXof: 2200 },
       { designation: "Escalier béton armé coulé en place (largeur 1.20m)", unit: "ml", laborHours: 4.5, laborRateXof: MO.coffreur, materialsXof: 28000, equipmentXof: 2000 },
       { designation: "Ferraillage HA Fe500 (façonnage + pose)", unit: "kg", laborHours: 0.12, laborRateXof: MO.ferrailleur, materialsXof: 850, equipmentXof: 0 },
+      { designation: "Film polyane (polyéthylène 200 microns) sous dallage", unit: "m2", laborHours: 0.05, laborRateXof: MO.manoeuvre, materialsXof: 450, equipmentXof: 0 },
     ],
   },
   {
@@ -97,6 +98,7 @@ const CATALOG: CategorySeed[] = [
       { designation: "Chevrons bois 5x7 cm (support couverture)", unit: "ml", laborHours: 0.2, laborRateXof: MO.charpentier, materialsXof: 1800, equipmentXof: 0 },
       { designation: "Faux-plafond en plaque de plâtre BA13 (ossature métallique)", unit: "m2", laborHours: 0.5, laborRateXof: MO.menuisier, materialsXof: 8500, equipmentXof: 0 },
       { designation: "Faux-plafond bois (contreplaqué 5mm sur ossature)", unit: "m2", laborHours: 0.55, laborRateXof: MO.menuisier, materialsXof: 7500, equipmentXof: 0 },
+      { designation: "Faux-plafond lambris PVC (ossature métallique, y/c cornière de finition)", unit: "m2", laborHours: 0.45, laborRateXof: MO.menuisier, materialsXof: 6800, equipmentXof: 0 },
     ],
   },
   {
