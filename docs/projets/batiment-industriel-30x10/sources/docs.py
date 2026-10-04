@@ -140,85 +140,103 @@ def puces(d, items):
 MO_K = 'Main-d\'œuvre'
 LOTNAME = {l: n for l, n, _ in C.LOTS}
 OPTION = {l: o for l, _, o in C.LOTS}
-q = C.q
+q = C.V
 
 # =================================================================== 1. ESQUISSE
 def esquisse():
     d = new_doc('ESQUISSE', landscape=True)
     titre(d, 'ESQUISSE - BÂTIMENT INDUSTRIEL 30,00 x 10,00 m',
-          'Murs en agglos 15 pleins - Piliers BA tous les 5,00 m - Entrée 6,00 m - Toiture 2 versants pente 20 %')
+          'Piliers IPE 220 tous les 5,00 m + poteaux BA - Murs en agglos 15 pleins - Dallage BA 20 cm - Toiture 2 versants pente 20 %')
     d.add_heading('1. Données du projet', 1)
     table(d, ['Paramètre', 'Valeur retenue'], [
         ['Dimensions en plan (entre axes)', '30,00 m x 10,00 m - emprise 300 m², surface utile ≈ 294 m²'],
+        ['Ossature', f'{C.N_PIL} piliers en IPE 220 (S235) tous les 5,00 m, de ±0,00 à +6,00, sur platine 320x220x15 '
+                     'et 4 tiges d\'ancrage M20 ; de part et d\'autre de chaque IPE, 2 poteaux BA 15 x 15 (4 HA10, cadres HA6)'],
+        ['Contreventements', 'Cornières 50 x 50 x 5 : 4 palées verticales en croix de Saint-André (travées d\'extrémité des long pans) '
+                             '+ poutre au vent en toiture dans les 2 travées d\'extrémité'],
         ['Maçonnerie', 'Agglos 15 pleins (40 x 20 x 15) - fondation h = 1,00 m, élévation 6,00 m'],
-        ['Chaînages', 'Bas (+0,00/+0,20), intermédiaire (+3,00/+3,20), haut (+5,80/+6,00) - section 15 x 20'],
-        ['Ferraillage', 'Armatures longitudinales HA10 - étriers/cadres HA6 (FeE500)'],
-        ['Piliers', f'{C.N_PIL} piliers BA tous les 5,00 m ; chaque pilier = 2 poteaux 15 x 20 jumelés (15 x 40), 8 HA10'],
+        ['Chaînages', 'Bas (±0,00/+0,20), intermédiaire (+3,00/+3,20), haut (+5,80/+6,00) - 15 x 20, 4 HA10, cadres HA6 e = 20'],
+        ['Fondations', 'Semelles isolées 80 x 80 x 30 sous piliers, fond de fouille à -1,20 m, nappe HA12 e = 15 dans les 2 sens, '
+                       'fût BA 40 x 40 (4 HA12) jusqu\'à ±0,00 ; semelle filante 40 x 15 (4 HA10) sous les murs'],
+        ['Dallage', 'Béton armé 20 cm dosé à 350 kg/m³, double nappe HA10 FeE500 e = 20 cm, polyane, joints sciés 5 x 5 m'],
+        ['Forme sous dallage', 'Purge et rechargement en latérite par couches de 20 cm compactées à 95 % OPM : '
+                               '40 cm si le sol est de mauvaise portance, 20 cm sinon'],
         ['Entrée', 'Ouverture 6,00 m (pignon Est), portail 6,00 x 4,50 m, linteau BA 15 x 40'],
-        ['Toiture', 'Deux versants, pente 20 % → flèche 1,00 m, faîtage à +7,00 m, pignons triangulaires'],
-        ['Fondations', 'Semelle filante BA 40 x 20 sous murs + semelles isolées 100 x 100 x 30 sous piliers, fond de fouille à -1,25/-1,40'],
-        ['Matériaux', 'Béton dosé à 350 kg/m³ (≈ C25/30), CPJ 42,5, sable lavé, gravier concassé'],
-    ], widths=[6, 19])
+        ['Toiture (option)', 'Deux versants, pente 20 % → faîtage à +7,00 m ; fermes, pannes Z 120 x 2 (entraxe ≤ 1,20 m), '
+                             'tôles bacs 5 ondulations'],
+    ], widths=[5, 20.5])
     d.add_heading('2. Interprétations et hypothèses à valider', 1)
     puces(d, [
-        '« Autour de chaque pilier deux poteaux » a été interprété comme : chaque pilier est constitué de 2 poteaux 15 x 20 '
-        'jumelés (section totale 15 x 40, dans l\'épaisseur du mur agglo 15), posés sur une semelle isolée commune. '
-        'Si vous entendiez 2 poteaux distincts de part et d\'autre de chaque pilier, je mets à jour le métré.',
-        'Disposition des piliers : 7 piliers par long pan (axes 1 à 7), 1 pilier au centre du pignon Ouest, 2 piliers '
-        'd\'encadrement de l\'entrée sur le pignon Est (le pilier central y est supprimé) → 17 piliers au total.',
-        'Pente 20 % appliquée à une toiture à 2 versants de 5,00 m chacun (flèche = 5,00 x 0,20 = 1,00 m).',
-        'Hauteur 6,00 m comptée du terrain naturel (±0,00) au dessus du chaînage haut ; fondation 1,00 m sous le TN.',
-        'Entrée 6,00 m placée au centre du pignon Est (2,00 m de mur de chaque côté).',
-        'Note vocale WhatsApp jointe : elle n\'a pas pu être transcrite ; seul le texte du message a été utilisé.',
+        '« Autour de chaque pilier deux poteaux » : chaque pilier IPE 220 est encadré par 2 poteaux BA 15 x 15 '
+        '(un de chaque côté, dans l\'épaisseur du mur) qui lient la maçonnerie et les chaînages à l\'ossature métallique.',
+        'Les tiges d\'ancrage (4 M20 par pilier) sont scellées dans un fût BA 40 x 40 coulé sur la semelle 80 x 80 ; '
+        'la platine est à ±0,00 et noyée dans le dallage.',
+        'Disposition : 7 piliers par long pan, 1 au centre du pignon Ouest, 2 piliers d\'encadrement de l\'entrée '
+        'sur le pignon Est → 17 piliers.',
+        'Rechargement en latérite chiffré pour 40 cm (cas défavorable) ; mettre p_EPLAT = 0,20 dans le fichier Excel '
+        'si les essais montrent une bonne portance.',
+        'Le gros œuvre comprend les lots 0 à 5 (y compris la structure métallique) ; la charpente de toiture et la couverture, '
+        'les enduits et le portail sont chiffrés en options (lots 6 à 8).',
+        'Note vocale WhatsApp : elle n\'a pas pu être transcrite ; seuls les messages écrits ont été utilisés.',
     ])
     d.add_heading('3. Plans d\'esquisse', 1)
-    for f, cap in [('01_plan.png', 'Plan d\'implantation des piliers et des murs'),
-                   ('02_facade_long_pan.png', 'Façade Nord (long pan)'),
+    for f, cap in [('01_plan.png', 'Plan d\'implantation - piliers IPE 220, poteaux BA, contreventements'),
+                   ('02_facade_long_pan.png', 'Façade Nord (long pan) - palées de stabilité'),
                    ('03_pignon_entree.png', 'Pignon Est - façade d\'entrée'),
                    ('04_coupe_AA.png', 'Coupe transversale A-A'),
-                   ('05_details_ferraillage.png', 'Détails de ferraillage type')]:
+                   ('05_details.png', 'Détails type')]:
         d.add_page_break()
-        h = 16.0 if f in ('03_pignon_entree.png', '04_coupe_AA.png') else None
-        if h: d.add_picture(f'{IMG}/{f}', height=Cm(h))
-        else: d.add_picture(f'{IMG}/{f}', width=Cm(26.0))
+        if f in ('03_pignon_entree.png', '04_coupe_AA.png', '05_details.png'):
+            d.add_picture(f'{IMG}/{f}', height=Cm(15.5))
+        else:
+            d.add_picture(f'{IMG}/{f}', width=Cm(26.0))
         d.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
         p = d.add_paragraph(cap); p.alignment = WD_ALIGN_PARAGRAPH.CENTER; p.runs[0].italic = True
     d.add_page_break()
     d.add_heading('4. Tableau des éléments structuraux', 1)
-    table(d, ['Élément', 'Section / dimensions', 'Armatures longitudinales', 'Armatures transversales', 'Béton'], [
-        ['Semelle isolée (17 u)', '1,00 x 1,00 x 0,30', 'Nappe 2 x 7 HA10 e = 15 cm', '-', '350 kg/m³'],
-        ['Semelle filante', '0,40 x 0,20', '4 HA10 filants', 'Répartiteurs HA6 e = 20 cm', '350 kg/m³'],
-        ['Pilier (17 u)', '15 x 40 (2 x 15 x 20)', '8 HA10', '2 cadres HA6 / niveau, e = 15 (10 en zones nodales)', '350 kg/m³'],
-        ['Chaînage bas', '15 x 20', '4 HA10', 'Cadres HA6 e = 20 cm', '350 kg/m³'],
-        ['Chaînage intermédiaire', '15 x 20 à +3,00', '4 HA10', 'Cadres HA6 e = 20 cm', '350 kg/m³'],
-        ['Chaînage haut', '15 x 20 à +5,80', '4 HA10', 'Cadres HA6 e = 20 cm', '350 kg/m³'],
-        ['Linteau d\'entrée', '15 x 40, portée 6,00 m', '2 lits 3 HA10 (inf.) + 2 HA10 (sup.)', 'Cadres HA6 e = 15 cm', '350 kg/m³'],
-        ['Chaînages rampants', '15 x 15, pente 20 %', '4 HA10', 'Cadres HA6 e = 20 cm', '350 kg/m³'],
-    ], widths=[4, 4.2, 5.5, 6.5, 2.5])
-    d.add_heading('5. Vérifications sommaires (BAEL 91 mod. 99 / EC2)', 1)
+    table(d, ['Élément', 'Section / dimensions', 'Armatures / profilé', 'Armatures transversales / assemblage', 'Matériau'], [
+        ['Semelle isolée (17 u)', '0,80 x 0,80 x 0,30, fond -1,20', '2 x 6 HA12 e = 15 cm (retours 20 cm)', '-', 'Béton 350 kg/m³'],
+        ['Fût sous platine (17 u)', '0,40 x 0,40, de -0,85 à ±0,00', '4 HA12 en L', 'Cadres HA6 e = 15 cm', 'Béton 350 kg/m³'],
+        ['Tiges d\'ancrage', '4 par pilier (68 u)', 'M20 L = 600 coudées', '2 écrous + rondelle, gabarit de pose', 'Acier 4.6 / S235'],
+        ['Pilier (17 u)', 'IPE 220, ±0,00 → +6,00', 'Platine de pied 320 x 220 x 15 + raidisseurs', 'Calage mortier sans retrait', 'S235, peint'],
+        ['Poteaux BA (34 u)', '15 x 15, de -0,85 à +6,00', '4 HA10', 'Cadres HA6 e = 15 cm', 'Béton 350 kg/m³'],
+        ['Contreventements', 'Croix en L 50 x 50 x 5', '4 palées + poutre au vent (2 travées)', 'Goussets 8 mm, boulons M12', 'S235, peint'],
+        ['Semelle filante', '0,40 x 0,15', '4 HA10 filants', 'Répartiteurs HA6 e = 20 cm', 'Béton 350 kg/m³'],
+        ['Chaînages bas / interm. / haut', '15 x 20', '4 HA10', 'Cadres HA6 e = 20 cm', 'Béton 350 kg/m³'],
+        ['Linteau d\'entrée', '15 x 40, portée 6,00 m', '2 lits 3 HA10 (inf.) + 2 HA10 (sup.)', 'Cadres HA6 e = 15 cm', 'Béton 350 kg/m³'],
+        ['Dallage', 'ép. 20 cm, 294 m²', '2 nappes HA10 e = 20 (2 sens)', 'Chaises HA10 1/m²', 'Béton 350 kg/m³'],
+        ['Pannes (option)', 'Z 120 x 2, 12 lignes', 'Entraxe ≤ 1,20 m', 'Échantignoles boulonnées', 'Galvanisé'],
+        ['Couverture (option)', '≈ 347 m²', 'Tôles bacs 5 ondulations', 'Faîtière, fixations', '-'],
+    ], widths=[4.2, 4.6, 5.2, 6.2, 3.2])
+    d.add_heading('5. Vérifications sommaires (BAEL 91 mod. 99 / EC2 / EC3)', 1)
     table(d, ['Vérification', 'Calcul', 'Conclusion'], [
-        ['Pourcentage mini chaînage 15 x 20', '4 HA10 = 3,14 cm² → 1,05 % > 0,2 % (BAEL) et > 0,26 fctm/fyk·b·d (EC2)', 'Vérifié'],
-        ['Pourcentage pilier 15 x 40', '8 HA10 = 6,28 cm² → 1,05 % ; 0,2 % < ρ < 5 %', 'Vérifié'],
-        ['Diamètre des cadres', 'Øt = 6 mm ≥ Øl/3 = 3,3 mm (BAEL) et ≥ max(6 ; Øl/4) (EC2)', 'Vérifié'],
-        ['Espacement des cadres de pilier', 'st ≤ min(15 Øl = 15 cm ; a + 10 = 25 cm ; 40 cm) = 15 cm (BAEL) ; '
-         'EC2 : scl,max = min(20 Øl ; b ; 400) = 15 cm', 'e = 15 cm retenu'],
-        ['Élancement pilier (sens faible)', 'lf ≈ 0,7 x 3,00 = 2,10 m ; λ = 2,10 x √12 / 0,15 = 48,5 < 50', 'Vérifié (BAEL)'],
-        ['Linteau 6,00 m (ELU)', 'pu ≈ 7,0 kN/m → Mu = 7,0 x 6,20² / 8 = 33,6 kN·m ; μ = 0,123 ; As = 2,33 cm² '
-         '< 6 HA10 = 4,71 cm²', 'Vérifié'],
-        ['Enrobage', 'Fondations : 4 cm (XC2, sol latéritique humide) ; élévation : 3 cm (XC3/XC4 climat tropical)', 'À respecter'],
-    ], widths=[5.5, 14.5, 3.5])
-    p = d.add_paragraph('Ces vérifications sont sommaires : la charpente (ratio 17 kg/m²), les réactions d\'appui sur les '
-                        'piliers et la contrainte admissible du sol (hypothèse σsol ≥ 1,5 bar sur latérite) doivent être '
-                        'confirmées par une note de calcul et une reconnaissance géotechnique avant exécution.')
+        ['Semelle 80 x 80 - sol', 'Nser ≈ 42 kN (G) + 25 kN (Q) = 67 kN → σ = 0,067 / 0,64 = 0,105 MPa ≈ 1,05 bar < 1,5 bar', 'Vérifié (sol à confirmer)'],
+        ['Semelle 80 x 80 - aciers', 'Nu ≈ 1,35 x 42 + 1,5 x 25 = 94 kN ; bielles : As = Nu (A - a) / (8 d fsu) = 0,094 x 0,40 / (8 x 0,25 x 435) '
+         '= 0,43 cm² < 6 HA12 = 6,79 cm²', 'Vérifié (largement)'],
+        ['IPE 220 - flexion (vent)', 'w = 1,5 x 0,6 kN/m² x 5 m = 4,5 kN/m ; M = 4,5 x 6² / 8 = 20,3 kN·m < Mpl = 285 cm³ x 235 = 67 kN·m',
+         'Vérifié'],
+        ['IPE 220 - flambement axe faible', 'l0 = 3,00 m (tenu par les chaînages) ; λ̄z = 1,29 ; χ ≈ 0,42 → Nb,Rd ≈ 330 kN > 94 kN', 'Vérifié'],
+        ['Cornière 50 x 50 x 5 (traction)', 'A = 4,80 cm² → Npl = 113 kN ; effort diagonal estimé ≈ 19 kN', 'Vérifié'],
+        ['Panne Z 120 x 2', 'qu ≈ 1,14 kN/m sur 5,00 m → M ≈ 3,6 kN·m ; W requis ≈ 15 cm³ (Z 120 x 2 : W ≈ 19 cm³)',
+         'Vérifié - liernes à mi-portée'],
+        ['Poteaux BA 15 x 15', '4 HA10 = 3,14 cm² → ρ = 1,4 % ; λ = 0,7 x 3,00 x √12 / 0,15 = 48,5 < 50 ; st = 15 cm ≤ 15 Øl', 'Vérifié'],
+        ['Dallage', 'Double nappe HA10 e = 20 : 3,93 cm²/m par nappe et par sens > Amin = 0,13 % x 20 x 100 = 2,6 cm²/m (EC2)', 'Vérifié'],
+        ['Linteau 6,00 m (ELU)', 'Mu ≈ 33,6 kN·m ; As = 2,33 cm² < 6 HA10 = 4,71 cm²', 'Vérifié'],
+        ['Enrobage', 'Fondations 4 cm (XC2, sol latéritique humide) ; élévation et dallage 3 cm (climat tropical)', 'À respecter'],
+    ], widths=[5.0, 15.0, 3.5])
+    p = d.add_paragraph('Vérifications sommaires : les charges de la charpente, la pression du vent (NV 65 / EC1 adaptés '
+                        'à la Côte d\'Ivoire) et la portance du sol doivent être confirmées par une note de calcul complète '
+                        'et une étude de sol (essais LBTP) avant exécution.')
     p.runs[0].italic = True
     d.add_heading('6. Recommandations - contexte ivoirien', 1)
     puces(d, [
-        'Sol latéritique : purger les poches argileuses ou organiques, arroser et compacter le fond de fouille avant le béton de propreté.',
-        'Chaleur tropicale : cure humide du béton pendant au moins 7 jours (arrosage, sacs mouillés) ; éviter le bétonnage entre 12 h et 15 h.',
-        'Agglos : fabrication au moins 28 jours avant la pose, arrosage pendant 7 jours, humidification avant pose.',
-        'Arase étanche hydrofugée sur le chaînage bas contre les remontées capillaires (saison des pluies).',
-        'Traitement anti-termites des fouilles et sous dallage.',
-        'Toiture pente 20 % : bonne évacuation des fortes pluies ; prévoir gouttières et descentes EP (non chiffrées).',
+        'Sol latéritique : purger les poches argileuses ou organiques ; rechargement par couches de 20 cm arrosées et compactées '
+        'à 95 % de l\'OPM, avec un contrôle de densité par couche.',
+        'Tiges d\'ancrage : poser avec un gabarit en contreplaqué, vérifier l\'implantation et les niveaux avant bétonnage des fûts.',
+        'Acier : décapage et 2 couches d\'antirouille + finition (humidité et air salin à Abidjan).',
+        'Chaleur tropicale : cure humide du béton et du dallage pendant au moins 7 jours ; sciage des joints sous 24 h.',
+        'Agglos : fabrication au moins 28 jours avant pose, arrosage 7 jours ; arase étanche hydrofugée sur le chaînage bas.',
+        'Traitement anti-termites des fouilles et sous dallage ; gouttières et descentes EP à prévoir (non chiffrées).',
     ])
     d.save(f'{OUT}/01_Esquisse_Batiment_Industriel_30x10.docx')
 
@@ -234,7 +252,8 @@ def dqe():
         f'bénéfice {int(C.BEN*100)} %) - voir document « Déboursé sec ».',
         'Prix en FCFA, conditions du marché d\'Abidjan en octobre 2026, à actualiser avec les cotations des fournisseurs.',
         'TVA 18 % (Côte d\'Ivoire).',
-        'Le gros œuvre (lots 0 à 3) correspond strictement à la demande ; les lots 4 à 7 sont des options pour rendre le bâtiment exploitable.',
+        'Le gros œuvre et la structure (lots 0 à 5) correspondent à la demande ; les lots 6 à 8 (enduits, charpente de toiture + pannes Z 120 x 2 + tôles bacs 5 ondes, portail) sont des options.',
+        'Le fichier Excel « Batiment_30x10_Metre_DS_DQE.xlsx » contient le même calcul avec des formules modifiables.',
     ])
     d.add_heading('2. Avant-métré', 1)
     rows = [[a['code'], a['des'], a['metre'], a['u'], fnum(a['q'], 2)] for a in C.ART]
@@ -245,14 +264,14 @@ def dqe():
     for lot, elt, nu, lg in C.acier_detail:
         rows.append([f'Lot {lot}', elt, nu, fnum(lg, 1), fnum(lg * C.KG[nu], 1)])
     tot = {nu: sum(lg for _, _, n, lg in C.acier_detail if n == nu) for nu in C.KG}
-    for nu in ('HA10', 'HA6'):
+    for nu in ('HA12', 'HA10', 'HA6'):
         rows.append(['', f'Total {nu} (hors chutes)', nu, fnum(tot[nu], 1), fnum(tot[nu] * C.KG[nu], 1)])
         rows.append(['', f'Total {nu} avec 5 % de chutes', nu, '', fnum(tot[nu] * C.KG[nu] * C.CHUTES, 1)])
         rows.append(['', f'Nombre de barres de 12 m à commander', nu, '',
-                     f'{math.ceil(tot[nu] * C.CHUTES / 12)} barres'])
+                     f'{math.ceil(tot[nu] * C.KG[nu] * C.CHUTES / (12 * C.KG[nu]))} barres'])
     n = len(C.acier_detail)
     table(d, ['Lot', 'Élément', 'Nuance', 'Longueur (m)', 'Poids (kg)'], rows, widths=[1.3, 9.5, 1.5, 2.3, 2.6],
-          align=['c', 'l', 'c', 'r', 'r'], bold_rows=range(n, n + 6), fs=8)
+          align=['c', 'l', 'c', 'r', 'r'], bold_rows=range(n, n + 9), fs=8)
     d.add_page_break()
     d.add_heading('4. Devis quantitatif et estimatif', 1)
     rows, bold, fill = [], [], {}
@@ -270,15 +289,16 @@ def dqe():
     go = sum(tot_lot[l] for l in tot_lot if not OPTION[l])
     op = sum(tot_lot[l] for l in tot_lot if OPTION[l])
     rows = [[f'Lot {l}', LOTNAME[l], fnum(tot_lot[l])] for l in tot_lot if not OPTION[l]]
-    rows += [['', 'TOTAL GROS ŒUVRE HT (A)', fnum(go)], ['', 'TVA 18 %', fnum(go * C.TVA)],
+    rows += [['', 'TOTAL GROS ŒUVRE ET STRUCTURE HT (A)', fnum(go)], ['', 'TVA 18 %', fnum(go * C.TVA)],
              ['', 'TOTAL GROS ŒUVRE TTC', fnum(go * (1 + C.TVA))]]
     rows += [[f'Lot {l}', LOTNAME[l], fnum(tot_lot[l])] for l in tot_lot if OPTION[l]]
     tg = go + op
     rows += [['', 'TOTAL OPTIONS HT (B)', fnum(op)], ['', 'TOTAL GÉNÉRAL HT (A + B)', fnum(tg)],
              ['', 'TVA 18 %', fnum(tg * C.TVA)], ['', 'TOTAL GÉNÉRAL TTC (A + B)', fnum(tg * (1 + C.TVA))]]
-    b = [4, 5, 6, 11, 12, 13, 14]
+    nb = sum(1 for l in tot_lot if not OPTION[l]); no = sum(1 for l in tot_lot if OPTION[l])
+    b = [nb, nb + 1, nb + 2, nb + 3 + no, nb + 4 + no, nb + 5 + no, nb + 6 + no]
     table(d, ['Lot', 'Désignation', 'Montant (FCFA)'], rows, widths=[1.5, 11.5, 4.0], align=['c', 'l', 'r'],
-          bold_rows=b, fill_rows={6: 'D6E4F0', 14: 'D6E4F0'}, fs=9)
+          bold_rows=b, fill_rows={nb + 2: 'D6E4F0', nb + 6 + no: 'D6E4F0'}, fs=9)
     ttc_go = round(go * (1 + C.TVA)); ttc = round(tg * (1 + C.TVA))
     p = d.add_paragraph()
     p.add_run('Arrêté le présent devis (gros œuvre) à la somme TTC de : ').bold = True
@@ -303,22 +323,15 @@ def ds():
                     'matériel, sans frais de chantier, frais généraux, aléas, bénéfice ni TVA. Le petit outillage est '
                     'compté à 3 % de la main-d\'œuvre dans chaque sous-détail.')
     d.add_heading('2. Prix de base (Abidjan, octobre 2026 - à confirmer par cotations)', 1)
-    rows = [[lib, u, fnum(pu)] for lib, u, pu in C.PRIX.values()]
-    table(d, ['Matériau', 'Unité', 'Prix (FCFA)'], rows, widths=[11, 2, 3], align=['l', 'c', 'r'], fs=8.5)
-    noms = {'chef': 'Chef de chantier', 'macon': 'Maçon', 'ferr': 'Ferrailleur', 'coff': 'Coffreur',
-            'soud': 'Soudeur / couvreur', 'manoeuvre': 'Manœuvre', 'tech': 'Technicien (implantation)'}
-    table(d, ['Main-d\'œuvre', 'Unité', 'Salaire journalier (FCFA)'], [[noms[k], 'h.j', fnum(v)] for k, v in C.MO.items()],
-          widths=[11, 2, 3], align=['l', 'c', 'r'], fs=8.5)
-    table(d, ['Matériel (location)', 'Unité', 'Prix (FCFA)'],
-          [['Bétonnière 350 L', 'j', fnum(C.MAT['betonniere'])], ['Vibreur', 'j', fnum(C.MAT['vibreur'])],
-           ['Dame sauteuse', 'j', fnum(C.MAT['dame'])], ['Camion benne 10 m³', 'voyage', fnum(C.MAT['camion'])]],
-          widths=[11, 2, 3], align=['l', 'c', 'r'], fs=8.5)
+    for cat in ('Matériaux', 'Main-d\'œuvre', 'Matériel'):
+        rows = [[lib, u, fnum(pu)] for code, lib, u, pu, ct in C.PRIX if ct == cat]
+        table(d, [cat, 'Unité', 'Prix (FCFA)'], rows, widths=[11, 2, 3], align=['l', 'c', 'r'], fs=8.5)
     d.add_heading('3. Sous-détails des prix unitaires', 1)
     for a in C.ART:
         p = d.add_paragraph(); r = p.add_run(f"Article {a['code']} - {a['des']} (unité : {a['u']})"); r.bold = True
         r.font.color.rgb = BLEU
         rows = []
-        for nat, lib, u, qq, pu in a['comp']:
+        for nat, lib, u, qq, pu in a['comp_v']:
             rows.append([nat, lib, u, fnum(qq, 3), fnum(pu), fnum(qq * pu)])
         po = 0.03 * a['ds_nat']['Main-d\'œuvre']
         if po:
@@ -350,9 +363,10 @@ def ds():
         ls = [l for l in tot if f(l)]
         return {k: sum(tot[l][k] for l in ls) for k in ('Matériaux', 'Main-d\'œuvre', 'Matériel', 'tot')}
     go = somme(lambda l: not OPTION[l]); op = somme(lambda l: OPTION[l]); tg = somme(lambda l: True)
+    nb = sum(1 for l in tot if not OPTION[l]); no = sum(1 for l in tot if OPTION[l])
     rows = [[f'Lot {l}', LOTNAME[l], fnum(tot[l]['Matériaux']), fnum(tot[l]['Main-d\'œuvre']), fnum(tot[l]['Matériel']),
              fnum(tot[l]['tot'])] for l in tot if not OPTION[l]]
-    rows.append(['', 'DS GROS ŒUVRE (A)', fnum(go['Matériaux']), fnum(go['Main-d\'œuvre']), fnum(go['Matériel']), fnum(go['tot'])])
+    rows.append(['', 'DS GROS ŒUVRE ET STRUCTURE (A)', fnum(go['Matériaux']), fnum(go['Main-d\'œuvre']), fnum(go['Matériel']), fnum(go['tot'])])
     rows += [[f'Lot {l}', LOTNAME[l], fnum(tot[l]['Matériaux']), fnum(tot[l]['Main-d\'œuvre']), fnum(tot[l]['Matériel']),
               fnum(tot[l]['tot'])] for l in tot if OPTION[l]]
     rows.append(['', 'DS OPTIONS (B)', fnum(op['Matériaux']), fnum(op['Main-d\'œuvre']), fnum(op['Matériel']), fnum(op['tot'])])
@@ -361,9 +375,9 @@ def ds():
                  fnum(go[MO_K]/go['tot']*100, 1) + ' %', fnum(go['Matériel']/go['tot']*100, 1) + ' %', '100 %'])
     table(d, ['Lot', 'Désignation', 'Matériaux', 'Main-d\'œuvre', 'Matériel', 'DS total'], rows,
           widths=[1.2, 6.8, 2.5, 2.4, 2.0, 2.5], align=['c', 'l', 'r', 'r', 'r', 'r'],
-          bold_rows=[4, 9, 10, 11], fill_rows={4: 'D6E4F0', 10: 'D6E4F0'}, fs=8)
+          bold_rows=[nb, nb + 1 + no, nb + 2 + no, nb + 3 + no], fill_rows={nb: 'D6E4F0', nb + 2 + no: 'D6E4F0'}, fs=8)
     d.add_heading('6. Besoins en matériaux (liste de commande)', 1)
-    for titre_b, base in (('Gros œuvre seul (lots 0 à 3)', True), ('Gros œuvre + options (lots 0 à 7)', False)):
+    for titre_b, base in (('Gros œuvre et structure (lots 0 à 5)', True), ('Avec options (lots 0 à 8)', False)):
         d.add_paragraph(titre_b).runs[0].bold = True
         need = C.besoins(base)
         rows = []
@@ -372,6 +386,7 @@ def ds():
             arr = math.ceil(qq) if u in ('sac', 'u') else round(qq, 1)
             extra = ''
             if lib.startswith('Acier HA10'): extra = f' (≈ {math.ceil(qq / 7.40)} barres de 12 m)'
+            if lib.startswith('Acier HA12'): extra = f' (≈ {math.ceil(qq / 10.66)} barres de 12 m)'
             if lib.startswith('Acier HA6'): extra = f' (≈ {math.ceil(qq / 2.66)} barres de 12 m)'
             if lib.startswith('Ciment'): extra = f' (≈ {fnum(qq * 50 / 1000, 1)} t)'
             rows.append([lib, u, fnum(arr, 0 if u in ('sac', 'u') else 1) + extra, fnum(qq * pu)])
