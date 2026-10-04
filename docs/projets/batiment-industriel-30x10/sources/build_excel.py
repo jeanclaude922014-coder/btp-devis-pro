@@ -7,6 +7,8 @@ from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.comments import Comment
 from openpyxl.utils import get_column_letter as CL
 import modele as Mo
+import entreprise as ENT
+from openpyxl.drawing.image import Image as XLImage
 
 OUTX = sys.argv[1]
 Mo.compute()
@@ -31,6 +33,7 @@ QTE3 = '#,##0.000;(#,##0.000);"-"'
 wb = Workbook()
 wb.properties.creator = AUTEUR
 wb.properties.lastModifiedBy = AUTEUR
+wb.properties.subject = ENT.NOM
 wb.properties.title = 'Bâtiment industriel 30 x 10 m - Métré, déboursé sec et DQE'
 
 def nom(name, ref):
@@ -39,15 +42,17 @@ def nom(name, ref):
 def feuille(titre, sous_titre, larg, ws=None):
     ws = ws or wb.create_sheet(titre)
     ws.title = titre
-    ws['A1'] = 'MOULO JEAN CLAUDE - Technicien Génie Civil BTP - Abidjan, Côte d\'Ivoire'
+    ws['A1'] = f'{ENT.NOM} - {ENT.ACTIVITE} - {ENT.LIGNE_CONTACT}'
     ws['A1'].font = Font(name=F, size=12, bold=True, color='1F3A5F')
-    ws['A2'] = f'{sous_titre} - Construction d\'un bâtiment industriel 30,00 x 10,00 m - 04/10/2026 - BAEL 91 mod. 99 / EC2'
+    ws['A2'] = (f'{sous_titre} - Bâtiment industriel 30,00 x 10,00 m - 04/10/2026 - '
+                f'établi par {ENT.AUTEUR}, {ENT.FONCTION} - BAEL 91 mod. 99 / EC2')
     ws['A2'].font = Font(name=F, size=10, italic=True, color='1F3A5F')
     for i, w in enumerate(larg, 1):
         ws.column_dimensions[CL(i)].width = w
-    ws.oddHeader.left.text = 'Moulo Jean Claude - Technicien Génie Civil BTP'
+    ws.oddHeader.left.text = f'{ENT.NOM} - établi par {ENT.AUTEUR}'
     ws.oddHeader.right.text = sous_titre
-    ws.oddFooter.center.text = 'Page &P / &N'
+    ws.oddFooter.left.text = f'{ENT.NOM} - N° CC {ENT.CC} - RCCM {ENT.RCCM}'
+    ws.oddFooter.right.text = 'Page &P / &N'
     ws.page_setup.orientation = 'landscape'
     ws.page_setup.paperSize = ws.PAPERSIZE_A4
     ws.page_setup.fitToWidth = 1; ws.page_setup.fitToHeight = 0
@@ -75,6 +80,15 @@ def qname(code):
 # =============================================================== LISEZ-MOI
 ws = feuille('Lisez-moi', 'Notice du classeur', [3, 28, 95], wb.active)
 lignes = [
+    ('ENTREPRISE', ''),
+    ('Raison sociale', f'{ENT.NOM} ({ENT.SIGLE}) - {ENT.ACTIVITE}'),
+    ('Siège', ENT.VILLE),
+    ('Téléphone', ENT.TEL),
+    ('Email', ENT.EMAIL),
+    ('N° CC / RCCM', f'{ENT.CC} / {ENT.RCCM}'),
+    ('Banque', ENT.BANQUE),
+    ('Régime fiscal', ENT.IMPOT),
+    ('', ''),
     ('Objet', 'Métré, déboursé sec et devis quantitatif et estimatif (DQE) d\'un bâtiment industriel 30 x 10 m, '
               'murs en agglos 15 pleins, piliers IPE 220 tous les 5 m encadrés de 2 poteaux BA, contreventements en cornières 50x50x5, '
               'entrée 6 m, toiture 2 versants à 20 %, '
@@ -112,6 +126,9 @@ lignes = [
               '(valeur par défaut), 20 cm sinon.'),
     ('Options', 'Lots 6 à 8 (enduits, fermes + pannes Z 120x2 + tôles bacs 5 ondes, portail) chiffrés séparément.'),
 ]
+img = XLImage(ENT.LOGO); img.height, img.width = 95, 140
+ws.add_image(img, 'D1')
+ws.column_dimensions['D'].width = 22
 r = 4
 for a, b in lignes:
     ws.cell(r, 2, a).font = GRAS if (a.isupper() or a in ('Objet', 'Auteur', 'Date')) else NOIR
@@ -329,7 +346,11 @@ put(ws, r, 2, 'TVA'); put(ws, r, 5, '=p_TVA', fmt='0%'); put(ws, r, 6, f'=F{rG}*
 put(ws, r, 2, 'TOTAL GÉNÉRAL TTC (A + B)', GRAS, fill=TOT); put(ws, r, 6, f'=F{rG}+F{r-1}', GRAS, FCFA, TOT); rGT = r; r += 2
 put(ws, r, 2, 'Ratio gros œuvre HT par m² d\'emprise'); put(ws, r, 6, f'=F{rA}/(p_L*p_B)', fmt=FCFA); r += 1
 put(ws, r, 2, 'Marge brute gros œuvre (PV HT - déboursé sec)'); put(ws, r, 6, f'=F{rA}-{DS_GO}', fmt=FCFA); r += 2
-ws.cell(r, 2, 'Fait à Abidjan, le 04/10/2026 - Moulo Jean Claude, Technicien Génie Civil BTP').font = Font(name=F, size=10, bold=True)
+ws.cell(r, 2, 'Fait à Abidjan, le 04/10/2026 - Établi par Moulo Jean Claude, Technicien Génie Civil BTP').font = Font(name=F, size=10, bold=True)
+ws.cell(r + 1, 2, f'Pour {ENT.NOM} : cachet et signature').font = Font(name=F, size=10, bold=True)
+ws.cell(r + 2, 2, f'{ENT.NOM} - {ENT.LIGNE_LEGALE}').font = Font(name=F, size=8, italic=True)
+img2 = XLImage(ENT.LOGO); img2.height, img2.width = 75, 110
+ws.add_image(img2, 'H1')
 CELLS = {'GO_HT': ('DQE', f'F{rA}'), 'GO_TTC': ('DQE', f'F{rAT}'), 'OP_HT': ('DQE', f'F{rB}'), 'TG_TTC': ('DQE', f'F{rGT}'),
          'DS_GO': ('Déboursé sec', f'L{rgo}'), 'DS_OP': ('Déboursé sec', f'L{rgo+1}')}
 

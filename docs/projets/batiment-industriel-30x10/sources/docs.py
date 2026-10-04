@@ -8,6 +8,7 @@ from docx.enum.section import WD_ORIENT
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 import calc as C
+import entreprise as ENT
 
 OUT = os.environ['OUT']; IMG = os.environ['IMG']
 AUTEUR = 'Moulo Jean Claude'
@@ -82,24 +83,42 @@ def new_doc(titre_doc, landscape=False):
     hd = s.header; p = hd.paragraphs[0]
     t = hd.add_table(rows=1, cols=2, width=s.page_width - s.left_margin - s.right_margin)
     c0, c1 = t.rows[0].cells
-    r = c0.paragraphs[0].add_run('MOULO JEAN CLAUDE'); r.bold = True; r.font.size = Pt(11); r.font.color.rgb = BLEU
-    c0.add_paragraph('Technicien Génie Civil BTP - Abidjan, Côte d\'Ivoire').runs[0].font.size = Pt(8)
+    t.columns[0].width = Cm(9.0)
+    c0.paragraphs[0].add_run().add_picture(ENT.LOGO, height=Cm(1.6))
+    r = c0.add_paragraph().add_run(ENT.NOM); r.bold = True; r.font.size = Pt(10); r.font.color.rgb = BLEU
+    c0.add_paragraph(f'{ENT.ACTIVITE} - {ENT.VILLE}').runs[0].font.size = Pt(8)
+    c0.add_paragraph(f'Tél : {ENT.TEL} - {ENT.EMAIL}').runs[0].font.size = Pt(8)
     p1 = c1.paragraphs[0]; p1.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     r = p1.add_run(titre_doc); r.bold = True; r.font.size = Pt(10); r.font.color.rgb = BLEU
     p2 = c1.add_paragraph(PROJET); p2.alignment = WD_ALIGN_PARAGRAPH.RIGHT; p2.runs[0].font.size = Pt(8)
     p3 = c1.add_paragraph(f'Date : {DATE} - Normes : BAEL 91 mod. 99 / EC2'); p3.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     p3.runs[0].font.size = Pt(8)
+    p4 = c1.add_paragraph(f'Établi par : {ENT.AUTEUR}, {ENT.FONCTION}'); p4.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p4.runs[0].font.size = Pt(8); p4.runs[0].bold = True
     for c in (c0, c1): shade(c, 'EAF0F7')
     p.text = ''
     # pied de page
     fp = s.footer.paragraphs[0]; fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r = fp.add_run(f'Document établi par {AUTEUR} - Technicien Génie Civil BTP  |  Page '); r.font.size = Pt(8)
+    r = fp.add_run(f'{ENT.NOM} - {ENT.LIGNE_CONTACT}\n{ENT.LIGNE_LEGALE}\n'); r.font.size = Pt(7)
+    r = fp.add_run(f'Document établi par {AUTEUR} - {ENT.FONCTION}  |  Page '); r.font.size = Pt(8)
     r = fp.add_run(); r.font.size = Pt(8); field(r, 'PAGE')
     r = fp.add_run(' / '); r.font.size = Pt(8)
     r = fp.add_run(); r.font.size = Pt(8); field(r, 'NUMPAGES')
     cp = d.core_properties; cp.author = AUTEUR; cp.last_modified_by = AUTEUR; cp.title = f'{titre_doc} - {PROJET}'
     cp.created = datetime.datetime(2026, 10, 4)
+    cp.category = ENT.NOM; cp.comments = f'{ENT.NOM} - {ENT.LIGNE_LEGALE}'
     return d
+
+def signatures(d):
+    d.add_paragraph()
+    p = d.add_paragraph(f'Fait à Abidjan, le {DATE}'); p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    t = d.add_table(rows=2, cols=2); t.alignment = WD_TABLE_ALIGNMENT.CENTER
+    for i, (h, b) in enumerate([('Établi par', f'{ENT.AUTEUR}\n{ENT.FONCTION}'),
+                                (f'Pour {ENT.NOM}', 'Cachet et signature du responsable')]):
+        r = t.rows[0].cells[i].paragraphs[0].add_run(h); r.bold = True; r.font.color.rgb = BLEU
+        t.rows[0].cells[i].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        t.rows[1].cells[i].text = b + '\n\n\n\n'
+        t.rows[1].cells[i].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
 def titre(d, t, st=None):
     p = d.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -238,6 +257,7 @@ def esquisse():
         'Agglos : fabrication au moins 28 jours avant pose, arrosage 7 jours ; arase étanche hydrofugée sur le chaînage bas.',
         'Traitement anti-termites des fouilles et sous dallage ; gouttières et descentes EP à prévoir (non chiffrées).',
     ])
+    signatures(d)
     d.save(f'{OUT}/01_Esquisse_Batiment_Industriel_30x10.docx')
 
 # =================================================================== 2. DQE
@@ -308,9 +328,8 @@ def dqe():
     p.add_run(f'{lettres(ttc)} francs CFA ({fnum(ttc)} FCFA).')
     d.add_paragraph(f'Ratio gros œuvre : {fnum(go / 300)} FCFA HT/m² d\'emprise ; ratio global : {fnum(tg / 300)} FCFA HT/m².')
     d.add_paragraph()
-    p = d.add_paragraph(f'Fait à Abidjan, le {DATE}'); p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    p = d.add_paragraph(f'{AUTEUR}\nTechnicien Génie Civil BTP'); p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    p.runs[0].bold = True
+    signatures(d)
+
     d.save(f'{OUT}/02_Devis_Quantitatif_Estimatif_Batiment_30x10.docx')
     return go, op
 
@@ -405,9 +424,8 @@ def ds():
           align=['l', 'r', 'r'], bold_rows=[1], fs=9)
     d.add_paragraph('Main-d\'œuvre estimée (gros œuvre) : ' +
                     fnum(go['Main-d\'œuvre'] / 7500) + ' hommes-jours environ (base moyenne 7 500 FCFA/h.j).')
-    p = d.add_paragraph(f'Fait à Abidjan, le {DATE}'); p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    p = d.add_paragraph(f'{AUTEUR}\nTechnicien Génie Civil BTP'); p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    p.runs[0].bold = True
+    signatures(d)
+
     d.save(f'{OUT}/03_Debourse_Sec_Batiment_30x10.docx')
     return go, op
 

@@ -22,8 +22,9 @@ def cote(ax, x1, y1, x2, y2, txt, off=0.0, vertical=False, fs=8):
             rotation=90 if vertical else 0, ha='center', va='center', bbox=dict(fc='white', ec='none', pad=0.5))
 
 def cartouche(fig, titre, ech):
-    fig.text(0.01, 0.01, f'Projet : Bâtiment industriel 30 x 10 m - {titre} - {ech}', fontsize=8, color='#555')
-    fig.text(0.99, 0.01, 'Esquisse établie par Moulo Jean Claude - Technicien génie civil BTP - Abidjan', fontsize=8,
+    fig.text(0.01, 0.01, f'ASSEYA SILVER CONSTRUCTION - Bouaké - Projet : Bâtiment industriel 30 x 10 m - {titre} - {ech}',
+             fontsize=8, color='#555')
+    fig.text(0.99, 0.01, 'Esquisse établie par Moulo Jean Claude - Technicien génie civil BTP', fontsize=8,
              color='#555', ha='right')
 
 def niveaux(ax, x, items):
