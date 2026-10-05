@@ -20,7 +20,7 @@ PARAMS = [
     ('p_PENTE', 'Pente de la toiture (2 versants)', 0.20, '-', 'Donnée : 20 %', 'Géométrie'),
     ('p_H', 'Hauteur élévation (TN → dessus chaînage haut)', 6.0, 'm', 'Donnée : 6 m', 'Géométrie'),
     ('p_HFOND', 'Hauteur maçonnerie agglos en fondation', 1.0, 'm', 'Donnée : 1 m', 'Géométrie'),
-    ('p_EP', 'Épaisseur des murs (agglos 15 pleins)', 0.15, 'm', 'Donnée', 'Géométrie'),
+    ('p_EP', 'Épaisseur des murs (agglos 15)', 0.15, 'm', 'Donnée', 'Géométrie'),
     ('p_PL', 'Largeur de l\'entrée', 6.0, 'm', 'Donnée : 6 m', 'Géométrie'),
     ('p_PH', 'Hauteur du portail', 4.5, 'm', 'Hypothèse', 'Géométrie'),
     ('p_NPIL', 'Nombre de piliers IPE 220', '=2*(p_L/p_ESP+1)+3', 'u', '7 par long pan + 1 pignon Ouest + 2 encadrement entrée', 'Géométrie'),
@@ -33,11 +33,11 @@ PARAMS = [
     ('p_ZCHI', 'Niveau du chaînage intermédiaire', 3.0, 'm', 'Hypothèse : mi-hauteur', 'Géométrie'),
     ('p_LINH', 'Hauteur du linteau d\'entrée', 0.40, 'm', 'Linteau 15x40', 'Géométrie'),
     # fondations
-    ('p_FRL', 'Largeur des fouilles en rigole', 0.60, 'm', '', 'Fondations'),
     ('p_FRH', 'Profondeur des fouilles (rigoles et puits)', 1.20, 'm', 'Donnée : 120 cm', 'Fondations'),
     ('p_PROP', 'Épaisseur béton de propreté', 0.05, 'm', '', 'Fondations'),
-    ('p_SFB', 'Semelle filante : largeur', 0.40, 'm', '', 'Fondations'),
-    ('p_SFH', 'Semelle filante : hauteur', 0.15, 'm', '', 'Fondations'),
+    ('p_SFB', 'Semelle filante : largeur', 0.60, 'm', 'Donnée : 60 cm', 'Fondations'),
+    ('p_SFH', 'Semelle filante : hauteur', 0.15, 'm', 'Donnée : 15 cm', 'Fondations'),
+    ('p_FRL', 'Largeur des fouilles en rigole', '=p_SFB+0.20', 'm', 'Semelle + 10 cm de chaque côté', 'Fondations'),
     ('p_SIA', 'Semelle isolée : côté', 0.80, 'm', 'Donnée : 80 x 80 cm', 'Fondations'),
     ('p_SIH', 'Semelle isolée : hauteur', 0.30, 'm', 'Hypothèse (≥ (A-a)/4 = 0,16 m)', 'Fondations'),
     ('p_FPA', 'Fouille en puits : côté', '=p_SIA+0.20', 'm', '10 cm de jeu de chaque côté', 'Fondations'),
@@ -48,7 +48,7 @@ PARAMS = [
     # dallage
     ('p_EPDAL', 'Épaisseur du dallage', 0.20, 'm', 'Donnée : 20 cm', 'Dallage'),
     ('p_EDAL', 'Maille des armatures du dallage', 0.20, 'm', 'HA10 e = 20 cm dans les 2 sens', 'Dallage'),
-    ('p_NNAP', 'Nombre de nappes', 2, 'u', 'Donnée : double nappe HA10', 'Dallage'),
+    ('p_NNAP', 'Nombre de nappes', 1, 'u', 'Donnée : nappe simple HA10 (mettre 2 pour une double nappe)', 'Dallage'),
     ('p_RDAL', 'Majoration recouvrements dallage', 1.10, '-', '', 'Dallage'),
     ('p_NCHA', 'Chaises (distanciers) HA10 par m²', 1, 'u/m²', 'L = 0,80 m par chaise', 'Dallage'),
     ('p_EPLAT', 'Épaisseur de latérite (purge + rechargement)', 0.40, 'm', 'Mettre 0,20 si le sol a une bonne portance ; 0,40 sinon', 'Dallage'),
@@ -109,6 +109,7 @@ PRIX = [
     ('gravier', 'Gravier concassé 5/15 - 15/25', 'm³', 25000, 'Matériaux'),
     ('eau', 'Eau', 'm³', 1000, 'Matériaux'),
     ('agglo', 'Agglo 15 plein 40x20x15 rendu chantier', 'u', 500, 'Matériaux'),
+    ('agglo_cr', 'Agglo 15 creux 40x20x15 rendu chantier', 'u', 400, 'Matériaux'),
     ('ha6', 'Acier HA6 FeE500 (barre 12 m = 2,66 kg à 2 300)', 'kg', 865, 'Matériaux'),
     ('ha10', 'Acier HA10 FeE500 (barre 12 m = 7,40 kg à 6 000)', 'kg', 810, 'Matériaux'),
     ('ha12', 'Acier HA12 FeE500 (barre 12 m = 10,66 kg à 8 500)', 'kg', 800, 'Matériaux'),
@@ -175,7 +176,7 @@ ACIERS = [
     (3, 'Linteau : cadres HA6 15x40 e=15 (L = 1,00 m)', 'HA6', '=ROUNDUP((p_PL+0.80)/0.15,0)*1.00'),
     (3, 'Chaînages rampants 15x15 : 4 HA10', 'HA10', '=16*p_RAMP*1.10'),
     (3, 'Chaînages rampants : cadres HA6 e=20 (L = 0,50 m)', 'HA6', '=4*p_RAMP/0.20*0.50'),
-    (5, 'Dallage : double nappe HA10 e=20 dans les 2 sens', 'HA10', '=p_SINT*p_NNAP*2/p_EDAL*p_RDAL'),
+    (5, 'Dallage : nappe(s) HA10 e=20 dans les 2 sens', 'HA10', '=p_SINT*p_NNAP*2/p_EDAL*p_RDAL'),
     (5, 'Dallage : chaises HA10 (L = 0,80 m)', 'HA10', '=p_SINT*p_NCHA*0.80'),
 ]
 KGNAME = {'HA6': 'p_KG6', 'HA10': 'p_KG10', 'HA12': 'p_KG12'}
@@ -198,6 +199,9 @@ COFF = [c(M, 'bois', '=1'), c(M, 'pointes', '=0.15'), c(M, 'huile', '=0.10'),
 AGG = [c(M, 'agglo', '=12.5*1.05', 'Agglos 15 pleins (12,5 u/m² + 5 % casse)'), c(M, 'ciment', '=0.15'),
        c(M, 'sable', '=0.03'), c(M, 'eau', '=0.01'),
        c(O, 'mo_macon', '=1/10', 'Maçon (10 m²/j)'), c(O, 'mo_man', '=1/10', 'Manœuvre (10 m²/j)')]
+AGG_CR = [c(M, 'agglo_cr', '=12.5*1.05', 'Agglos 15 creux (12,5 u/m² + 5 % casse)'), c(M, 'ciment', '=0.13'),
+          c(M, 'sable', '=0.025'), c(M, 'eau', '=0.01'),
+          c(O, 'mo_macon', '=1/12', 'Maçon (12 m²/j)'), c(O, 'mo_man', '=1/12', 'Manœuvre (12 m²/j)')]
 
 LOTS = [
     (0, 'INSTALLATION DE CHANTIER ET TRAVAUX PRÉPARATOIRES', False),
@@ -225,7 +229,7 @@ art('0.2', 0, 'Débroussaillage et décapage de la terre végétale ép. 10 cm',
 art('0.3', 0, 'Implantation du bâtiment (chaises, cordeaux, axes et niveaux)', 'ft', '=1',
     [c(M, 'ff_implant', '=1'), c(O, 'mo_tech', '=2'), c(O, 'mo_man', '=4'), c(E, 'mt_niveau', '=2')])
 
-art('1.1', 1, 'Fouilles en rigole 0,60 x 1,20 m en terrain latéritique', 'm³', '=p_VRIG',
+art('1.1', 1, 'Fouilles en rigole 0,80 x 1,20 m en terrain latéritique', 'm³', '=p_VRIG',
     [c(O, 'mo_man', '=1/1.5', 'Manœuvre (1,5 m³/j en latérite compacte)')])
 art('1.2', 1, 'Fouilles en puits 1,00 x 1,00 x 1,20 m pour semelles isolées 80x80 (complément)', 'm³', '=p_VPUI',
     [c(O, 'mo_man', '=1/1.5', 'Manœuvre (1,5 m³/j)')])
@@ -238,7 +242,7 @@ art('1.5', 1, 'Traitement anti-termites des fonds de fouilles', 'm²', '=p_P*p_F
 
 art('2.1', 2, 'Béton de propreté dosé à 150 kg/m³, ép. 5 cm', 'm³', '=p_VPROP', beton(150, 8))
 art('2.2', 2, 'Béton armé dosé à 350 kg/m³ pour semelles isolées 0,80 x 0,80 x 0,30', 'm³', '=p_VSI', beton(350, 5))
-art('2.3', 2, 'Béton armé dosé à 350 kg/m³ pour semelle filante 0,40 x 0,15', 'm³', '=p_VSF', beton(350, 6))
+art('2.3', 2, 'Béton armé dosé à 350 kg/m³ pour semelle filante 0,60 x 0,15', 'm³', '=p_VSF', beton(350, 6))
 art('2.4', 2, 'Maçonnerie d\'agglos 15 pleins en fondation h = 1,00 m, mortier dosé à 300 kg/m³', 'm²', '=p_LNET*p_HFOND', AGG)
 art('2.11', 2, 'Béton armé dosé à 350 kg/m³ pour fûts 40 x 40 sous platines des IPE (de -0,85 à ±0,00)', 'm³', '=p_NPIL*p_AFUT*p_AFUT*p_HENT', beton(350, 4))
 art('2.12', 2, 'Fourniture et scellement des tiges d\'ancrage M20 des IPE (gabarit de pose, 4 par pilier)', 'u', '=p_NPIL*p_NTIG',
@@ -252,8 +256,8 @@ art('2.8', 2, 'Armatures HA12 FeE500 - semelles isolées 80x80 et fûts', 'kg', 
 art('2.9', 2, 'Armatures HA10 FeE500 - fondations', 'kg', acier_q(2, 'HA10'), acier('ha10'))
 art('2.10', 2, 'Armatures HA6 FeE500 - fondations', 'kg', acier_q(2, 'HA6'), acier('ha6'))
 
-art('3.1', 3, 'Maçonnerie d\'agglos 15 pleins en élévation, mortier dosé à 300 kg/m³ (y compris pignons)', 'm²',
-    '=p_LCHI*p_HM+p_PL*((p_H-p_HCH)-(p_PH+p_LINH))+2*p_PIGN', AGG)
+art('3.1', 3, 'Maçonnerie d\'agglos 15 creux en élévation h = 6,00 m, mortier dosé à 300 kg/m³ (y compris pignons)', 'm²',
+    '=p_LCHI*p_HM+p_PL*((p_H-p_HCH)-(p_PH+p_LINH))+2*p_PIGN', AGG_CR)
 art('3.2', 3, 'Béton armé dosé à 350 kg/m³ pour poteaux 15 x 15 (2 par pilier IPE), de -0,85 à +6,00', 'm³',
     '=p_NPIL*p_NPO*p_APO*p_APO*p_HPO+p_NPO*p_APO*p_APO*p_FL', beton(350, 4))
 art('3.3', 3, 'Béton armé dosé à 350 kg/m³ pour chaînage intermédiaire 15 x 20 à +3,00', 'm³', '=p_LCHI*p_BCH*p_HCH', beton(350, 5))
@@ -289,7 +293,7 @@ art('5.4', 5, 'Traitement anti-termites sous dallage', 'm²', '=p_SINT',
     [c(M, 'termite', '=1'), c(O, 'mo_man', '=1/50', 'Manœuvre (50 m²/j)')])
 art('5.5', 5, 'Film polyane 150 µ sous dallage (recouvrements 10 %)', 'm²', '=p_SINT*1.10',
     [c(M, 'polyane', '=1'), c(O, 'mo_man', '=1/150', 'Manœuvre (150 m²/j)')])
-art('5.6', 5, 'Armatures HA10 FeE500 - dallage double nappe e = 20 cm + chaises', 'kg', acier_q(5, 'HA10'), acier('ha10', 200))
+art('5.6', 5, 'Armatures HA10 FeE500 - dallage nappe simple e = 20 cm + chaises', 'kg', acier_q(5, 'HA10'), acier('ha10', 200))
 art('5.7', 5, 'Béton armé dosé à 350 kg/m³ pour dallage ép. 20 cm, vibré et surfacé', 'm³', '=p_SINT*p_EPDAL', beton(350, 8))
 art('5.8', 5, 'Joints de retrait sciés (maille 5 m) et joint périphérique', 'ml',
     '=(p_L/p_ESP-1)*(p_B-p_EP)+(ROUNDUP(p_B/p_ESP,0)-1)*(p_L-p_EP)+2*(p_L+p_B-2*p_EP)',

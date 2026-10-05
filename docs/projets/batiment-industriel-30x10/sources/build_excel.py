@@ -90,9 +90,9 @@ lignes = [
     ('Régime fiscal', ENT.IMPOT),
     ('', ''),
     ('Objet', 'Métré, déboursé sec et devis quantitatif et estimatif (DQE) d\'un bâtiment industriel 30 x 10 m, '
-              'murs en agglos 15 pleins, piliers IPE 220 tous les 5 m encadrés de 2 poteaux BA, contreventements en cornières 50x50x5, '
+              'murs en agglos 15 pleins en fondation (1 m) et 15 creux en élévation (6 m), semelle filante 60 x 15, piliers IPE 220 tous les 5 m encadrés de 2 poteaux BA, contreventements en cornières 50x50x5, '
               'entrée 6 m, toiture 2 versants à 20 %, '
-              'dallage BA 20 cm double nappe HA10, semelles isolées 80 x 80 x 30 en HA12 avec tiges d\'ancrage.'),
+              'dallage BA 20 cm nappe simple HA10, semelles isolées 80 x 80 x 30 en HA12 avec tiges d\'ancrage.'),
     ('Auteur', 'Moulo Jean Claude - Technicien Génie Civil BTP - Abidjan'),
     ('Date', '04/10/2026 - prix du marché d\'Abidjan à confirmer par cotations fournisseurs'),
     ('', ''),
@@ -121,7 +121,7 @@ lignes = [
                          'et poutre au vent dans 2 travées de toiture.'),
     ('Semelles isolées', '80 x 80 x 30 cm, fond de fouille à -1,20 m, nappe HA12 e = 15 cm dans les 2 sens, '
                          'fût BA 40 x 40 (4 HA12) jusqu\'à ±0,00 recevant les 4 tiges d\'ancrage M20 de la platine de l\'IPE.'),
-    ('Dallage', '20 cm, béton dosé à 350 kg/m³, double nappe HA10 e = 20 cm, chaises HA10, polyane, joints sciés maille 5 m.'),
+    ('Dallage', '20 cm, béton dosé à 350 kg/m³, nappe simple HA10 e = 20 cm (p_NNAP = 2 pour double nappe), chaises HA10, polyane, joints sciés maille 5 m.'),
     ('Forme', 'Purge et rechargement en latérite par couches de 20 cm compactées à 95 % OPM : 40 cm si mauvaise portance '
               '(valeur par défaut), 20 cm sinon.'),
     ('Options', 'Lots 6 à 8 (enduits, fermes + pannes Z 120x2 + tôles bacs 5 ondes, portail) chiffrés séparément.'),

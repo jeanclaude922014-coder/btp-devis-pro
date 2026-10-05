@@ -85,7 +85,7 @@ def plan():
     cote(ax, L + 2.9, 0, L + 2.9, 2.0, '2,00', vertical=True)
     cote(ax, L + 2.9, 2.0, L + 2.9, 8.0, '6,00', vertical=True)
     cote(ax, L + 2.9, 8.0, L + 2.9, B, '2,00', vertical=True)
-    ax.text(L / 2, B / 2, 'HALL INDUSTRIEL - surface utile ≈ 294 m²\nDallage BA 20 cm double nappe HA10 e = 20\n'
+    ax.text(L / 2, B / 2, 'HALL INDUSTRIEL - surface utile ≈ 294 m²\nDallage BA 20 cm nappe simple HA10 e = 20\n'
             'sur latérite compactée 2 x 20 cm', ha='center', va='center', fontsize=10, color=C_TXT, weight='bold')
     ax.plot([12.5, 12.5], [-1.0, B + 1.0], color='k', lw=1.4, ls=(0, (6, 2, 1, 2)))
     for y in (-1.0, B + 1.0):
@@ -95,7 +95,7 @@ def plan():
                 arrowprops=dict(arrowstyle='-|>', lw=1.5))
     # légende
     y0 = -3.9
-    ax.add_patch(Rectangle((0, y0 - 0.17), 0.7, 0.35, fc=C_MUR, ec='k', lw=0.6)); ax.text(0.9, y0, 'Mur agglos 15 pleins', fontsize=8, va='center')
+    ax.add_patch(Rectangle((0, y0 - 0.17), 0.7, 0.35, fc=C_MUR, ec='k', lw=0.6)); ax.text(0.9, y0, 'Mur agglos 15 (pleins fond. / creux élév.)', fontsize=8, va='center')
     ax.add_patch(Rectangle((6.2, y0 - 0.17), 0.25, 0.35, fc=C_IPE, ec='k', lw=0.6))
     ax.add_patch(Rectangle((6.5, y0 - 0.12), 0.25, 0.25, fc=C_BA, ec='k', lw=0.6))
     ax.text(6.95, y0, 'Pilier IPE 220 + 2 poteaux BA 15x15 (17 u)', fontsize=8, va='center')
@@ -155,8 +155,8 @@ def facade_long():
     for k in range(0, 62):
         ax.plot([-0.5 + k * 0.5] * 2, [5.90, 7.0], color='#6b8aa3', lw=0.3)
     ax.text(L / 2, 6.45, 'Tôles bacs 5 ondes sur pannes Z 120x2 - pente 20 % (option)', ha='center', fontsize=8, bbox=dict(fc='white', ec='none', pad=1))
-    ax.text(12.5, 1.6, 'Agglos 15 pleins', ha='center', fontsize=9)
-    ax.text(12.5, 4.4, 'Agglos 15 pleins', ha='center', fontsize=9)
+    ax.text(12.5, 1.6, 'Agglos 15 creux', ha='center', fontsize=9)
+    ax.text(12.5, 4.4, 'Agglos 15 creux', ha='center', fontsize=9)
     ax.text(12.5, -0.55, 'Fondation agglos 15 pleins h = 1,00 m', ha='center', fontsize=8, bbox=dict(fc='white', ec='none', pad=1))
     niveaux(ax, L + 1.0, [(-1.20, '-1,20 fond de fouille'), (-0.85, '-0,85 dessus semelle 80x80'),
                           (0.0, '±0,00 platines IPE'), (3.2, '+3,00/+3,20 chaînage interm.'),
@@ -202,12 +202,12 @@ def coupe():
     ax.add_patch(Rectangle((0.075, -0.40), B - 0.15, 0.20, fc=C_LAT, ec='k', lw=0.4, hatch='xx', alpha=0.8))
     ax.add_patch(Rectangle((0.075, -0.20), B - 0.15, 0.20, fc=C_LAT, ec='k', lw=0.4, hatch='..', alpha=0.8))
     ax.add_patch(Rectangle((0.075, 0.0), B - 0.15, 0.20, fc='#d0d3d4', ec='k', lw=0.6))
-    for z in (0.04, 0.16):
+    for z in (0.15, ):
         ax.plot([0.15, B - 0.15], [z, z], color='k', lw=0.7, ls=(0, (4, 1)))
     ax.plot([-2, 0], [0, 0], color='#6d4c41', lw=2); ax.plot([B, B + 2], [0, 0], color='#6d4c41', lw=2)
     for xw in (0, B):
-        ax.add_patch(Rectangle((xw - 0.30, -1.20), 0.60, 0.05, fc='#bbb', ec='k', lw=0.4))
-        ax.add_patch(Rectangle((xw - 0.20, -1.15), 0.40, 0.15, fc=C_BA, ec='k', lw=0.6))
+        ax.add_patch(Rectangle((xw - 0.40, -1.20), 0.80, 0.05, fc='#bbb', ec='k', lw=0.4))
+        ax.add_patch(Rectangle((xw - 0.30, -1.15), 0.60, 0.15, fc=C_BA, ec='k', lw=0.6))
         ax.add_patch(Rectangle((xw - 0.075, -1.00), 0.15, 1.00, fc=C_MUR, ec='k', lw=0.6, hatch='///'))
         for z0, h in ((0, 0.2), (3.0, 0.2), (5.8, 0.2)):
             ax.add_patch(Rectangle((xw - 0.075, z0), 0.15, h, fc=C_BA, ec='k', lw=0.6))
@@ -229,7 +229,7 @@ def coupe():
     ax.text(B / 2, E + 1.35, 'Fermes + pannes Z 120x2 (e ≤ 1,20 m) + tôles bacs 5 ondes (option)', ha='center', fontsize=8)
     ax.text(2.0, E + 0.55, '20 %', fontsize=9, color=C_COTE, rotation=11.3)
     ax.text(7.4, E + 0.55, '20 %', fontsize=9, color=C_COTE, rotation=-11.3)
-    ax.text(B / 2, 0.45, 'Dallage BA 20 cm - double nappe HA10 e = 20 - béton 350 kg/m³ - polyane', ha='center', fontsize=8)
+    ax.text(B / 2, 0.45, 'Dallage BA 20 cm - nappe simple HA10 e = 20 - béton 350 kg/m³ - polyane', ha='center', fontsize=8)
     ax.text(B / 2, -0.30, 'Latérite compactée 95 % OPM : 2 couches de 20 cm (1 seule si bonne portance)', ha='center', fontsize=7,
             bbox=dict(fc='white', ec='none', pad=0.5))
     cote(ax, 0, -2.0, B, -2.0, '10,00 m entre axes')
@@ -237,7 +237,7 @@ def coupe():
                           (-0.08, '±0,00'), (0.28, '+0,20 dallage'), (3.10, '+3,00'), (6.0, '+6,00'), (7.0, '+7,00 faîtage')])
     ann = [('Chaînage haut 15x20\n4 HA10 + cad. HA6 e=20', 5.9, 5.0), ('IPE 220 (portique axe 4,\nen arrière-plan)', 4.5, 3.9),
            ('Chaînage intermédiaire\n15x20 - 4 HA10', 3.1, 2.4), ('Chaînage bas 15x20\n+ arase étanche', 0.1, 1.0),
-           ('Agglos 15 pleins\nfondation h = 1,00', -0.5, -0.6), ('Semelle filante 40x15\n4 HA10 + HA6 e=20\npropreté 5 cm', -1.1, -1.9)]
+           ('Agglos 15 pleins\nfondation h = 1,00', -0.5, -0.6), ('Semelle filante 60x15\n4 HA10 + HA6 e=20\npropreté 5 cm', -1.1, -1.9)]
     for t, y, yt in ann:
         ax.annotate(t, xy=(0.0 if 'IPE' not in t else 0.18, y), xytext=(-2.7, yt), fontsize=7, arrowprops=dict(arrowstyle='->', lw=0.6))
     ax.set_xlim(-3.2, B + 3.8); ax.set_ylim(-2.5, 7.8); ax.set_aspect('equal'); ax.axis('off')
@@ -316,18 +316,18 @@ def details():
     ax.add_patch(Rectangle((0, -0.20), 1.2, 0.20, fc=C_LAT, ec='k', hatch='..', alpha=0.8))
     ax.plot([0, 1.2], [0.0, 0.0], color='#2e86c1', lw=2)
     ax.add_patch(Rectangle((0, 0.0), 1.2, 0.20, fc='#ecf0f1', ec='k', lw=1.2))
-    for z in (0.035, 0.165):
+    for z in (0.150, ):
         ax.plot([0.03, 1.17], [z, z], color='k', lw=1.2)
         for k in range(6):
             bar(ax, 0.1 + k * 0.2, z + (0.012 if z < 0.1 else -0.012), 0.008)
     for x in (0.3, 0.9):
-        ax.plot([x - 0.06, x - 0.03, x + 0.03, x + 0.06], [0.035, 0.153, 0.153, 0.035], color=C_COTE, lw=1)
-    ax.text(0.6, -0.47, 'Dallage BA 20 cm, béton 350 kg/m³ - 2 nappes HA10 e = 20 dans les 2 sens\n'
+        ax.plot([x - 0.06, x - 0.03, x + 0.03, x + 0.06], [0.0, 0.138, 0.138, 0.0], color=C_COTE, lw=1)
+    ax.text(0.6, -0.47, 'Dallage BA 20 cm, béton 350 kg/m³ - nappe simple HA10 e = 20 dans les 2 sens\n'
             'chaises HA10 (1/m²) - enrobage 3 cm - film polyane 150 µ\n'
             'Latérite par couches de 20 cm compactées à 95 % OPM (40 cm si mauvaise portance)\n'
             'Joints sciés maille 5 x 5 m, joint périphérique', ha='center', va='top', fontsize=8)
     ax.set_xlim(-0.05, 1.25); ax.set_ylim(-0.85, 0.30); ax.set_aspect('equal'); ax.axis('off')
-    ax.set_title('Dallage double nappe sur forme en latérite', fontsize=10, weight='bold')
+    ax.set_title('Dallage nappe simple sur forme en latérite', fontsize=10, weight='bold')
     # (e) contreventement
     ax = fig.add_subplot(gs[1, 2])
     ax.add_patch(Rectangle((0, 0), 0.11, 6, fc=C_IPE)); ax.add_patch(Rectangle((5 - 0.11, 0), 0.11, 6, fc=C_IPE))
@@ -339,7 +339,7 @@ def details():
             '+ poutre au vent en toiture (2 travées d\'extrémité)', ha='center', va='top', fontsize=8)
     ax.set_xlim(-0.3, 5.3); ax.set_ylim(-2.0, 6.3); ax.set_aspect('equal'); ax.axis('off')
     ax.set_title('Palée de stabilité (travée de 5,00 m)', fontsize=10, weight='bold')
-    fig.suptitle('DÉTAILS TYPE - IPE 220, poteaux BA, semelles 80x80 HA12, dallage double nappe, contreventements L50x50x5\n'
+    fig.suptitle('DÉTAILS TYPE - IPE 220, poteaux BA, semelles 80x80 HA12, dallage nappe simple, contreventements L50x50x5\n'
                  '(acier FeE500 - béton 350 kg/m³ ≈ C25/30 - BAEL 91 mod. 99 / EC2 / EC3)', fontsize=11, weight='bold')
     cartouche(fig, 'Détails', 'Échelles indicatives')
     fig.tight_layout(rect=(0, 0.03, 1, 0.94)); fig.savefig(f'{OUT}/05_details.png', dpi=200); plt.close(fig)

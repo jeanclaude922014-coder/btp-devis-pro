@@ -165,7 +165,7 @@ q = C.V
 def esquisse():
     d = new_doc('ESQUISSE', landscape=True)
     titre(d, 'ESQUISSE - BÂTIMENT INDUSTRIEL 30,00 x 10,00 m',
-          'Piliers IPE 220 tous les 5,00 m + poteaux BA - Murs en agglos 15 pleins - Dallage BA 20 cm - Toiture 2 versants pente 20 %')
+          'Piliers IPE 220 tous les 5,00 m + poteaux BA - Murs en agglos 15 pleins / creux - Dallage BA 20 cm - Toiture 2 versants pente 20 %')
     d.add_heading('1. Données du projet', 1)
     table(d, ['Paramètre', 'Valeur retenue'], [
         ['Dimensions en plan (entre axes)', '30,00 m x 10,00 m - emprise 300 m², surface utile ≈ 294 m²'],
@@ -173,11 +173,11 @@ def esquisse():
                      'et 4 tiges d\'ancrage M20 ; de part et d\'autre de chaque IPE, 2 poteaux BA 15 x 15 (4 HA10, cadres HA6)'],
         ['Contreventements', 'Cornières 50 x 50 x 5 : 4 palées verticales en croix de Saint-André (travées d\'extrémité des long pans) '
                              '+ poutre au vent en toiture dans les 2 travées d\'extrémité'],
-        ['Maçonnerie', 'Agglos 15 pleins (40 x 20 x 15) - fondation h = 1,00 m, élévation 6,00 m'],
+        ['Maçonnerie', 'Fondation : agglos 15 pleins h = 1,00 m ; élévation : agglos 15 creux h = 6,00 m (40 x 20 x 15)'],
         ['Chaînages', 'Bas (±0,00/+0,20), intermédiaire (+3,00/+3,20), haut (+5,80/+6,00) - 15 x 20, 4 HA10, cadres HA6 e = 20'],
         ['Fondations', 'Semelles isolées 80 x 80 x 30 sous piliers, fond de fouille à -1,20 m, nappe HA12 e = 15 dans les 2 sens, '
-                       'fût BA 40 x 40 (4 HA12) jusqu\'à ±0,00 ; semelle filante 40 x 15 (4 HA10) sous les murs'],
-        ['Dallage', 'Béton armé 20 cm dosé à 350 kg/m³, double nappe HA10 FeE500 e = 20 cm, polyane, joints sciés 5 x 5 m'],
+                       'fût BA 40 x 40 (4 HA12) jusqu\'à ±0,00 ; semelle filante 60 x 15 (4 HA10, répartiteurs HA6 e = 20) sous les murs'],
+        ['Dallage', 'Béton armé 20 cm dosé à 350 kg/m³, nappe simple HA10 FeE500 e = 20 cm dans les 2 sens, polyane, joints sciés 5 x 5 m'],
         ['Forme sous dallage', 'Purge et rechargement en latérite par couches de 20 cm compactées à 95 % OPM : '
                                '40 cm si le sol est de mauvaise portance, 20 cm sinon'],
         ['Entrée', 'Ouverture 6,00 m (pignon Est), portail 6,00 x 4,50 m, linteau BA 15 x 40'],
@@ -220,10 +220,10 @@ def esquisse():
         ['Pilier (17 u)', 'IPE 220, ±0,00 → +6,00', 'Platine de pied 320 x 220 x 15 + raidisseurs', 'Calage mortier sans retrait', 'S235, peint'],
         ['Poteaux BA (34 u)', '15 x 15, de -0,85 à +6,00', '4 HA10', 'Cadres HA6 e = 15 cm', 'Béton 350 kg/m³'],
         ['Contreventements', 'Croix en L 50 x 50 x 5', '4 palées + poutre au vent (2 travées)', 'Goussets 8 mm, boulons M12', 'S235, peint'],
-        ['Semelle filante', '0,40 x 0,15', '4 HA10 filants', 'Répartiteurs HA6 e = 20 cm', 'Béton 350 kg/m³'],
+        ['Semelle filante', '0,60 x 0,15', '4 HA10 filants', 'Répartiteurs HA6 e = 20 cm', 'Béton 350 kg/m³'],
         ['Chaînages bas / interm. / haut', '15 x 20', '4 HA10', 'Cadres HA6 e = 20 cm', 'Béton 350 kg/m³'],
         ['Linteau d\'entrée', '15 x 40, portée 6,00 m', '2 lits 3 HA10 (inf.) + 2 HA10 (sup.)', 'Cadres HA6 e = 15 cm', 'Béton 350 kg/m³'],
-        ['Dallage', 'ép. 20 cm, 294 m²', '2 nappes HA10 e = 20 (2 sens)', 'Chaises HA10 1/m²', 'Béton 350 kg/m³'],
+        ['Dallage', 'ép. 20 cm, 294 m²', 'Nappe simple HA10 e = 20 (2 sens)', 'Chaises HA10 1/m²', 'Béton 350 kg/m³'],
         ['Pannes (option)', 'Z 120 x 2, 12 lignes', 'Entraxe ≤ 1,20 m', 'Échantignoles boulonnées', 'Galvanisé'],
         ['Couverture (option)', '≈ 347 m²', 'Tôles bacs 5 ondulations', 'Faîtière, fixations', '-'],
     ], widths=[4.2, 4.6, 5.2, 6.2, 3.2])
@@ -239,7 +239,7 @@ def esquisse():
         ['Panne Z 120 x 2', 'qu ≈ 1,14 kN/m sur 5,00 m → M ≈ 3,6 kN·m ; W requis ≈ 15 cm³ (Z 120 x 2 : W ≈ 19 cm³)',
          'Vérifié - liernes à mi-portée'],
         ['Poteaux BA 15 x 15', '4 HA10 = 3,14 cm² → ρ = 1,4 % ; λ = 0,7 x 3,00 x √12 / 0,15 = 48,5 < 50 ; st = 15 cm ≤ 15 Øl', 'Vérifié'],
-        ['Dallage', 'Double nappe HA10 e = 20 : 3,93 cm²/m par nappe et par sens > Amin = 0,13 % x 20 x 100 = 2,6 cm²/m (EC2)', 'Vérifié'],
+        ['Dallage', 'Nappe simple HA10 e = 20 : 3,93 cm²/m par sens > Amin = 0,13 % x 20 x 100 = 2,6 cm²/m (EC2) ; nappe à 5 cm sous la face supérieure', 'Vérifié'],
         ['Linteau 6,00 m (ELU)', 'Mu ≈ 33,6 kN·m ; As = 2,33 cm² < 6 HA10 = 4,71 cm²', 'Vérifié'],
         ['Enrobage', 'Fondations 4 cm (XC2, sol latéritique humide) ; élévation et dallage 3 cm (climat tropical)', 'À respecter'],
     ], widths=[5.0, 15.0, 3.5])
