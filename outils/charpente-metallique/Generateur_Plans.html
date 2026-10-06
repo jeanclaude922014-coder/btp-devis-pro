@@ -24,7 +24,7 @@ textarea{width:100%;height:60px;font-size:11px}
 main{flex:1;min-width:0}
 .page{background:#fff;width:281mm;height:194mm;margin:0 auto 14px;padding:4mm;box-shadow:0 1px 4px rgba(0,0,0,.25);display:flex;flex-direction:column;overflow:hidden}
 .page .bandeau{background:var(--bleu);color:#fff;font-weight:bold;font-size:13px;padding:4px 8px}
-.page svg{width:100%;height:148mm;display:block}
+.page > svg{width:100%;height:148mm;display:block}
 table.cart{width:100%;border-collapse:collapse;font-size:9.5px;margin-top:2mm}
 table.cart td{border:1px solid #000;padding:2px 4px;vertical-align:middle}
 .cart .t{font-weight:bold;font-size:12px}
@@ -418,6 +418,363 @@ function P7(g){
   return v;
 }
 
+// ============================================================ planches de présentation (perspectives, éclaté, détails)
+const KG={"IPE 160":15.8,"IPE 180":18.8,"IPE 200":22.4,"IPE 220":26.2,"IPE 240":30.7,"IPE 270":36.1,"IPE 300":42.2,"IPE 330":49.1,
+ "IPE 360":57.1,"IPE 400":66.3,"IPE 450":77.6,"IPE 500":90.7,"IPE 550":106,"IPE 600":122,"HEA 140":24.7,"HEA 160":30.4,"HEA 180":35.5,
+ "HEA 200":42.3,"HEA 220":50.5,"HEA 240":60.3,"HEA 260":68.2,"HEA 280":76.4,"HEA 300":88.3,"HEA 320":97.6,"HEA 340":105,"HEA 360":112,
+ "HEA 400":125,"UPN 140":16,"L 40x4":2.42,"L 45x4.5":3.06,"L 50x5":3.77,"L 60x6":5.42,"L 70x7":7.38,"L 80x8":9.63,"L 90x9":12.2,
+ "L 100x10":15,"Z 160":4.35,"Z 200":5.2,"Z 220":6.9,"Z 250":7.6,"C 160":4.57,"C 200":5.5,"C 220":6.95,"C 250":7.6,"Rond 12":0.888,
+ "Rond 16":1.58,"Rond 20":2.47,"Rond 24":3.55,"Rond 27":4.49,"Rond 30":5.55};
+const ST={acier:"#34495E",acierC:"#8FA9BD",panne:"#5D7A91",cv:"#D35400",beton:"#BDBDBD",betonF:"#E3E3E3",betonD:"#A8A8A8",
+  toit:"#B8C6D3",toitD:"#9FB0C0",mur:"#D6DEE6",murD:"#B9C5D1",porte:"#6E7B88",agg:"#E9D8BF",aggL:"#C9A27E",rouge:"#C00000",transl:"#CFE6F7"};
+const CI=Math.cos(Math.PI/6), SI=Math.sin(Math.PI/6);
+const iso=(x,y,z)=>[(x+y)*CI,(x-y)*SI+z];
+// Figure : primitives en coordonnées « monde » 2D, rendues dans un panneau (mm)
+class Fig{
+  constructor(){this.it=[];this.b=[1e9,1e9,-1e9,-1e9];}
+  _p(p){const b=this.b;b[0]=Math.min(b[0],p[0]);b[1]=Math.min(b[1],p[1]);b[2]=Math.max(b[2],p[0]);b[3]=Math.max(b[3],p[1]);}
+  poly(pts,fill,stroke="#333",w=0.2,close=true,dash=""){pts.forEach(p=>this._p(p));this.it.push({t:"p",pts,fill,stroke,w,close,dash});}
+  line(a,b,stroke,w=0.3,dash=""){this.poly([a,b],"none",stroke,w,false,dash);}
+  circ(p,rmm,fill,stroke="#333",w=0.15){this._p(p);this.it.push({t:"c",p,r:rmm,fill,stroke,w});}
+  text(p,s,o={}){this.it.push({t:"t",p,s,o});}
+  call(p,s,dx,dy,o={}){this.it.push({t:"k",p,s,dx,dy,o});}   // étiquette avec ligne de rappel (décalage en mm)
+  render(x0,y0,w,h,pad=4){
+    const calls=this.it.filter(i=>i.t==="k"), sm=calls.length?Math.min(34,w*0.24):0;
+    const [a,b,c,d]=this.b, dx=Math.max(1e-6,c-a), dy=Math.max(1e-6,d-b), W=w-2*pad-2*sm, H=h-2*pad;
+    const s=Math.min(W/dx,H/dy), ox=x0+pad+sm+(W-s*dx)/2, oy=y0+pad+(H-s*dy)/2;
+    const X=p=>(ox+(p[0]-a)*s).toFixed(2), Y=p=>(oy+(d-p[1])*s).toFixed(2);
+    const T=(x,y,s_,o)=>`<text x="${x}" y="${y}" font-size="${o.size||2.3}" text-anchor="${o.anchor||"start"}" font-family="Arial" fill="${o.col||"#000"}"${o.bold?' font-weight="bold"':""}>${esc(s_)}</text>`;
+    // étiquettes rangées en colonnes dans les marges gauche / droite, sans chevauchement
+    for(const side of [-1,1]){
+      const L=calls.filter(i=>(i.dx<0?-1:1)===side).map(i=>{i.x1=+X(i.p); i.y1=+Y(i.p); i.yl=Math.max(y0+4,Math.min(y0+h-2,i.y1+i.dy)); return i;}).sort((u,v)=>u.yl-v.yl);
+      for(let k=1;k<L.length;k++) L[k].yl=Math.max(L[k].yl,L[k-1].yl+3.8);
+      for(let k=L.length-1;k>=0;k--){ if(L[k].yl>y0+h-2){L[k].yl=y0+h-2; if(k>0) L[k-1].yl=Math.min(L[k-1].yl,L[k].yl-3.8);} }
+    }
+    return this.it.map(i=>{
+      if(i.t==="p") return `<${i.close?"polygon":"polyline"} points="${i.pts.map(p=>X(p)+","+Y(p)).join(" ")}" fill="${i.fill}" stroke="${i.stroke}" stroke-width="${i.w}" stroke-linejoin="round" stroke-linecap="round"${i.dash?` stroke-dasharray="${i.dash}"`:""}/>`;
+      if(i.t==="c") return `<circle cx="${X(i.p)}" cy="${Y(i.p)}" r="${i.r}" fill="${i.fill}" stroke="${i.stroke}" stroke-width="${i.w}"/>`;
+      if(i.t==="t") return T((+X(i.p)+(i.o.dx||0)).toFixed(2),(+Y(i.p)+(i.o.dy||0)).toFixed(2),i.s,i.o);
+      const left=i.dx<0, size=(i.o.size||2.3), tw=i.s.length*size*0.5;
+      const xt=left?x0+2.5:x0+w-2.5, xe=left?xt+tw+1:xt-tw-1;
+      return `<circle cx="${i.x1}" cy="${i.y1}" r="0.55" fill="#000"/><polyline points="${i.x1},${i.y1} ${xe.toFixed(2)},${i.yl.toFixed(2)}" fill="none" stroke="#000" stroke-width="0.18"/>`+
+        T(xt.toFixed(2),(i.yl+0.8).toFixed(2),i.s,Object.assign({anchor:left?"start":"end",size},i.o));
+    }).join("");
+  }
+}
+function panneau(x,y,w,h,titre,contenu){
+  return `<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="#fff" stroke="#8C99A6" stroke-width="0.35"/>
+  <text x="${x+3}" y="${y+5}" font-size="3.4" font-weight="bold" font-family="Arial" fill="#1F2D3A">${esc(titre)}</text>${contenu}</g>`;
+}
+// boîte isométrique (3 faces visibles : dessus, y max, x min)
+function boite(f,x0,x1,y0,y1,z0,z1,c=[ST.betonF,ST.beton,ST.betonD],w=0.15){
+  const P=(x,y,z)=>iso(x,y,z);
+  f.poly([P(x0,y1,z0),P(x1,y1,z0),P(x1,y1,z1),P(x0,y1,z1)],c[1],"#555",w);
+  f.poly([P(x0,y0,z0),P(x0,y1,z0),P(x0,y1,z1),P(x0,y0,z1)],c[2],"#555",w);
+  f.poly([P(x0,y0,z1),P(x1,y0,z1),P(x1,y1,z1),P(x0,y1,z1)],c[0],"#555",w);
+}
+// poutrelle en I verticale (âme parallèle à y) : 3 boîtes triées par profondeur
+function poteauI(f,xc,yc,z0,z1,b,h,tf,tw){
+  const c=["#9DB2C4","#5E7A92","#425A6E"];
+  boite(f,xc-b/2,xc+b/2,yc-h/2,yc-h/2+tf,z0,z1,c,0.12);
+  boite(f,xc-tw/2,xc+tw/2,yc-h/2+tf,yc+h/2-tf,z0,z1,c,0.12);
+  boite(f,xc-b/2,xc+b/2,yc+h/2-tf,yc+h/2,z0,z1,c,0.12);
+}
+// segments 3D triés par profondeur (vue depuis x−, y+, z+)
+class Scene3D{
+  constructor(){this.s=[];}
+  seg(a,b,col,w,hi=0,dash=""){this.s.push({a,b,col,w,hi,dash,d:(a[1]+b[1])/2-(a[0]+b[0])/2+(a[2]+b[2])*0.01});}
+  draw(f){this.s.sort((u,v)=>u.d-v.d).forEach(q=>{const A=iso(...q.a),B=iso(...q.b);
+    f.line(A,B,q.col,q.w,q.dash); if(q.hi) f.line(A,B,ST.acierC,q.w*0.32);});}
+}
+// ---------------------------------------------------------- ossature 3D (option éclatée)
+function ossature(g,ex=0,f){
+  const {B,L,H,Hm,Hf,p,er,nt}=g, sc=new Scene3D(), d=+P.deb;
+  const wP=Math.max(0.55,Math.min(1.3,0.025*Math.max(B,L)))*1.0;
+  const top=(y)=>Hm+p*Math.min(y,B-y);
+  const dzP=ex*0.14*B, dxF=ex*0.16*B, dyG=ex*0.12*B;
+  const callPts={};
+  for(let i=0;i<=nt;i++){
+    const x=er*i-(i===0?dxF:0), cP=i===0&&ex?"#2C3E50":ST.acier;
+    sc.seg([x,0,0],[x,0,Hm],cP,wP,1); sc.seg([x,B,0],[x,B,Hm],cP,wP,1);
+    if(g.treil){ sc.seg([x,0,Hm],[x,B/2,Hf],cP,wP*0.8,1); sc.seg([x,B/2,Hf],[x,B,Hm],cP,wP*0.8,1); sc.seg([x,0,H],[x,B,H],cP,wP*0.7,1);
+      const a=B/Math.max(1,g.npan);
+      for(let j=1;j<g.npan;j++) sc.seg([x,j*a,H],[x,j*a,top(j*a)],cP,wP*0.3);
+      for(let j=1;j<=g.npan;j++){const y0=(j-1)*a,y1=j*a; if(j<=g.npan/2) sc.seg([x,y0,top(y0)],[x,y1,H],cP,wP*0.3); else sc.seg([x,y0,H],[x,y1,top(y1)],cP,wP*0.3);} }
+    else { sc.seg([x,0,Hm],[x,B/2,Hf],cP,wP,1); sc.seg([x,B/2,Hf],[x,B,Hm],cP,wP,1);
+      const lj=g.lj, hj=g.htrav*1.6;
+      sc.seg([x,0,H-hj],[x,lj,H+p*lj],ST.cv,wP*0.55); sc.seg([x,B,H-hj],[x,B-lj,H+p*lj],ST.cv,wP*0.55); }
+    if(g.fint) sc.seg([x,B/2,0],[x,B/2,g.treil?H:Hf],cP,wP,1);
+  }
+  callPts.poteau=[-dxF,B,Hm*0.45]; callPts.trav=[-dxF,B*0.72,top(B*0.72)]; callPts.jarret=[-dxF,B-g.lj*0.6,H+p*g.lj*0.4-g.htrav*0.6];
+  // poteaux de pignon
+  for(const x of [-dxF,L]) for(let k=1;k<g.nip;k++){const y=k*g.eppr; sc.seg([x,y,0],[x,y,top(y)],ST.acier,wP*0.8,1);}
+  callPts.pignon=[-dxF,g.eppr*Math.max(1,Math.floor(g.nip/2)),top(g.eppr*Math.max(1,Math.floor(g.nip/2)))*0.5];
+  // sablières
+  sc.seg([0,0,Hm],[L,0,Hm],ST.panne,wP*0.5); sc.seg([0,B,Hm],[L,B,Hm],ST.panne,wP*0.5);
+  // pannes
+  for(let j=0;j<g.np;j++){const y=j*(B/2)/Math.max(1,g.np-1);
+    for(const yy of [y,B-y]){const z=top(yy)+0.12+dzP; sc.seg([-d,yy,z],[L+d,yy,z],ST.panne,wP*0.38);} }
+  callPts.panne=[L*0.55,B*0.25,top(B*0.25)+0.12+dzP];
+  // lisses
+  if(g.kbard){ for(let k=0;k<g.nrows;k++){const z=g.z0+k*P.elis+0.3;
+      sc.seg([0,-0.15,z],[L,-0.15,z],ST.panne,wP*0.32); sc.seg([0,B+0.15+dyG,z],[L,B+0.15+dyG,z],ST.panne,wP*0.32);}
+    for(let k=0;k<16;k++){const z=g.z0+k*P.elis+0.3; if(z>=Hf-0.3)break; const ya=z<=Hm?0:(z-Hm)/p;
+      sc.seg([L+0.15,ya,z],[L+0.15,B-ya,z],ST.panne,wP*0.32); sc.seg([-dxF-0.15,ya,z],[-dxF-0.15,B-ya,z],ST.panne,wP*0.32);}
+    callPts.lisse=[L*0.62,B+0.15+dyG,g.z0+P.elis+0.3]; }
+  // contreventements
+  for(let m=1;m<=g.nbcv;m++){const b=bayBraced(g,m),xa=(b-1)*er,xb=b*er;
+    for(const y of [0,B]){const yy=y===B?B+dyG*0.0:y; sc.seg([xa,yy,0.1],[xb,yy,Hm-0.1],ST.cv,wP*0.4); sc.seg([xb,yy,0.1],[xa,yy,Hm-0.1],ST.cv,wP*0.4);}
+    for(const v of [0,1]) for(let r=1;r<=g.npv;r++){const ya=v*B/2+(r-1)*(B/2)/g.npv, yb=ya+(B/2)/g.npv, za=top(ya)+0.05+dzP, zb=top(yb)+0.05+dzP;
+      sc.seg([xa,ya,za],[xb,yb,zb],ST.cv,wP*0.35); sc.seg([xa,yb,zb],[xb,ya,za],ST.cv,wP*0.35);} }
+  const bb=bayBraced(g,Math.min(2,g.nbcv)); callPts.croix=[(bb-0.5)*er,B,Hm*0.5]; callPts.pav=[(bb-0.5)*er,B*0.75,top(B*0.75)+dzP];
+  // massifs
+  for(let i=0;i<=nt;i++){const x=er*i-(i===0?dxF:0); for(const y of [0,B]) boite(f,x-P.a1/2*0.8,x+P.a1/2*0.8,y-P.a1/2*0.8,y+P.a1/2*0.8,-0.45,0);}
+  callPts.platine=[-dxF,B,0];
+  sc.draw(f);
+  return callPts;
+}
+// ---------------------------------------------------------- bâtiment terminé
+function batiment(g,f){
+  const {B,L,Hm,Hf,p,er,nt}=g, d=+P.deb, I=iso, top=y=>Hm+p*Math.min(y,B-y);
+  f.poly([I(-1.5,-1.5,0),I(L+1.5,-1.5,0),I(L+1.5,B+1.5,0),I(-1.5,B+1.5,0)],"#EFEFEF","#BBB",0.15);
+  f.poly([I(L,B,0),I(L+0.25*Hm,B+0.6*Hm,0),I(0.25*Hm,B+0.6*Hm,0),I(0,B,0)],"#DADADA","none",0);   // ombre portée
+  // toiture
+  const s1=[I(-d,0,Hm),I(L+d,0,Hm),I(L+d,B/2,Hf),I(-d,B/2,Hf)], s2=[I(-d,B/2,Hf),I(L+d,B/2,Hf),I(L+d,B,Hm),I(-d,B,Hm)];
+  f.poly(s1,ST.toitD,"#556",0.25); f.poly(s2,ST.toit,"#556",0.25);
+  const pct=P.pct/100, w=pct*er;
+  if(pct>0) for(let i=1;i<=nt;i++){const xc=(i-0.5)*er; for(const [y0,y1] of [[0.4,B/2-0.3],[B/2+0.3,B-0.4]])
+    f.poly([I(xc-w/2,y0,top(y0)),I(xc+w/2,y0,top(y0)),I(xc+w/2,y1,top(y1)),I(xc-w/2,y1,top(y1))],ST.transl,"#7FA7C9",0.15);}
+  const step=Math.max(0.5,(L+2*d)/70);
+  for(let x=-d+step;x<L+d;x+=step){ f.line(I(x,0,Hm),I(x,B/2,Hf),"#8796A5",0.08); f.line(I(x,B/2,Hf),I(x,B,Hm),"#8796A5",0.1); }
+  f.line(I(-d,B/2,Hf),I(L+d,B/2,Hf),"#445",0.5);
+  // long-pan (y = B)
+  const zb=g.z0;
+  if(zb>0) f.poly([I(0,B,0),I(L,B,0),I(L,B,zb),I(0,B,zb)],ST.agg,"#7A6A55",0.2);
+  if(zb<Hm) f.poly([I(0,B,zb),I(L,B,zb),I(L,B,Hm),I(0,B,Hm)],ST.mur,"#556",0.2);
+  if(zb>0) for(let z=0.4;z<zb;z+=0.4) f.line(I(0,B,z),I(L,B,z),ST.aggL,0.08);
+  if(zb<Hm) for(let x=0.3;x<L;x+=Math.max(0.3,L/120)) f.line(I(x,B,zb),I(x,B,Hm),ST.murD,0.08);
+  // pignon (x = 0)
+  const gp=[I(0,0,0),I(0,B,0),I(0,B,Hm),I(0,B/2,Hf),I(0,0,Hm)];
+  f.poly(gp,"#C5D0DB","#556",0.2);
+  if(zb>0){ const zt=Math.min(zb,Hm); f.poly([I(0,0,0),I(0,B,0),I(0,B,zt),I(0,0,zt)],ST.agg,"#7A6A55",0.2);
+    if(g.aggFull) f.poly([I(0,0,Hm),I(0,B,Hm),I(0,B/2,Hf)],ST.agg,"#7A6A55",0.2);
+    for(let z=0.4;z<(g.aggFull?Hf:zt);z+=0.4){const ya=z<=Hm?0:(z-Hm)/p; f.line(I(0,ya,z),I(0,B-ya,z),ST.aggL,0.08);} }
+  if(g.kbard) for(let y=0.3;y<B;y+=Math.max(0.3,B/80)) f.line(I(0,y,zb),I(0,y,top(y)),"#A7B4C1",0.08);
+  // chéneau, descentes
+  f.line(I(-d,B,Hm),I(L+d,B,Hm),"#445",0.6);
+  const ns=g.ndesc/2; for(let k=1;k<=ns;k++){const x=(k-0.5)*L/ns; f.line(I(x,B+0.1,Hm),I(x,B+0.1,0.2),"#556",0.35);}
+  // portes
+  const porte=(pts,slats)=>{f.poly(pts,ST.porte,"#2D3842",0.3); slats.forEach(s=>f.line(s[0],s[1],"#56636F",0.1));};
+  for(const dd of g.doors.LP){const sl=[]; for(let z=0.25;z<dd.h;z+=0.25) sl.push([I(dd.xl,B,z),I(dd.xr,B,z)]);
+    porte([I(dd.xl,B,0),I(dd.xr,B,0),I(dd.xr,B,dd.h),I(dd.xl,B,dd.h)],sl);}
+  for(const dd of g.doors.PG){const sl=[]; for(let z=0.25;z<dd.h;z+=0.25) sl.push([I(0,dd.xl,z),I(0,dd.xr,z)]);
+    porte([I(0,dd.xl,0),I(0,dd.xr,0),I(0,dd.xr,dd.h),I(0,dd.xl,dd.h)],sl);}
+  return {toit:I(L*0.6,B*0.7,top(B*0.7)),mur:I(L*0.8,B,Hm*0.55),pignon:I(0,B*0.2,Hm*0.6),
+    porte:g.doors.LP[0]?I(g.doors.LP[0].xc,B,g.doors.LP[0].h*0.5):(g.doors.PG[0]?I(0,g.doors.PG[0].xc,g.doors.PG[0].h*0.5):null),
+    transl:pct>0?I(1.5*er,B*0.25,top(B*0.25)):null};
+}
+// ---------------------------------------------------------- plan de charpente (poster)
+function planCharpente(g,f){
+  const {B,L,er,nt}=g, u=Math.max(B,L)/60;
+  for(let i=0;i<=nt;i++) f.line([er*i,-3*u],[er*i,B+1.5*u],"#999",0.15,"2 1");
+  f.line([-3*u,0],[L+1.5*u,0],"#999",0.15,"2 1"); f.line([-3*u,B],[L+1.5*u,B],"#999",0.15,"2 1");
+  for(let j=0;j<g.np;j++){const y=j*(B/2)/Math.max(1,g.np-1); f.line([0,y],[L,y],ST.panne,0.2); f.line([0,B-y],[L,B-y],ST.panne,0.2);}
+  for(let m=1;m<=g.nbcv;m++){const b=bayBraced(g,m),xa=(b-1)*er,xb=b*er;
+    for(const v of [0,1]) for(let r=1;r<=g.npv;r++){const ya=v*B/2+(r-1)*(B/2)/g.npv, yb=ya+(B/2)/g.npv; f.line([xa,ya],[xb,yb],ST.cv,0.45); f.line([xa,yb],[xb,ya],ST.cv,0.45);}}
+  for(let i=0;i<=nt;i++) f.line([er*i,0],[er*i,B],ST.acier,0.9);
+  f.line([0,0],[L,0],ST.acier,0.6); f.line([0,B],[L,B],ST.acier,0.6); f.line([0,B/2],[L,B/2],"#444",0.4,"3 1.2");
+  for(let i=0;i<=nt;i++){ for(const y of [0,B]) f.poly([[er*i-u*0.35,y-u*0.35],[er*i+u*0.35,y-u*0.35],[er*i+u*0.35,y+u*0.35],[er*i-u*0.35,y+u*0.35]],"#2C3E50","#000",0.1);
+    f.circ([er*i,-4.5*u],1.9,"#fff","#333",0.25); f.text([er*i,-4.5*u],String(i+1),{anchor:"middle",dy:0.9,size:2.4,bold:true});
+    if(i<nt) f.text([er*(i+0.5),-2*u],f2(er),{anchor:"middle",size:2,dy:0.7}); }
+  [["A",0],["B",B]].forEach(([t,y])=>{f.circ([-4.5*u,y],1.9,"#fff","#333",0.25); f.text([-4.5*u,y],t,{anchor:"middle",dy:0.9,size:2.4,bold:true});});
+  f.text([L/2,B/2],"faîtage",{anchor:"middle",size:2,dy:-0.8,col:"#444"});
+  f.text([L/2,-7*u],"Longueur "+f2(L)+" m – "+nt+" travées de "+f2(er)+" m",{anchor:"middle",size:2.3,dy:1});
+  f.text([-6.5*u,B/2],"Portée "+f2(B),{anchor:"middle",size:2.2});
+  return {panne:[L*0.3,B*0.15],croix:[(bayBraced(g,1)-0.5)*er,B*0.3]};
+}
+// ---------------------------------------------------------- nomenclature
+function nomenclature(g){
+  const kg=n=>KG[n]||0, cvv=g.B<=20?"L 60x6":"L 70x7", cvt=g.B<=20?"L 50x5":(g.B<=30?"L 60x6":"L 70x7");
+  const ldv=Math.hypot(g.er,g.Hm), ldt=Math.hypot(g.er,g.R1/g.npv), Lp=g.L+2*P.deb;
+  const avgPig=g.nip>1?(g.Hm+g.p*(g.B/g.nip)*Math.floor(g.nip*g.nip/4)/(g.nip-1)):0;
+  const lisLP=2*g.nrows*g.L, lisPG=g.kbard?2*(g.B*(g.Hm-g.z0)+g.p*g.B*g.B/4)/P.elis:0;
+  const R=[];
+  R.push(["A","Poteaux de portique",g.ppot,2*g.N,g.Hm,kg(g.ppot)]);
+  if(g.treil){
+    const a=g.B/Math.max(1,g.npan);
+    R.push(["B","Fermes – membrures sup.",P.nacc+" "+g.pmsup,g.N,2*g.R1,kg(g.pmsup)*P.nacc]);
+    R.push(["B'","Fermes – membrures inf.",P.nacc+" "+g.pminf,g.N,g.B,kg(g.pminf)*P.nacc]);
+    R.push(["B''","Fermes – montants / diagonales","Cornières",g.N*(2*g.npan+1),Math.hypot(a,g.h0+g.p*g.B/4),4.5]);
+  } else {
+    R.push(["B","Traverses (2 versants)",g.ptrav,g.N,2*g.R1,kg(g.ptrav)]);
+    R.push(["B'","Jarrets",g.ptrav,2*g.N,g.lj,kg(g.ptrav)]);
+  }
+  R.push(["C","Poteaux de pignon",g.ppp,2*(g.nip-1),avgPig,kg(g.ppp)]);
+  R.push(["D","Pannes",g.ppanne,2*g.np,Lp,kg(g.ppanne)]);
+  if(g.kbard) R.push(["E","Lisses de bardage",g.plisse,Math.round((lisLP+lisPG)/g.er),g.er,kg(g.plisse)]);
+  R.push(["F","Croix de Saint-André",cvv,4*g.nbcv,ldv,kg(cvv)]);
+  R.push(["G","Poutre au vent",cvt,4*g.nbcv*g.npv,ldt,kg(cvt)]);
+  R.push(["H","Liernes et bretelles","Rond 12",g.nt*g.nl*2*g.np,g.epanr,0.888]);
+  R.push(["I","Platines de pied","PL 450×350×20",2*g.N,null,24.7,true]);
+  R.push(["J","Tiges d'ancrage",P.dtige,8*g.N,+P.ltige,kg(P.dtige)]);
+  R.push(["K","Boulons HR M20","HR M20",24*g.N,null,0.45,true]);
+  let tot=0; R.forEach(r=>{r.push(r[6]?r[3]*r[5]:r[3]*r[4]*r[5]); tot+=r[r.length-1];});
+  return {R,tot};
+}
+function tableNomenclature(g,x,y,w){
+  const {R,tot}=nomenclature(g), cols=[8,40,22,10,13,17], sum=cols.reduce((a,b)=>a+b), k=w/sum, rh=5.1;
+  const hdr=["Rep.","Désignation","Profil","Nb","L (m)","Poids (kg)"];
+  let o=`<rect x="${x}" y="${y}" width="${w}" height="${rh}" fill="#1F4E79"/>`, cx=x;
+  hdr.forEach((h,i)=>{o+=`<text x="${cx+1}" y="${y+3.6}" font-size="2.4" font-weight="bold" fill="#fff" font-family="Arial">${h}</text>`; cx+=cols[i]*k;});
+  R.forEach((r,j)=>{const yy=y+rh*(j+1); o+=`<rect x="${x}" y="${yy}" width="${w}" height="${rh}" fill="${j%2?"#F4F7FA":"#fff"}" stroke="#C9D1DB" stroke-width="0.15"/>`;
+    const cells=[r[0],r[1],r[2],String(Math.round(r[3])),r[4]==null?"–":f2(r[4]),Math.round(r[r.length-1]).toLocaleString("fr-FR")];
+    let cx=x; cells.forEach((c,i)=>{const right=i>=3; o+=`<text x="${right?cx+cols[i]*k-1:cx+1}" y="${yy+3.6}" font-size="2.2" text-anchor="${right?"end":"start"}" font-family="Arial">${esc(c)}</text>`; cx+=cols[i]*k;});});
+  const yt=y+rh*(R.length+1);
+  o+=`<rect x="${x}" y="${yt}" width="${w}" height="${rh}" fill="#FBE5D6" stroke="#C9D1DB" stroke-width="0.15"/>
+  <text x="${x+1}" y="${yt+3.6}" font-size="2.4" font-weight="bold" font-family="Arial">TOTAL INDICATIF (hors chutes)</text>
+  <text x="${x+w-1}" y="${yt+3.6}" font-size="2.4" font-weight="bold" text-anchor="end" font-family="Arial">${Math.round(tot).toLocaleString("fr-FR")} kg</text>
+  <text x="${x}" y="${yt+rh+3.4}" font-size="2" font-style="italic" font-family="Arial">Soit ≈ ${f1(tot/(g.B*g.L))} kg/m². Métré détaillé : feuille QUANTITATIF_CHARPENTE du classeur.</text>`;
+  return o;
+}
+// ---------------------------------------------------------- détails d'assemblage
+function detailPied(g){
+  const f=new Fig(), a=+P.a1, hs=+P.hs1, fv=+P.f1, hf=Math.min(+P.hfut,1.0), hp=g.hpot, bp=Math.min(0.3,hp*0.6);
+  const zS0=-hf-hs, zS1=-hf;
+  boite(f,-a/2,a/2,-a/2,a/2,zS0,zS1);
+  for(let k=0;k<=4;k++){const t=-a/2+0.06+k*(a-0.12)/4; f.line(iso(t,a/2,zS0+0.06),iso(t,a/2,zS0+0.2),ST.rouge,0.3); f.line(iso(-a/2,t,zS0+0.06),iso(-a/2,t,zS0+0.2),ST.rouge,0.3);}
+  f.line(iso(-a/2+0.05,a/2,zS0+0.06),iso(a/2-0.05,a/2,zS0+0.06),ST.rouge,0.35); f.line(iso(-a/2,-a/2+0.05,zS0+0.06),iso(-a/2,a/2-0.05,zS0+0.06),ST.rouge,0.35);
+  boite(f,-fv/2,fv/2,-fv/2,fv/2,zS1,0);
+  boite(f,-fv/2+0.02,fv/2-0.02,-fv/2+0.02,fv/2-0.02,0,0.03,["#D8D2C4","#C2BBA9","#ACA592"]);
+  const lp=Math.max(fv-0.04,hp+0.12), tp=0.025;
+  boite(f,-bp/2-0.06,bp/2+0.06,-lp/2,lp/2,0.03,0.03+tp,["#B7C7D4","#7F97AB","#5F778B"]);
+  const zt=0.03+tp, ta=[[-bp/2-0.03,-lp/2+0.05],[bp/2+0.03,-lp/2+0.05],[-bp/2-0.03,lp/2-0.05],[bp/2+0.03,lp/2-0.05]];
+  ta.filter(t=>t[1]<0).forEach(([x,y])=>f.line(iso(x,y,zt+0.06),iso(x,y,zt-Math.min(+P.ltige,hf)),ST.rouge,0.5));
+  poteauI(f,0,0,zt,zt+0.9,bp,hp,0.016,0.009);
+  ta.filter(t=>t[1]>0).forEach(([x,y])=>{f.line(iso(x,y,zt+0.06),iso(x,y,zt-Math.min(+P.ltige,hf)),ST.rouge,0.5); f.circ(iso(x,y,zt+0.03),0.8,"#333","#000",0.1);});
+  ta.filter(t=>t[1]<0).forEach(([x,y])=>f.circ(iso(x,y,zt+0.03),0.8,"#333","#000",0.1));
+  f.call(iso(0,hp/2,zt+0.7),"Poteau "+g.ppot,-12,-4);
+  f.call(iso(bp/2+0.06,lp/2,zt),"Platine ép. 20 mm",14,-6);
+  f.call(iso(bp/2+0.03,lp/2-0.05,zt-0.1),"Tiges d'ancrage "+P.dtige+" (×4)",14,2);
+  f.call(iso(-fv/2,fv/2-0.1,0.015),"Calage / mortier sans retrait",-10,4);
+  f.call(iso(-fv/2,0.05,-hf/2),"Fût "+Math.round(fv*100)+"×"+Math.round(fv*100),-12,2);
+  f.call(iso(-a/2,a/3,zS0+hs/2),"Semelle "+Math.round(a*100)+"×"+Math.round(a*100)+"×"+Math.round(hs*100),-8,6);
+  f.call(iso(0,a/2,zS0+0.1),"Quadrillage "+P.hasem+" e="+Math.round(P.msem*100),12,6);
+  return f;
+}
+function detailFaitage(g){
+  const f=new Fig(), h=g.treil?0.25:g.htrav, p=g.p, Lr=1.6, c=Math.cos(Math.atan(p)), s=Math.sin(Math.atan(p));
+  const band=(sg)=>{const x0=0,y0=0, dx=-sg*Lr*c, dy=-Lr*s; return [[x0,y0],[x0+dx,y0+dy],[x0+dx,y0+dy-h/c],[x0,y0-h/c]];};
+  for(const sg of [-1,1]){const b=band(sg); f.poly(b,"#7F97AB","#2C3E50",0.4);
+    const off=0.018/c; f.line([b[0][0],b[0][1]-off],[b[1][0],b[1][1]-off],"#2C3E50",0.2); f.line([b[3][0],b[3][1]+off],[b[2][0],b[2][1]+off],"#2C3E50",0.2);}
+  const hj=h*0.8; f.poly([[-0.5*c,-0.5*s-h/c],[0,-h/c-hj],[0.5*c,-0.5*s-h/c]],"#9DB2C4","#2C3E50",0.3);
+  f.poly([[-0.012,0.05],[0.012,0.05],[0.012,-h/c-hj-0.03],[-0.012,-h/c-hj-0.03]],"#425A6E","#000",0.2);
+  const n=4; for(let k=0;k<n;k++){const yy=-0.04-(k+0.5)*(h/c+hj-0.05)/n; f.circ([-0.07,yy],0.9,"#222","#000",0.1); f.circ([0.07,yy],0.9,"#222","#000",0.1);}
+  for(const sg of [-1,1]) for(let k=1;k<=3;k++) f.poly([[sg*k*0.45*c-0.04,-k*0.45*s+0.02],[sg*k*0.45*c+0.04,-k*0.45*s+0.02],[sg*k*0.45*c,-k*0.45*s+0.07]],"#5D7A91","#333",0.1);
+  f.call([-0.9*c,-0.9*s-h/(2*c)],(g.treil?"Membrure sup. ":"Traverse ")+(g.treil?P.nacc+" "+g.pmsup:g.ptrav),-6,10);
+  f.call([0.012,0.03],"Platines d'about ép. 20",10,-6);
+  f.call([0.07,-h/(2*c)],"Boulons HR M20 (×8)",14,6);
+  f.call([0.25*c,-0.25*s-h/c-hj*0.5],"Jarret de faîtage",12,10);
+  f.call([0.9*c,-0.9*s+0.07],"Pannes sur échantignoles",8,-8);
+  return f;
+}
+function detailJarret(g){
+  const f=new Fig(), hp=g.hpot, ht=g.treil?0.2:g.htrav, p=g.p, c=Math.cos(Math.atan(p)), s=Math.sin(Math.atan(p)), Lr=1.8, Hc=1.6;
+  f.poly([[0,-Hc],[hp,-Hc],[hp,0.05],[0,0.05]],"#7F97AB","#2C3E50",0.4);
+  f.line([0.016,-Hc],[0.016,0.05],"#2C3E50",0.2); f.line([hp-0.016,-Hc],[hp-0.016,0.05],"#2C3E50",0.2);
+  if(!g.treil){
+    const x0=hp+0.025, y0=0.05;
+    f.poly([[x0,y0],[x0+Lr*c,y0+Lr*s],[x0+Lr*c,y0+Lr*s-ht/c],[x0,y0-ht/c]],"#7F97AB","#2C3E50",0.4);
+    const lj=Math.min(g.lj,1.4), hj=ht*1.2;
+    f.poly([[x0,y0-ht/c],[x0+lj*c,y0+lj*s-ht/c],[x0,y0-ht/c-hj]],"#9DB2C4","#2C3E50",0.35);
+    f.poly([[hp,y0+0.03],[hp+0.025,y0+0.03],[hp+0.025,y0-ht/c-hj-0.03],[hp,y0-ht/c-hj-0.03]],"#425A6E","#000",0.2);
+    const n=5; for(let k=0;k<n;k++){const yy=y0-0.05-(k+0.5)*(ht/c+hj-0.06)/n; f.circ([hp-0.09,yy],0.9,"#222","#000",0.1);}
+    f.line([0.016,y0-ht/c],[hp-0.016,y0-ht/c],"#2C3E50",0.35); f.line([0.016,y0-ht/c-hj],[hp-0.016,y0-ht/c-hj],"#2C3E50",0.35);
+    f.call([hp/2,-Hc*0.6],"Poteau "+g.ppot,-8,6);
+    f.call([x0+Lr*0.7*c,y0+Lr*0.7*s-ht/(2*c)],"Traverse "+g.ptrav,8,-8);
+    f.call([x0+lj*0.3*c,y0+lj*0.3*s-ht/c-hj*0.3],"Jarret (L = "+f2(g.lj)+" m)",12,10);
+    f.call([hp+0.012,y0-0.1],"Platine d'about + boulons HR M20",14,-4);
+    f.call([hp/2,y0-ht/c-hj],"Raidisseurs",-12,8);
+  } else {
+    const y0=0.05, h0=Math.min(g.h0,1.2);
+    f.poly([[hp,y0-0.15],[hp+0.5,y0-0.15],[hp+0.5,y0+h0],[hp,y0+h0]],"#C9D6E0","#2C3E50",0.3);
+    f.poly([[hp,y0+h0],[hp+1.8*c,y0+h0+1.8*s],[hp+1.8*c,y0+h0+1.8*s-0.08],[hp,y0+h0-0.08]],"#7F97AB","#2C3E50",0.35);
+    f.poly([[hp,y0],[hp+1.8,y0],[hp+1.8,y0-0.07],[hp,y0-0.07]],"#7F97AB","#2C3E50",0.35);
+    f.line([hp+0.1,y0+h0-0.05],[hp+0.9,y0],"#5D7A91",1.1);
+    for(let k=0;k<4;k++) f.circ([hp+0.25,y0+0.1+k*h0/4],0.9,"#222","#000",0.1);
+    f.call([hp/2,-Hc*0.6],"Poteau "+g.ppot,-8,6);
+    f.call([hp+1.2*c,y0+h0+1.2*s],"Membrure sup. "+P.nacc+" "+g.pmsup,4,-8);
+    f.call([hp+1.4,y0-0.04],"Membrure inf. "+P.nacc+" "+g.pminf,4,8);
+    f.call([hp+0.4,y0+h0*0.4],"Gousset ép. 10 + boulons",14,-2);
+    f.call([hp+0.6,y0+0.15],"Diagonale d'about",14,6);
+  }
+  return f;
+}
+function detailContrev(g){
+  const f=new Fig(), cvv=g.B<=20?"L 60x6":"L 70x7", hp=g.hpot, ang=Math.atan2(g.Hm,g.er);
+  f.poly([[0,-1.3],[hp,-1.3],[hp,0.9],[0,0.9]],"#7F97AB","#2C3E50",0.4);
+  f.line([hp-0.016,-1.3],[hp-0.016,0.9],"#2C3E50",0.2);
+  f.poly([[hp,0.25],[hp+0.35,0.25],[hp+0.35,-0.05],[hp+0.1,-0.25],[hp,-0.25]],"#B7C7D4","#2C3E50",0.35);
+  const c=Math.cos(ang), s=Math.sin(ang), x0=hp+0.12, y0=0.12, L=1.6, w=0.07;
+  f.poly([[x0,y0],[x0+L*c,y0-L*s],[x0+L*c+w*s,y0-L*s+w*c],[x0+w*s,y0+w*c]],"#E67E22","#A04000",0.35);
+  [[0.1,0],[0.24,0]].forEach(([t])=>f.circ([x0+t*c+w*s/2,y0-t*s+w*c/2],0.9,"#222","#000",0.1));
+  f.circ([hp+0.25,0.1],0.7,"#555","#000",0.1); f.circ([hp+0.25,-0.1],0.7,"#555","#000",0.1);
+  f.call([hp/2,-0.9],"Poteau "+g.ppot,-8,4);
+  f.call([hp+0.3,0.2],"Gousset ép. 10 soudé",8,-8);
+  f.call([x0+0.9*c,y0-0.9*s+w/2],"Diagonale "+cvv+" (traction)",6,8);
+  f.call([x0+0.17*c+w*s/2,y0-0.17*s+w*c/2],"Boulons HR M16 (×2)",12,-14);
+  f.text([hp+0.9,0.8],"Croix de Saint-André – travée d'extrémité",{size:2.1,col:"#333"});
+  return f;
+}
+// ---------------------------------------------------------- pages
+function pageEnsemble(g){
+  const W=VW, H=VH, g2=3, w=(W-g2)/2, h=(H-g2)/2;
+  const f1_=new Fig(); const cb=batiment(g,f1_);
+  if(cb.toit) f1_.call(cb.toit,"Couverture bac acier "+(P.fac==="Agglos 15 creux"?"":""),14,-8);
+  f1_.call(cb.mur,P.fac==="Agglos 15 creux"?"Murs agglos 15 creux":(P.fac==="Mixte"?"Bardage sur soubassement agglos":"Bardage bac acier"),10,8);
+  f1_.call(cb.pignon,"Pignon",-10,6);
+  if(cb.porte) f1_.call(cb.porte,"Porte",-8,10);
+  if(cb.transl) f1_.call(cb.transl,"Translucides "+P.pct+" %",-12,-8);
+  const f2_=new Fig(); const cp=ossature(g,0,f2_);
+  f2_.call(iso(...cp.trav),g.treil?"Ferme treillis":"Portique principal",-14,-8);
+  f2_.call(iso(...cp.panne),"Pannes "+g.ppanne,12,-8);
+  f2_.call(iso(...cp.croix),"Croix de Saint-André",10,8);
+  if(!g.treil) f2_.call(iso(...cp.jarret),"Jarrets",-12,6);
+  f2_.call(iso(...cp.pav),"Poutre au vent",12,-2);
+  const f4=new Fig(); planCharpente(g,f4);
+  const ev3=P3(g).svg().replace("<svg ",`<svg x="2" y="${h+8}" width="${w-4}" height="${h/2-6}" preserveAspectRatio="xMidYMid meet" `);
+  const ev4=P4(g).svg().replace("<svg ",`<svg x="2" y="${h+h/2+4}" width="${w-4}" height="${h/2-6}" preserveAspectRatio="xMidYMid meet" `);
+  return {svg:()=>`<svg viewBox="0 0 ${VW} ${VH}" xmlns="http://www.w3.org/2000/svg">
+    ${panneau(0,0,w,h,"BÂTIMENT TERMINÉ",f1_.render(0,7,w,h-7,4))}
+    ${panneau(w+g2,0,w,h,"OSSATURE MÉTALLIQUE",f2_.render(w+g2,7,w,h-7,4))}
+    ${panneau(0,h+g2,w,h,"ÉLÉVATIONS LONG-PAN ET PIGNON","")}${ev3}${ev4}
+    ${panneau(w+g2,h+g2,w,h,"PLAN DE CHARPENTE DE TOITURE",f4.render(w+g2,h+g2+7,w,h-7,5))}</svg>`};
+}
+function pageEclate(g){
+  const W=VW, wl=176;
+  const f=new Fig(); const cp=ossature(g,1,f);
+  f.call(iso(...cp.poteau),"Poteau "+g.ppot,-14,4);
+  f.call(iso(...cp.trav),g.treil?"Ferme : "+P.nacc+" "+g.pmsup+" / "+P.nacc+" "+g.pminf:"Traverse "+g.ptrav,-16,-10);
+  if(!g.treil) f.call(iso(...cp.jarret),"Jarret",-14,8);
+  f.call(iso(...cp.panne),"Pannes "+g.ppanne+" ("+g.np+" par versant)",12,-10);
+  if(cp.lisse) f.call(iso(...cp.lisse),"Lisses "+g.plisse,12,8);
+  f.call(iso(...cp.croix),"Croix de Saint-André",14,10);
+  f.call(iso(...cp.pav),"Poutre au vent",14,-4);
+  f.call(iso(...cp.pignon),"Poteau de pignon "+g.ppp,-14,-6);
+  f.call(iso(...cp.platine),"Platine + tiges d'ancrage",-14,8);
+  return {svg:()=>`<svg viewBox="0 0 ${VW} ${VH}" xmlns="http://www.w3.org/2000/svg">
+    ${panneau(0,0,wl,VH,"ASSEMBLAGE ÉCLATÉ DE L'OSSATURE",f.render(0,7,wl,VH-7,5))}
+    ${panneau(wl+3,0,W-wl-3,VH,"NOMENCLATURE DES MATÉRIAUX",tableNomenclature(g,wl+5,9,W-wl-7))}</svg>`};
+}
+function pageDetails(g){
+  const g2=3, w=(VW-g2)/2, h=(VH-g2)/2;
+  const t3=g.treil?"APPUI DE FERME SUR POTEAU":"JARRET – ASSEMBLAGE POTEAU-TRAVERSE";
+  return {svg:()=>`<svg viewBox="0 0 ${VW} ${VH}" xmlns="http://www.w3.org/2000/svg">
+    ${panneau(0,0,w,h,"PIED DE POTEAU (PERSPECTIVE)",detailPied(g).render(0,7,w,h-7,8))}
+    ${panneau(w+g2,0,w,h,"ASSEMBLAGE DE FAÎTAGE",detailFaitage(g).render(w+g2,7,w,h-7,10))}
+    ${panneau(0,h+g2,w,h,t3,detailJarret(g).render(0,h+g2+7,w,h-7,10))}
+    ${panneau(w+g2,h+g2,w,h,"ATTACHE DE CONTREVENTEMENT",detailContrev(g).render(w+g2,h+g2+7,w,h-7,10))}</svg>`};
+}
+
 // ============================================================ planches + cartouches
 const LEG="Couleurs : charpente en bleu · contreventements en orange · béton en gris · aciers en rouge · maçonnerie en marron clair · cotes et baies en noir · translucides hachurés en bleu clair · remblai en latérite";
 function legende(k,g){
@@ -425,27 +782,31 @@ function legende(k,g){
     case 0: return `Poteaux de portique ■ ${g.ppot} sur semelles ${P.a1*100} × ${P.a1*100} ; poteaux de pignon ● ${g.ppp} sur semelles ${P.a2*100} × ${P.a2*100} ; semelles filantes en pointillés.`;
     case 4: return `Translucides : ${P.pct} % – skydomes : ${P.nsky} – descentes EP : ${g.ndesc} – poutre au vent : ${g.nbcv} travées – liernes : ${g.nl} ligne(s) par travée.`;
     case 5: return `Aciers : semelles isolées ${P.hasem} maille ${P.msem*100} cm ; fûts ${P.nbf} ${P.hafut} + cadres ${P.hacad} e = ${P.ecad*100} cm ; semelle filante ${P.nfil} ${P.hafil} + ${P.harep} e = ${P.erep*100} cm ; dallage ${P.ferr} ${P.hix} (X) / ${P.hiy} (Y)${g.kdbl?` + nappe sup. ${P.hsx} / ${P.hsy} + chaises`:""}, maille ${g.maille*100} cm.`;
+    case 7: return `Perspectives isométriques sans échelle. Ossature : poteaux ${g.ppot}, ${g.treil?"fermes treillis":"traverses "+g.ptrav}, pannes ${g.ppanne}, ${g.kbard?"lisses "+g.plisse+", ":""}contreventements en orange.`;
+    case 8: return `Vue éclatée : pannes et poutre au vent soulevées, portique de rive et lisses du long-pan avant écartés pour la lisibilité. Nomenclature indicative.`;
+    case 9: return `Détails types sans échelle – épaisseurs et boulonnerie à confirmer par la note de calcul des assemblages (EC3-1-8).`;
     case 6: return `Sections : chaînages ${P.bch*100} × ${P.hch*100} cm et raidisseurs ${P.brd*100} × ${P.brd*100} cm – 4 ${P.hachl} + cadres ${P.hachc} e = ${P.echc*100} cm ; linteaux idem avec appuis de 20 cm.`;
     default: return `Croix de Saint-André dans les travées d'extrémité et une travée sur 5 (${g.nbcv} travées). ${g.kbard?`Lisses ${g.plisse} e = ${f2(P.elis)} m`:"Façade maçonnée : lisses sans objet"}${g.kag?` ; maçonnerie agglos 15 creux sur ${f2(g.z0)} m.`:"."}`;
   }
 }
 const TITRES=["VUE EN PLAN – IMPLANTATION","COUPE TRANSVERSALE – PORTIQUE TYPE","ÉLÉVATION LONG-PAN","ÉLÉVATION PIGNON",
-  "VUE EN PLAN TOITURE – CALEPINAGE","COUPE DE FONDATION ET DALLAGE (DÉTAIL)","ÉLÉVATION MUR AGGLOS – PANNEAU TYPE"];
+  "VUE EN PLAN TOITURE – CALEPINAGE","COUPE DE FONDATION ET DALLAGE (DÉTAIL)","ÉLÉVATION MUR AGGLOS – PANNEAU TYPE",
+  "VUE D'ENSEMBLE – PERSPECTIVES ET PLAN DE CHARPENTE","ASSEMBLAGE ÉCLATÉ ET NOMENCLATURE","DÉTAILS D'ASSEMBLAGE"];
 let DATE=new Date().toLocaleDateString("fr-FR");
 function dessiner(){
-  const g=calc(), vues=[P1,P2,P3,P4,P5,P6,P7].map(f=>f(g));
+  const g=calc(), vues=[P1,P2,P3,P4,P5,P6,P7,pageEnsemble,pageEclate,pageDetails].map(f=>f(g)), NP=vues.length;
   const gabTxt=`Gabarit ${P.gab} : portée ${f2(g.B)} m × longueur ${f2(g.L)} m – H sablière ${f2(g.H)} m – pente ${f1(P.p)} % – ${g.systeme} – façade : ${P.fac}`;
   document.getElementById("planches").innerHTML=vues.map((v,k)=>`
   <section class="page">
-    <div class="bandeau">PLANCHE ${k+1} / 7 – ${TITRES[k]}</div>
+    <div class="bandeau">PLANCHE ${k+1} / ${NP} – ${TITRES[k]}</div>
     ${v.svg()}
     <table class="cart">
-      <tr><td colspan="3" class="t">${TITRES[k]}</td><td style="width:16%;text-align:center"><b>Planche n° ${k+1} / 7</b></td><td style="width:16%">Date : <input value="${DATE}" onchange="DATE=this.value"></td></tr>
+      <tr><td colspan="3" class="t">${TITRES[k]}</td><td style="width:16%;text-align:center"><b>Planche n° ${k+1} / ${NP}</b></td><td style="width:16%">Date : <input value="${DATE}" onchange="DATE=this.value"></td></tr>
       <tr><td colspan="3">${esc(P.projet)} – ${esc(P.lieu)} · ${esc(gabTxt)}</td><td colspan="2" class="nc">ESQUISSE NON CONTRACTUELLE</td></tr>
       <tr><td colspan="3" class="leg">${LEG}</td><td colspan="2" class="bpa">BON POUR ACCORD</td></tr>
       <tr><td colspan="3" rowspan="2" style="font-size:9px">${esc(legende(k,g))}</td><td>Date :</td><td></td></tr>
       <tr><td style="height:9mm">Signature :</td><td></td></tr>
-      <tr><td colspan="5" class="leg">Échelle automatique (même échelle en X et en Y) – cotes en mètres – EC3 / EC1 / BAEL 91 mod. 99 / EC2 – esquisse de prédimensionnement à confirmer par note de calcul.</td></tr>
+      <tr><td colspan="5" class="leg">${k>=7?"Perspectives et détails sans échelle":"Échelle automatique (même échelle en X et en Y)"} – cotes en mètres – EC3 / EC1 / BAEL 91 mod. 99 / EC2 – esquisse de prédimensionnement à confirmer par note de calcul.</td></tr>
     </table>
   </section>`).join("");
 }

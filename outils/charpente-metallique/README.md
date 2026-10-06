@@ -24,6 +24,11 @@ Deux possibilités :
    - On peut aussi saisir les paramètres directement dans le panneau de gauche.
    - Cliquer sur **« Enregistrer en PDF / Imprimer »** et choisir l'imprimante « Enregistrer au format PDF », en A4 paysage.
    - Les planches sont dessinées en vectoriel : traits nets à l'impression, hachures pour les translucides, le remblai et le sable.
+   - En plus des 7 planches techniques, le générateur produit **3 planches de présentation** (10 planches au total) :
+     - **8 – Vue d'ensemble** : bâtiment terminé en perspective (bardage ou agglos, couverture, translucides, portes, descentes EP), ossature métallique en perspective, élévations long-pan et pignon, plan de charpente de toiture avec repères de files.
+     - **9 – Assemblage éclaté** : perspective éclatée de l'ossature avec étiquettes des éléments et profilés, et nomenclature des matériaux (repère, profil, nombre, longueur, poids indicatif).
+     - **10 – Détails d'assemblage** : pied de poteau en perspective (platine, tiges d'ancrage, calage, fût, semelle ferraillée), assemblage de faîtage, jarret ou appui de ferme selon le système, attache de contreventement.
+   - Ces planches de présentation n'existent que dans le HTML : les graphiques Excel ne permettent ni faces ombrées ni perspectives.
    - Le cartouche comporte : projet, lieu, date modifiable, mention « esquisse non contractuelle », « Bon pour accord / Date / Signature ».
 
 ## Structure du classeur
