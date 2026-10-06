@@ -15,6 +15,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.comments import Comment
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.formatting.rule import FormulaRule
+from openpyxl.worksheet.pagebreak import Break
 
 from moteur import Model, absref
 import plans
@@ -24,6 +25,7 @@ import finaliser
 ACC, PAR, BP, BA = "ACCUEIL", "PARAMÈTRES", "BASE_PROFILÉS", "BASE_ACIERS"
 PRE, QC, GO, DQE = "PRÉDIMENSIONNEMENT", "QUANTITATIF_CHARPENTE", "GROS_ŒUVRE", "DQE_DEVIS"
 REC, PL, CO, CA = "RÉCAP_GABARITS", "PLANS", "COORD_PLANS", "CALC_GABARITS"
+VER = "RAPPORT_VÉRIFICATION"
 
 GABARITS = [("10 × 30", 10, 30), ("15 × 20", 15, 20), ("15 × 30", 15, 30), ("20 × 20", 20, 20),
             ("20 × 40", 20, 40), ("30 × 40", 30, 40), ("40 × 40", 40, 40)]
@@ -197,29 +199,87 @@ PROFILES = [
       [(10, 0.617), (12, 0.888), (14, 1.21), (16, 1.58), (18, 2.00), (20, 2.47), (22, 2.98), (24, 3.55),
        (27, 4.49), (30, 5.55)]],
 ]
+# Caractéristiques de section : A (cm²), Iy (cm4), W (cm3 : Wpl laminés, Wel formés à froid / cornières), iy, imin (cm)
+PROPS = {
+    "IPE 160": (20.1, 869, 124, 6.58, 1.84), "IPE 180": (23.9, 1317, 166, 7.42, 2.05),
+    "IPE 200": (28.5, 1943, 221, 8.26, 2.24), "IPE 220": (33.4, 2772, 285, 9.11, 2.48),
+    "IPE 240": (39.1, 3892, 367, 9.97, 2.69), "IPE 270": (45.9, 5790, 484, 11.2, 3.02),
+    "IPE 300": (53.8, 8356, 628, 12.5, 3.35), "IPE 330": (62.6, 11770, 804, 13.7, 3.55),
+    "IPE 360": (72.7, 16270, 1019, 15.0, 3.79), "IPE 400": (84.5, 23130, 1307, 16.5, 3.95),
+    "IPE 450": (98.8, 33740, 1702, 18.5, 4.12), "IPE 500": (116.0, 48200, 2194, 20.4, 4.31),
+    "IPE 550": (134.0, 67120, 2787, 22.3, 4.45), "IPE 600": (156.0, 92080, 3512, 24.3, 4.66),
+    "HEA 140": (31.4, 1033, 173, 5.73, 3.52), "HEA 160": (38.8, 1673, 245, 6.57, 3.98),
+    "HEA 180": (45.3, 2510, 325, 7.45, 4.52), "HEA 200": (53.8, 3692, 429, 8.28, 4.98),
+    "HEA 220": (64.3, 5410, 568, 9.17, 5.51), "HEA 240": (76.8, 7763, 745, 10.1, 6.00),
+    "HEA 260": (86.8, 10450, 920, 11.0, 6.50), "HEA 280": (97.3, 13670, 1112, 11.9, 7.00),
+    "HEA 300": (112.5, 18260, 1383, 12.7, 7.49), "HEA 320": (124.4, 22930, 1628, 13.6, 7.49),
+    "HEA 340": (133.5, 27690, 1850, 14.4, 7.46), "HEA 360": (142.8, 33090, 2088, 15.2, 7.43),
+    "HEA 400": (159.0, 45070, 2562, 16.8, 7.34),
+    "UPN 80": (11.0, 106, 31.8, 3.10, 1.33), "UPN 100": (13.5, 206, 49.0, 3.91, 1.47),
+    "UPN 120": (17.0, 364, 72.6, 4.62, 1.59), "UPN 140": (20.4, 605, 103, 5.45, 1.75),
+    "UPN 160": (24.0, 925, 138, 6.21, 1.89), "UPN 180": (28.0, 1350, 179, 6.95, 2.02),
+    "UPN 200": (32.2, 1910, 228, 7.70, 2.14), "UPN 220": (37.4, 2690, 292, 8.48, 2.30),
+    "UPN 240": (42.3, 3600, 358, 9.22, 2.42), "UPN 260": (48.3, 4820, 442, 9.99, 2.56),
+    "UPN 300": (58.8, 8030, 632, 11.7, 2.90),
+    "L 40x4": (3.08, 4.47, 1.55, 1.21, 0.78), "L 45x4.5": (3.90, 7.14, 2.20, 1.35, 0.87),
+    "L 50x5": (4.80, 11.0, 3.05, 1.51, 0.98), "L 60x6": (6.91, 22.8, 5.29, 1.82, 1.17),
+    "L 70x7": (9.40, 42.3, 8.41, 2.12, 1.36), "L 80x8": (12.3, 72.2, 12.6, 2.42, 1.55),
+    "L 90x9": (15.5, 116, 18.0, 2.73, 1.75), "L 100x10": (19.2, 177, 24.6, 3.04, 1.95),
+    "Z 120": (4.40, 100, 16.7, 4.77, 1.5), "Z 140": (4.84, 146, 20.9, 5.49, 1.6), "Z 160": (5.54, 207, 25.9, 6.11, 1.7),
+    "Z 180": (6.05, 271, 30.1, 6.69, 1.8), "Z 200": (6.62, 352, 35.2, 7.29, 1.9), "Z 220": (8.79, 524, 47.6, 7.72, 2.1),
+    "Z 250": (9.68, 705, 56.4, 8.53, 2.2),
+    "C 120": (5.00, 113, 18.8, 4.75, 1.8), "C 140": (5.40, 162, 23.1, 5.48, 1.9), "C 160": (5.82, 221, 27.6, 6.16, 2.0),
+    "C 180": (6.62, 312, 34.7, 6.87, 2.1), "C 200": (7.00, 404, 40.4, 7.60, 2.2), "C 220": (8.85, 600, 54.5, 8.23, 2.4),
+    "C 250": (9.68, 810, 64.8, 9.15, 2.5),
+}
+
+
+def props(name):
+    if name in PROPS:
+        return PROPS[name]
+    import math
+    if name.startswith("Rond "):
+        d = float(name.split()[1]) / 10
+        a = math.pi * d * d / 4
+        return (round(a, 2), round(math.pi * d ** 4 / 64, 2), round(math.pi * d ** 3 / 32, 2), d / 4, d / 4)
+    if name.startswith("Tube Ø"):
+        D, t = [float(x) / 10 for x in name[6:].split("x")]
+        a = math.pi * (D * D - (D - 2 * t) ** 2) / 4
+        i_ = math.pi * (D ** 4 - (D - 2 * t) ** 4) / 64
+        return (round(a, 2), round(i_, 1), round(i_ / (D / 2) * 1.3, 1), round((i_ / a) ** 0.5, 2), round((i_ / a) ** 0.5, 2))
+    if name.startswith("Tube "):
+        b, _, t = [float(x) / 10 for x in name[5:].split("x")]
+        a = b * b - (b - 2 * t) ** 2
+        i_ = (b ** 4 - (b - 2 * t) ** 4) / 12
+        return (round(a, 2), round(i_, 1), round(i_ / (b / 2) * 1.2, 1), round((i_ / a) ** 0.5, 2), round((i_ / a) ** 0.5, 2))
+    return (0, 0, 0, 0, 0)
+
+
 ACIERS = [("HA6", 6, 0.222), ("HA8", 8, 0.395), ("HA10", 10, 0.617), ("HA12", 12, 0.888),
           ("HA14", 14, 1.208), ("HA16", 16, 1.578), ("HA20", 20, 2.466), ("HA25", 25, 3.853)]
 
 
 def build_bases(wb):
     ws = wb.create_sheet(BP)
-    title(ws, "BASE DES PROFILÉS – poids en kg/ml", "Valeurs indicatives (catalogues usuels). "
-          "Recherche par RECHERCHEX dans toutes les feuilles. Ajouter de nouveaux profilés en fin de tableau.", 6)
-    header(ws, 4, ["Désignation", "Famille", "kg/ml", "h (mm)", "Remarque"])
+    title(ws, "BASE DES PROFILÉS – poids en kg/ml et caractéristiques de section", "Valeurs indicatives (catalogues usuels). "
+          "Recherche par RECHERCHEX dans toutes les feuilles. Ajouter de nouveaux profilés en fin de tableau.", 11)
+    header(ws, 4, ["Désignation", "Famille", "kg/ml", "h (mm)", "A (cm²)", "Iy (cm4)", "W (cm3)", "iy (cm)",
+                   "i min (cm)", "Remarque"])
     for i, (n, f, w, h) in enumerate(PROFILES):
         r = 5 + i
-        for j, v in enumerate([n, f, w, h]):
+        for j, v in enumerate([n, f, w, h, *props(n)]):
             c = ws.cell(r, 2 + j, v)
-            st(c, fmt=NF_2 if j == 2 else None)
+            st(c, fmt=NF_2 if j in (2, 4, 7, 8) else ("#,##0.0" if j in (5, 6) else None))
             c.protection = Protection(locked=False)
             c.fill = FILL(C_JAUNE)
-        st(ws.cell(r, 6), size=8)
+        st(ws.cell(r, 11), size=8)
     for r in range(5 + len(PROFILES), 201):
-        for j in range(4):
+        for j in range(9):
             c = ws.cell(r, 2 + j)
             c.protection = Protection(locked=False)
-    ws.cell(5, 6, "Membrures de treillis : poids multiplié par le nombre de cornières accolées")
-    for col, w in zip("ABCDEF", [2, 18, 30, 10, 10, 60]):
+    ws.cell(5, 11, "Membrures et diagonales de treillis : poids et section × nombre de cornières accolées")
+    ws.cell(6, 11, "W = module plastique (laminés) ou élastique (profils formés à froid, cornières) – valeurs indicatives")
+    for col, w in zip("ABCDEFGHIJK", [2, 18, 30, 9, 8, 9, 10, 9, 8, 9, 70]):
         ws.column_dimensions[col].width = w
     ws.freeze_panes = "A5"
     page_setup(ws)
@@ -477,7 +537,35 @@ def build_parametres(wb):
     P.p("chutes_ha", "Chutes sur aciers HA", 0.05, "%", "5 %")
     P.p("pct_mo", "Main d'œuvre et matériel gros œuvre (% des matériaux)", 0.40, "%", "")
 
-    P.sec("10. PRIX UNITAIRES (FCFA HT, rendu Abidjan)")
+    P.sec("10. CHARGES, MATÉRIAUX ET CRITÈRES DE VÉRIFICATION (rapport de vérification)")
+    P.p("G_couv", "Charge permanente de couverture (tôles, fixations, translucides)", 0.10, "kN/m²", "")
+    P.p("Q_toit", "Charge d'exploitation de toiture (EC1, catégorie H)", 0.40, "kN/m²", "toiture non accessible")
+    P.p("vb", "Vitesse de référence du vent", 25.0, "m/s", "à confirmer (données SODEXAM / BET) – pas de carte EC1 pour la CI")
+    P.p("ce", "Coefficient d'exposition ce(z)", 1.70, "", "catégorie de terrain III, z ≈ 8 à 10 m")
+    P.p("cp_toit", "Coefficient de pression nette en toiture (soulèvement)", 0.90, "", "cpe −0,7 et cpi +0,2")
+    P.p("cp_mur", "Coefficient de pression nette sur les parois", 1.10, "", "cpe +0,8 et cpi −0,3")
+    P.p("fy", "Limite d'élasticité acier laminé (S235)", 235, "MPa", "S235 ; 275 si S275")
+    P.p("fy_fr", "Limite d'élasticité profils formés à froid (pannes, lisses)", 350, "MPa", "S350GD")
+    P.p("E_acier", "Module d'élasticité de l'acier", 210000, "MPa", "")
+    P.p("gM0", "Coefficient partiel γM0", 1.0, "", "EC3")
+    P.p("gM1", "Coefficient partiel γM1", 1.0, "", "EC3")
+    P.p("f_pan", "Flèche limite des pannes (L / …)", 200, "", "")
+    P.p("f_lis", "Flèche limite des lisses (L / …)", 150, "", "")
+    P.p("f_trav", "Flèche limite des traverses et fermes (L / …)", 200, "", "")
+    P.p("f_pp", "Flèche limite des poteaux de pignon (h / …)", 150, "", "")
+    P.p("portee_tole", "Portée admissible des tôles (entraxe des pannes)", 1.60, "m", "selon fiche fabricant")
+    P.p("sig_adm", "Contrainte admissible du sol (latérite compactée)", 0.20, "MPa", "à confirmer par étude géotechnique")
+    P.p("k_stab", "Coefficient des actions stabilisantes (soulèvement)", 0.90, "", "EC0 – EQU")
+    P.p("g_beton", "Poids volumique du béton armé", 25.0, "kN/m³", "")
+    P.p("g_terre", "Poids volumique des terres", 18.0, "kN/m³", "")
+    P.p("g_ap", "Poids volumique maçonnerie agglos pleins", 20.0, "kN/m³", "")
+    P.p("g_ac", "Poids volumique maçonnerie agglos creux", 13.5, "kN/m³", "")
+    P.p("Q_dal", "Charge d'exploitation du dallage", 10.0, "kN/m²", "stockage / circulation légère")
+    P.p("fe", "Limite d'élasticité des aciers HA (FeE500)", 500, "MPa", "BAEL")
+    P.p("gs", "Coefficient γs des aciers", 1.15, "", "BAEL")
+    P.p("As_ch", "Section minimale des chaînages", 1.60, "cm²", "règle de bonne pratique")
+
+    P.sec("11. PRIX UNITAIRES (FCFA HT, rendu Abidjan)")
     for n, lab, v, u in [
         ("pu_acier", "Acier de charpente fourni et fabriqué", 1150, "FCFA/kg"),
         ("pu_montage", "Montage de la charpente", 250, "FCFA/kg"),
@@ -548,21 +636,21 @@ def build_parametres(wb):
 
 
 # ============================================================================= PRÉDIMENSIONNEMENT
-RULES = [  # borne sup. portée, système, poteau IPE, traverse IPE, poteau treillis, memb sup, memb inf, montants, diagonales
-    (10, "Portique IPE + jarrets", "IPE 220", "IPE 200", "HEA 180", "L 50x5", "L 45x4.5", "L 40x4", "L 40x4"),
-    (15, "Portique IPE + jarrets", "IPE 270", "IPE 240", "HEA 200", "L 60x6", "L 50x5", "L 40x4", "L 45x4.5"),
-    (20, "Portique IPE + jarrets", "IPE 330", "IPE 300", "HEA 220", "L 70x7", "L 60x6", "L 45x4.5", "L 50x5"),
-    (25, "IPE renforcé ou treillis", "IPE 400", "IPE 360", "HEA 240", "L 70x7", "L 60x6", "L 50x5", "L 50x5"),
-    (30, "IPE renforcé ou treillis", "IPE 450", "IPE 400", "HEA 260", "L 80x8", "L 70x7", "L 50x5", "L 60x6"),
-    (35, "Ferme treillis", "IPE 500", "IPE 450", "HEA 280", "L 90x9", "L 80x8", "L 50x5", "L 60x6"),
-    (40, "Ferme treillis", "IPE 550", "IPE 500", "HEA 300", "L 100x10", "L 90x9", "L 60x6", "L 70x7"),
+RULES = [  # portée ≤, système, poteau IPE, traverse IPE, poteau treillis, memb sup, memb inf, montants, diagonales, diag. d'about
+    (10, "Portique IPE + jarrets", "IPE 220", "IPE 200", "HEA 180", "L 50x5", "L 45x4.5", "L 40x4", "L 40x4", "L 45x4.5"),
+    (15, "Portique IPE + jarrets", "IPE 270", "IPE 240", "HEA 200", "L 60x6", "L 50x5", "L 40x4", "L 40x4", "L 50x5"),
+    (20, "Portique IPE + jarrets", "IPE 330", "IPE 300", "HEA 220", "L 70x7", "L 60x6", "L 45x4.5", "L 45x4.5", "L 60x6"),
+    (25, "IPE renforcé ou treillis", "IPE 400", "IPE 360", "HEA 240", "L 70x7", "L 60x6", "L 50x5", "L 50x5", "L 60x6"),
+    (30, "IPE renforcé ou treillis", "IPE 500", "IPE 450", "HEA 260", "L 80x8", "L 70x7", "L 50x5", "L 60x6", "L 70x7"),
+    (35, "Ferme treillis", "IPE 550", "IPE 450", "HEA 280", "L 90x9", "L 80x8", "L 50x5", "L 60x6", "L 70x7"),
+    (40, "Ferme treillis", "IPE 600", "IPE 500", "HEA 300", "L 100x10", "L 90x9", "L 60x6", "L 70x7", "L 80x8"),
     (50, "Ferme treillis + file intermédiaire", "IPE 600", "IPE 550", "HEA 340", "L 100x10", "L 100x10", "L 60x6",
-     "L 80x8"),
+     "L 80x8", "L 90x9"),
     (1000, "Ferme treillis + file intermédiaire", "IPE 600", "IPE 600", "HEA 400", "L 100x10", "L 100x10", "L 70x7",
-     "L 90x9"),
+     "L 90x9", "L 100x10"),
 ]
 RULES_PIG = [(6, "IPE 180"), (8, "IPE 220"), (10, "IPE 270"), (12, "IPE 300"), (1000, "IPE 360")]  # selon Hf
-RULES_PAN = [(5, "Z 160", "C 140"), (6, "Z 200", "C 160"), (7, "Z 220", "C 180"), (1000, "Z 250", "C 200")]
+RULES_PAN = [(5, "Z 160", "C 160"), (6, "Z 200", "C 200"), (7, "Z 220", "C 220"), (1000, "Z 250", "C 250")]
 
 
 def build_predim(wb):
@@ -572,9 +660,9 @@ def build_predim(wb):
           "> 30 m : ferme treillis (cornières) + alerte file intermédiaire. Valeurs de prédimensionnement à "
           "confirmer par une note de calcul EC3 / EC1 (vent).", 10)
     # --- règles
-    section(ws, 4, "A. RÈGLES DE CHOIX SELON LA PORTÉE", 2, 9)
+    section(ws, 4, "A. RÈGLES DE CHOIX SELON LA PORTÉE", 2, 10)
     header(ws, 5, ["Portée ≤ (m)", "Système indicatif", "Poteau (portique IPE)", "Traverse IPE",
-                   "Poteau (treillis)", "Membrure sup.", "Membrure inf.", "Montants", "Diagonales"])
+                   "Poteau (treillis)", "Membrure sup.", "Membrure inf.", "Montants", "Diagonales", "Diag. d'about"])
     for i, rule in enumerate(RULES):
         for j, v in enumerate(rule):
             c = ws.cell(6 + i, 2 + j, v)
@@ -680,7 +768,8 @@ def build_predim(wb):
         ("msup", "Membrures supérieures (treillis)", f'INDEX({rng("G")},{{idx_regle}})', "Tableau A – cornières accolées"),
         ("minf", "Membrures inférieures (treillis)", f'INDEX({rng("H")},{{idx_regle}})', "Tableau A – cornières accolées"),
         ("mont", "Montants (treillis)", f'INDEX({rng("I")},{{idx_regle}})', "Tableau A"),
-        ("diag", "Diagonales (treillis)", f'INDEX({rng("J")},{{idx_regle}})', "Tableau A"),
+        ("diag", "Diagonales courantes (treillis)", f'INDEX({rng("J")},{{idx_regle}})', "Tableau A – cornières accolées"),
+        ("diab", "Diagonales d'about (treillis)", f'INDEX({rng("K")},{{idx_regle}})', "Tableau A – cornières accolées"),
         ("pp", "Poteaux de pignon",
          f"INDEX('{PRE}'!$C${pg0}:$C${pg1},COUNTIF('{PRE}'!$B${pg0}:$B${pg1},\"<\"&{{Hf}})+1)", "Selon hauteur au faîtage"),
         ("pint", "Poteaux intermédiaires (file centrale)", '"HEA 200"', "Valeur proposée"),
@@ -688,8 +777,9 @@ def build_predim(wb):
          f"INDEX('{PRE}'!$G${pn0}:$G${pn1},COUNTIF('{PRE}'!$F${pn0}:$F${pn1},\"<\"&{{er}})+1)", "Selon entraxe des portiques"),
         ("lisse", "Lisses de bardage",
          f"INDEX('{PRE}'!$H${pn0}:$H${pn1},COUNTIF('{PRE}'!$F${pn0}:$F${pn1},\"<\"&{{er}})+1)", "Selon entraxe des portiques"),
-        ("cvv", "Contreventements verticaux (croix)", '"L 70x7"', "Cornière proposée"),
-        ("cvt", "Contreventements de couverture (poutre au vent)", '"L 60x6"', "Cornière proposée"),
+        ("cvv", "Contreventements verticaux (croix)", 'IF({portee}<=20,"L 60x6","L 70x7")', "Selon portée"),
+        ("cvt", "Contreventements de couverture (poutre au vent)",
+         'IF({portee}<=20,"L 50x5",IF({portee}<=30,"L 60x6","L 70x7"))', "Selon portée"),
         ("lierne", "Liernes et bretelles", '"Rond 12"', "Rond Ø12"),
         ("chev", "Chevêtres de skydome", '"L 60x6"', "Cadre en cornière"),
         ("baion", "Baïonnettes d'acrotère", '"L 50x5"', "Cornière"),
@@ -708,7 +798,7 @@ def build_predim(wb):
         M.var("auto_" + k, auto, PRE, f"C{rw}", "@")
         M.var("prof_" + k, f'IF({{force_{k}}}="",{{auto_{k}}},{{force_{k}}})', PRE, f"E{rw}", "@",
               eng=(lambda kk: (lambda gi, s: "{auto_" + kk + "}"))(k))
-        mult = "*{nb_acc}" if k in ("msup", "minf") else ""
+        mult = "*{nb_acc}" if k in ("msup", "minf", "diag", "diab") else ""
         M.var("kg_" + k, XL("{prof_" + k + "}", "D") + mult, PRE, f"F{rw}", NF_2)
         M.var("h_" + k, XL("{prof_" + k + "}", "E"), PRE, f"G{rw}", "0")
         red_if(ws, f"F{rw}", f"F{rw}=0")
@@ -733,7 +823,7 @@ def build_predim(wb):
         ws.merge_cells(start_row=rw, start_column=2, end_row=rw, end_column=10)
         M.disp(PRE, f"B{rw}", a)
         red_if(ws, f"B{rw}", f'LEFT(B{rw},6)="ALERTE"')
-    for col, w in zip("ABCDEFGHIJ", [2, 44, 20, 16, 16, 12, 12, 12, 12, 12]):
+    for col, w in zip("ABCDEFGHIJK", [2, 44, 20, 16, 16, 12, 12, 12, 12, 12, 12]):
         ws.column_dimensions[col].width = w
     ws.freeze_panes = "A4"
     page_setup(ws, rows_title="1:2")
@@ -837,9 +927,13 @@ def build_qc(wb):
     L("mont", "Ferme treillis – montants", "ml", "{prof_mont}", "{N}*{treil}*({n_pan}+1)", None,
       "{N}*{treil}*(({n_pan}+1)*{h0}+{pente}*({portee}/{ktreil_pv})*INT({n_pan}^2/4))", "{kg_mont}",
       rule="(n + 1) montants par ferme, hauteur h0 + pente × min(x ; B − x)", tag="acier")
-    L("diag", "Ferme treillis – diagonales", "ml", "{prof_diag}", "{N}*{treil}*{n_pan}",
+    L("diag", "Ferme treillis – diagonales courantes (cornières accolées)", "ml", "{prof_diag}",
+      "{N}*{treil}*MAX(0,{n_pan}-4)",
       "{treil}*SQRT(({portee}/{ktreil_pv})^2+({h0}+{pente}*{portee}/4)^2)", kgml="{kg_diag}",
-      rule="n diagonales par ferme, longueur √(pas² + h moyenne²)", tag="acier")
+      rule="(n − 4) diagonales par ferme, longueur √(pas² + h moyenne²) ; poids × cornières accolées", tag="acier")
+    L("diab", "Ferme treillis – diagonales d'about (cornières accolées)", "ml", "{prof_diab}",
+      "{N}*{treil}*MIN(4,{n_pan})", "{treil}*SQRT(({portee}/{ktreil_pv})^2+({h0}+{pente}*{portee}/{ktreil_pv})^2)",
+      kgml="{kg_diab}", rule="4 diagonales les plus sollicitées près des appuis", tag="acier")
     L("pl_pp", "Platines de pied – poteaux de portique", "u", '"PL"', "2*{N}+{n_int}", kgml="{kg_pl_pied_port}",
       rule="1 par poteau de portique ou intermédiaire", tag="acier")
     L("pl_pg", "Platines de pied – poteaux de pignon", "u", '"PL"', "{n_pp}", kgml="{kg_pl_pied_pig}",
@@ -1131,6 +1225,328 @@ def build_go(wb):
     return Lg
 
 
+# ============================================================================= RAPPORT DE VÉRIFICATION
+def XS(e):
+    """Section (cm²) d'un acier HA."""
+    keys, vals = f"'{BA}'!$B$5:$B$20", f"'{BA}'!$E$5:$E$20"
+    return (f"IFERROR(_xlfn.XLOOKUP({e},{keys},{vals}),"
+            f"IFERROR(INDEX({vals},MATCH({e},{keys},0)),0))")
+
+
+def PR(k, col):
+    """Caractéristique de section du profilé retenu k : F=A, G=Iy, H=W, I=iy, J=imin."""
+    return XL("{prof_" + k + "}", col)
+
+
+def chi(lam, alpha):
+    return (f"MIN(1,1/(0.5*(1+{alpha}*({lam}-0.2)+({lam})^2)+SQRT((0.5*(1+{alpha}*({lam}-0.2)+({lam})^2))^2-({lam})^2)))")
+
+
+def build_verif(wb):
+    ws = wb.create_sheet(VER)
+    title(ws, "RAPPORT DE VÉRIFICATION – PRÉDIMENSIONNEMENT DE LA CHARPENTE ET DES FONDATIONS",
+          "Vérifications simplifiées EC3 / EC1 / EC0 et BAEL 91 mod. 99 du gabarit actif – mises à jour automatiquement. "
+          "Elles ne remplacent pas la note de calcul d'exécution.", 10)
+    R = [4]
+
+    def row():
+        R[0] += 1
+        return R[0]
+
+    # ---- identification
+    section(ws, row(), "1. IDENTIFICATION", 2, 9)
+    for lab, val, yel in [("Projet / ouvrage", "Bâtiment industriel en charpente métallique", True),
+                          ("Lieu", "Abidjan (Côte d'Ivoire)", True), ("Établi par", "", True),
+                          ("Date", "=TODAY()", False)]:
+        r = row()
+        st(ws.cell(r, 2, lab), bold=True)
+        ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=3)
+        c = ws.cell(r, 4, val)
+        ws.merge_cells(start_row=r, start_column=4, end_row=r, end_column=10)
+        if yel:
+            yellow(c)
+        else:
+            st(c, fmt="dd/mm/yyyy", h="left")
+    r = row()
+    st(ws.cell(r, 2, "Ouvrage vérifié"), bold=True)
+    ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=3)
+    st(ws.cell(r, 4), wrap=True)
+    ws.merge_cells(start_row=r, start_column=4, end_row=r, end_column=10)
+    ws.row_dimensions[r].height = 28
+    M.disp(VER, f"D{r}", '"Gabarit "&{gab}&" – portée "&FIXED({portee},2,TRUE)&" m × longueur "&FIXED({longueur},2,TRUE)'
+           '&" m – H sablière "&FIXED({hauteur},2,TRUE)&" m – pente "&FIXED({pente}*100,1,TRUE)&" % – "&{systeme}'
+           '&" – "&{N}&" portiques à "&FIXED({er},2,TRUE)&" m – façade : "&{facade}')
+
+    # ---- hypothèses
+    R[0] += 1
+    section(ws, row(), "2. NORMES, HYPOTHÈSES ET GRANDEURS DE CALCUL", 2, 9)
+    header(ws, row(), ["Grandeur", "", "Expression", "Valeur", "", "Unité", "", "", ""])
+
+    def d(name, label, expr, unit, rule="", fmt=NF_2):
+        r = row()
+        st(ws.cell(r, 2, label))
+        ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=3)
+        st(ws.cell(r, 4, rule), size=8, italic=True)
+        st(ws.cell(r, 5), fmt=fmt, h="right", fill=C_BLEU_CLAIR)
+        st(ws.cell(r, 7, unit), size=9, h="center")
+        M.disp(VER, f"E{r}", expr, fmt)
+        M.param("v_" + name, VER, f"E{r}")
+
+    lam1 = "93.9*SQRT(235/{fy})"
+    d("qb", "Pression dynamique de référence", "0.5*1.25*{vb}^2/1000", "kN/m²", "qb = ½ ρ vb² (ρ = 1,25 kg/m³)", "0.000")
+    d("qp", "Pression dynamique de pointe", "{ce}*{v_qb}", "kN/m²", "qp = ce(z) × qb", "0.000")
+    d("wt", "Soulèvement net en toiture", "{v_qp}*{cp_toit}", "kN/m²", "w = qp × cp,net", "0.000")
+    d("wm", "Pression nette sur les parois", "{v_qp}*{cp_mur}", "kN/m²", "w = qp × cp,net", "0.000")
+    d("gp", "Poids propre d'une panne", "{kg_panne}*9.81/1000", "kN/m", "kg/ml × 9,81 / 1000", "0.000")
+    d("Gm2", "Charge permanente de toiture (couverture + pannes)", "{G_couv}+{v_gp}/{e_panr}", "kN/m²", "G + gp / entraxe", "0.000")
+    d("qG", "Portique : charge permanente linéique",
+      "{v_Gm2}*{er}+IF({treil}=1,({msup_kg}+{minf_kg}+{mont_kg}+{diag_kg}+{diab_kg})/MAX(1,{N})/{portee},{kg_trav})*9.81/1000",
+      "kN/m", "G × entraxe + poids propre traverse / ferme")
+    d("qQ", "Portique : charge d'exploitation linéique", "{Q_toit}*{er}", "kN/m", "Q × entraxe")
+    d("qW", "Portique : soulèvement linéique", "{v_wt}*{er}", "kN/m", "w × entraxe")
+    d("qu", "Portique : charge ELU", "1.35*{v_qG}+1.5*{v_qQ}", "kN/m", "1,35 G + 1,5 Q")
+    d("qs", "Portique : charge ELS", "{v_qG}+{v_qQ}", "kN/m", "G + Q")
+    d("lam1", "Élancement de référence λ1", lam1, "", "93,9 √(235 / fy)")
+    d("a", "Treillis : pas des panneaux", "{portee}/{ktreil_pv}", "m", "portée / nombre de panneaux")
+    d("Spig", "Surface d'un pignon", "{portee}*{Hm}+{pente}*{portee}^2/4", "m²", "B × Hm + pente × B² / 4")
+    d("RG", "Semelle portique : réaction permanente", "{v_qG}*{portee}/2+{kg_pot}*{Hm}*9.81/1000", "kN", "qG × B / 2 + poteau")
+    d("RQ", "Semelle portique : réaction d'exploitation", "{v_qQ}*{portee}/2", "kN", "qQ × B / 2")
+    d("RW", "Semelle portique : soulèvement au vent", "{v_qW}*{portee}/2", "kN", "qW × B / 2")
+    d("Psem", "Poids semelle + fût + terres", "({a1}^2*{h_s1}+{f1}^2*{h_fut})*{g_beton}+({a1}^2-{f1}^2)*MAX(0,{D}-{e_prop}-{h_s1})*{g_terre}",
+      "kN", "béton × 25 + terres × 18")
+    hsol = "MAX(0,{D}-{e_prop}-{h_s1})"
+    num = f"1.5*{{v_RW}}/{{k_stab}}-{{v_RG}}-{{f1}}^2*({{h_fut}}*{{g_beton}}-{hsol}*{{g_terre}})"
+    den = f"{{h_s1}}*{{g_beton}}+{hsol}*{{g_terre}}"
+    d("areq", "Côté de semelle nécessaire au soulèvement", f"CEILING(SQRT(MAX(0,{num})/({den})),0.05)", "m",
+      "a² ≥ (1,5 W / 0,9 − G − fût) / (h γb + terres γt)")
+    d("dsem", "Semelle portique : hauteur utile", "{h_s1}-{c_fond}-" + XD("{ha_sem}"), "m", "h − enrobage − Ø")
+    d("lpot", "Élancement réduit du poteau de portique",
+      "IF({treil}=1,{Hm},2*{hauteur})*100/(" + PR("pot", "I") + "*{v_lam1})", "", "Lcr = 2H (portique) ou Hm (treillis) / (iy λ1)")
+    d("lsup", "Élancement réduit de la membrure supérieure",
+      "({v_a}/COS(ATAN({pente})))*100/(" + PR("msup", "I") + "*{v_lam1})", "", "Lcr = pas des panneaux")
+    d("ld1", "Longueur de la diagonale d'about", "SQRT({v_a}^2+{h0}^2)", "m", "√(a² + h0²)")
+    d("h2", "Hauteur de ferme au 2e nœud", "{h0}+{pente}*2*{v_a}", "m", "h0 + pente × 2a")
+    d("ld3", "Longueur de la diagonale courante (3e panneau)", "SQRT({v_a}^2+{v_h2}^2)", "m", "√(a² + h2²)")
+    d("hmont", "Longueur du montant moyen", "{h0}+{pente}*{portee}/4", "m", "h0 + pente × B / 4")
+    r = row()
+    st(ws.cell(r, 2, "Combinaisons : ELU 1,35 G + 1,5 Q et G − 1,5 W (soulèvement) ; ELS G + Q. Flambement EC3 (courbes a, b, c). "
+                     "Semelles : méthode des bielles (BAEL). Déversement des pannes et lisses supposé empêché par la couverture "
+                     "et les liernes ; poteaux maintenus par les lisses."), size=8, italic=True, border=False)
+
+    # ---- vérifications
+    R[0] += 1
+    section(ws, row(), "3. VÉRIFICATIONS", 2, 9)
+    header(ws, row(), ["N°", "Vérification", "Règle / formule", "Sollicitation Ed", "Résistance / limite",
+                       "Unité", "Taux de travail", "Statut", "Recommandation si non conforme"])
+    first = R[0] + 1
+    nbx = ("ROUNDDOWN(({a1}-2*{c_fond})/{m_sem},0)+1")
+
+    def chk(no, label, rule, ed, rd, unit, cond="TRUE", reco="", custom=None):
+        r = row()
+        st(ws.cell(r, 2, no), h="center", bold=True)
+        st(ws.cell(r, 3, label), wrap=True)
+        st(ws.cell(r, 4, rule), size=8, italic=True, wrap=True)
+        st(ws.cell(r, 5), fmt="#,##0.00", h="right")
+        st(ws.cell(r, 6), fmt="#,##0.00", h="right")
+        st(ws.cell(r, 7, unit), size=9, h="center")
+        st(ws.cell(r, 8), fmt="0%", h="center", bold=True)
+        st(ws.cell(r, 9), h="center", bold=True)
+        st(ws.cell(r, 10), size=8, wrap=True)
+        ws.row_dimensions[r].height = 30
+        M.disp(VER, f"E{r}", f'IF({cond},{ed},"")')
+        M.disp(VER, f"F{r}", f'IF({cond},{rd},"")')
+        M.disp(VER, f"H{r}", '""' if custom else f'IF(AND({cond},N(F{r})>0),E{r}/F{r},"")')
+        status = custom or (f'IF(NOT({cond}),"SANS OBJET",IF(N(F{r})<=0,"À VÉRIFIER",'
+                            f'IF(E{r}/F{r}<=1,"OK","NON CONFORME")))')
+        M.disp(VER, f"I{r}", status)
+        rec = reco[1:] if reco.startswith("=") else f'"{reco}"'
+        M.disp(VER, f"J{r}", f'IF(I{r}="NON CONFORME",{rec},IF(I{r}="À VÉRIFIER","Valeur à contrôler",""))')
+
+    def sub(text):
+        r = row()
+        st(ws.cell(r, 2, text), bold=True, fill=C_BLEU_CLAIR)
+        for c in range(3, 11):
+            st(ws.cell(r, c), fill=C_BLEU_CLAIR)
+
+    E, fy, fyf = "{E_acier}", "{fy}", "{fy_fr}"
+    treil, ipe = "{treil}=1", "{treil}=0"
+    sub("A. COUVERTURE ET PANNES")
+    chk("A1", "Tôles : entraxe des pannes ≤ portée admissible", "e pannes ≤ portée admissible",
+        "{e_panr}", "{portee_tole}", "m", reco="Réduire l'entraxe des pannes ou augmenter l'épaisseur des tôles")
+    chk("A2", "Pannes : flexion ELU (charges descendantes)", "M = (1,35 G + 1,5 Q) e L² / 8 ≤ W fy / γM0",
+        "(1.35*({G_couv}*{e_panr}+{v_gp})+1.5*{Q_toit}*{e_panr})*{er}^2/8",
+        PR("panne", "H") + f"*{fyf}/1000/{{gM0}}", "kN·m", reco="Panne plus forte (forçage) ou réduire l'entraxe")
+    chk("A3", "Pannes : flexion au soulèvement (G − 1,5 W)", "M = (1,5 w e − G e − gp) L² / 8 ≤ W fy / γM0",
+        "MAX(0,1.5*{v_wt}*{e_panr}-{G_couv}*{e_panr}-{v_gp})*{er}^2/8",
+        PR("panne", "H") + f"*{fyf}/1000/{{gM0}}", "kN·m", reco="Panne plus forte ou réduire l'entraxe des pannes")
+    chk("A4", "Pannes : flèche ELS (G + Q)", "f = 5 q L⁴ / (384 E I) ≤ L / 200",
+        f"5*({{G_couv}}*{{e_panr}}+{{v_gp}}+{{Q_toit}}*{{e_panr}})*({{er}}*1000)^4/(384*{E}*" + PR("panne", "G") + "*10000)",
+        "{er}*1000/{f_pan}", "mm", reco="Panne de plus grande inertie")
+    sub("B. BARDAGE")
+    kb = "{kbard}=1"
+    chk("B1", "Lisses : flexion sous vent (1,5 W)", "M = 1,5 w e L² / 8 ≤ W fy / γM0",
+        "1.5*{v_wm}*{e_lis}*{er}^2/8", PR("lisse", "H") + f"*{fyf}/1000/{{gM0}}", "kN·m", kb,
+        "Lisse plus forte ou réduire l'entraxe des lisses")
+    chk("B2", "Lisses : flèche sous vent (ELS)", "f = 5 w e L⁴ / (384 E I) ≤ L / 150",
+        f"5*{{v_wm}}*{{e_lis}}*({{er}}*1000)^4/(384*{E}*" + PR("lisse", "G") + "*10000)", "{er}*1000/{f_lis}", "mm", kb,
+        "Lisse de plus grande inertie")
+    sub("C. PORTIQUES OU FERMES")
+    chk("C1", "Poteau de portique : flexion composée (N + M au nœud)",
+        "N / (χ A fy / γM1) + M / (Wpl fy / γM0) ≤ 1 ; M = qu B² / 12 ; Lcr = 2H",
+        "({v_qu}*{portee}/2)/(" + chi("{v_lpot}", 0.21) + "*" + PR("pot", "F") + f"*{fy}/10/{{gM1}})+({{v_qu}}*{{portee}}^2/12)/("
+        + PR("pot", "H") + f"*{fy}/1000/{{gM0}})", "1", "–", ipe, "Poteau plus fort (forçage en PRÉDIMENSIONNEMENT)")
+    chk("C2", "Traverse : moment en about de jarret", "M(x = lj) = qu (B x / 2 − x² / 2) − qu B² / 12",
+        "ABS({v_qu}*({portee}*{ratio_jarret}*{portee}/2-({ratio_jarret}*{portee})^2/2)-{v_qu}*{portee}^2/12)",
+        PR("trav", "H") + f"*{fy}/1000/{{gM0}}", "kN·m", ipe, "Traverse plus forte ou jarret plus long")
+    chk("C3", "Traverse : moment à mi-portée", "M = qu B² / 24", "{v_qu}*{portee}^2/24",
+        PR("trav", "H") + f"*{fy}/1000/{{gM0}}", "kN·m", ipe, "Traverse plus forte")
+    chk("C4", "Traverse : flèche ELS", "f ≈ qs B⁴ / (384 E I) ≤ B / 200",
+        f"{{v_qs}}*({{portee}}*1000)^4/(384*{E}*" + PR("trav", "G") + "*10000)", "{portee}*1000/{f_trav}", "mm", ipe,
+        "Traverse de plus grande inertie")
+    chk("C5", "Membrure supérieure : compression avec flambement",
+        "N = qu B² / 8 / z ≤ χ n A fy / γM1 (courbe c)",
+        "{v_qu}*{portee}^2/8/({h0}+{pente}*{portee}/2)",
+        chi("{v_lsup}", 0.49) + "*{nb_acc}*" + PR("msup", "F") + f"*{fy}/10/{{gM1}}", "kN", treil,
+        "Membrure plus forte ou ferme plus haute")
+    chk("C6", "Membrure inférieure : traction", "N = qu B² / 8 / z ≤ n A fy / γM0",
+        "{v_qu}*{portee}^2/8/({h0}+{pente}*{portee}/2)", "{nb_acc}*" + PR("minf", "F") + f"*{fy}/10/{{gM0}}", "kN", treil,
+        "Membrure inférieure plus forte")
+    chk("C7", "Diagonale d'about : compression avec flambement", "N = (qu B / 2) × ld / h0 ≤ χ n A fy / γM1",
+        "{v_qu}*{portee}/2*{v_ld1}/MAX(0.01,{h0})",
+        chi("{v_ld1}*100/(" + PR("diab", "I") + "*{v_lam1})", 0.49) + "*{nb_acc}*" + PR("diab", "F") + f"*{fy}/10/{{gM1}}",
+        "kN", treil, "Diagonales d'about plus fortes ou ferme plus haute aux appuis")
+    chk("C8", "Diagonale courante (3e panneau) : flambement", "N = qu (B / 2 − 2a) × ld / h2 ≤ χ n A fy / γM1",
+        "MAX(0,{v_qu}*({portee}/2-2*{v_a}))*{v_ld3}/{v_h2}",
+        chi("{v_ld3}*100/(" + PR("diag", "I") + "*{v_lam1})", 0.49) + "*{nb_acc}*" + PR("diag", "F") + f"*{fy}/10/{{gM1}}",
+        "kN", treil, "Diagonales courantes plus fortes")
+    chk("C9", "Montant moyen : flambement", "N = qu a ≤ χ A fy / γM1 (i min)",
+        "{v_qu}*{v_a}", chi("{v_hmont}*100/(" + PR("mont", "J") + "*{v_lam1})", 0.49) + "*" + PR("mont", "F")
+        + f"*{fy}/10/{{gM1}}", "kN", treil, "Montants plus forts")
+    chk("C10", "Poteau (ferme treillis) : compression + vent", "N / (χ A fy) + M / (Wpl fy) ≤ 1 ; M = 1,5 w e Hm² / 8",
+        "({v_qu}*{portee}/2)/(" + chi("{v_lpot}", 0.34) + "*" + PR("pot", "F") + f"*{fy}/10/{{gM1}})+(1.5*{{v_wm}}*{{er}}*{{Hm}}^2/8)/("
+        + PR("pot", "H") + f"*{fy}/1000/{{gM0}})", "1", "–", treil, "Poteau plus fort")
+    chk("C11", "Ferme : flèche ELS (inertie équivalente des membrures)", "f = 1,15 × 5 qs B⁴ / (384 E Ieq) ≤ B / 200",
+        f"1.15*5*{{v_qs}}*({{portee}}*1000)^4/(384*{E}*({{nb_acc}}*" + PR("msup", "F") + "*{nb_acc}*" + PR("minf", "F")
+        + "/({nb_acc}*" + PR("msup", "F") + "+{nb_acc}*" + PR("minf", "F") + "))*(({h0}+{pente}*{portee}/2)*100)^2*10000)",
+        "{portee}*1000/{f_trav}", "mm", treil, "Ferme plus haute ou membrures plus fortes")
+    sub("D. POTEAUX DE PIGNON")
+    kp = "{n_pp}>0"
+    chk("D1", "Poteaux de pignon : flexion sous vent", "M = 1,5 w e Hf² / 8 ≤ Wpl fy / γM0",
+        "1.5*{v_wm}*{e_ppr}*{Hf}^2/8", PR("pp", "H") + f"*{fy}/1000/{{gM0}}", "kN·m", kp, "Poteau de pignon plus fort")
+    chk("D2", "Poteaux de pignon : flèche sous vent", "f = 5 w e H⁴ / (384 E I) ≤ H / 150",
+        f"5*{{v_wm}}*{{e_ppr}}*({{Hf}}*1000)^4/(384*{E}*" + PR("pp", "G") + "*10000)", "{Hf}*1000/{f_pp}", "mm", kp,
+        "Poteau de pignon de plus grande inertie ou espacement réduit")
+    sub("E. STABILITÉ D'ENSEMBLE")
+    chk("E1", "Croix de Saint-André : traction de la diagonale",
+        "N = 1,5 w Spig / 4 / nb travées / cos α ≤ 0,85 A fy / γM0",
+        "1.5*{v_wm}*{v_Spig}/4/MAX(1,{nb_cv})/({er}/SQRT({er}^2+{Hm}^2))", "0.85*" + PR("cvv", "F") + f"*{fy}/10/{{gM0}}",
+        "kN", reco="Cornière plus forte ou travée contreventée supplémentaire")
+    chk("E2", "Poutre au vent : traction de la diagonale d'extrémité",
+        "N = (1,5 w Spig / 2) / 2 / cos β ≤ 0,85 A fy / γM0",
+        "(1.5*{v_wm}*{v_Spig}/2)/2/({er}/SQRT({er}^2+({R1}/{n_pv})^2))", "0.85*" + PR("cvt", "F") + f"*{fy}/10/{{gM0}}",
+        "kN", reco="Cornière plus forte pour la poutre au vent")
+    sub("F. FONDATIONS (sol latéritique)")
+    chk("F1", "Semelle isolée de portique : contrainte sur le sol (ELS)", "σ = (G + Q + P) / a² ≤ σ adm",
+        "({v_RG}+{v_RQ}+{v_Psem})/{a1}^2/1000", "{sig_adm}", "MPa", reco="Agrandir la semelle isolée")
+    chk("F2", "Semelle isolée de portique : soulèvement au vent", "1,5 W ≤ 0,9 (G + P)",
+        "1.5*{v_RW}", "{k_stab}*({v_RG}+{v_Psem})", "kN",
+        reco='="Porter la semelle à "&FIXED(MAX({v_areq},{a1})*100,0,TRUE)&" × "&FIXED(MAX({v_areq},{a1})*100,0,TRUE)'
+             '&" cm (h = "&FIXED({h_s1}*100,0,TRUE)&" cm) dans PARAMÈTRES, ou l\'épaissir / la relier par longrines"')
+    chk("F3", "Semelle isolée : section d'acier inférieure (méthode des bielles)",
+        "As ≥ Nu (a − b) / (8 d fe / γs) par direction",
+        "(1.35*{v_RG}+1.5*{v_RQ})*1000*({a1}-{f1})/(8*{v_dsem}*{fe}/{gs})/100", f"({nbx})*" + XS("{ha_sem}"), "cm²",
+        reco="Augmenter le diamètre ou réduire la maille du quadrillage")
+    chk("F4", "Semelle isolée : hauteur utile (rigidité, bielles)", "d ≥ (a − b) / 4",
+        "({a1}-{f1})/4", "{v_dsem}", "m", reco="Augmenter la hauteur de la semelle")
+    chk("F5", "Semelle filante : contrainte sur le sol", "σ = (maçonnerie + semelle) / b ≤ σ adm",
+        "({h_mf}*{e_mur}*{g_ap}+{h_ag}*{e_mur}*{g_ac}+{b_fil}*{h_fil}*{g_beton})/{b_fil}/1000", "{sig_adm}", "MPa",
+        reco="Élargir la semelle filante")
+    sub("G. DALLAGE ET MAÇONNERIE")
+    chk("G1", "Dallage : épaisseur minimale selon la charge", "e ≥ 15 cm (Q ≤ 10 kN/m²) ou 20 cm",
+        "IF({Q_dal}<=10,0.15,0.2)", "{e_dal}", "m", reco="Passer le dallage à 20 cm")
+    chk("G2", "Dallage : section d'acier – nappe inférieure X", "As ≥ 0,1 % × e × 1 m",
+        "{e_dal}*10", XS("{ha_ix}") + "/{maille}", "cm²/m", reco="Diamètre plus fort ou maille plus serrée")
+    chk("G3", "Dallage : section d'acier – nappe inférieure Y", "As ≥ 0,1 % × e × 1 m",
+        "{e_dal}*10", XS("{ha_iy}") + "/{maille}", "cm²/m", reco="Diamètre plus fort ou maille plus serrée")
+    chk("G4", "Chaînages : section minimale d'acier", "n × section ≥ 1,6 cm²", "{As_ch}", "{nb_chl}*" + XS("{ha_chl}"),
+        "cm²", "{kag}=1", "Augmenter le diamètre des aciers de chaînage")
+    sub("H. CONTRÔLES GÉNÉRAUX DU PROJET")
+    chk("H1", "Ratio d'acier de charpente dans la fourchette 18 à 45 kg/m²", "18 ≤ ratio ≤ 45", "{kg_m2}", "45", "kg/m²",
+        reco="Revoir le prédimensionnement (profilés, trame)",
+        custom=f'IF(AND({{kg_m2}}>=18,{{kg_m2}}<=45),"OK","NON CONFORME")')
+    chk("H2", "Pente de toiture ≥ 5 %", "pente ≥ 5 %", "0.05", "{pente}", "–", reco="Augmenter la pente")
+    chk("H3", "Épaisseur des tôles ≥ 0,40 mm (climat tropical humide)", "e ≥ 0,40 mm", "0.4", "{ep_tole}", "mm",
+        reco="Tôles de 0,45 à 0,50 mm")
+    chk("H4", "Portée > 30 m : file de poteaux intermédiaires", "file centrale si portée > 30 m", "{portee}", "30", "m",
+        reco="Prévoir une file centrale de poteaux",
+        custom='IF(OR({portee}<=30,{file_int}="Oui"),"OK","NON CONFORME")')
+    chk("H5", "Dallage de 15 cm en nappe double (peu courant)", "à éviter", "{e_dal}", "0.15", "m",
+        reco="Nappe simple en 15 cm, ou dallage de 20 cm",
+        custom='IF(AND({e_dal_c}="15 cm",{ferr}="Nappe double"),"À VÉRIFIER","OK")')
+    profs = ["pot", "trav", "pp", "panne", "lisse", "cvv", "cvt", "lierne", "bai"] + ["msup", "minf", "mont", "diag", "diab"]
+    cnt = "+".join(f"IF({{kg_{k}}}=0,1,0)" for k in profs)
+    chk("H6", "Profilés retenus présents dans BASE_PROFILÉS", "kg/ml > 0 pour chaque profilé", cnt, "1", "nb",
+        reco="Corriger le nom du profilé forcé",
+        custom=f'IF(({cnt})=0,"OK","NON CONFORME")')
+    chk("H7", "Cohérence moteur des gabarits / DQE", "écart nul", "0", "1", "–", reco="Vérifier les forçages",
+        custom="IF(LEFT('" + REC + "'!$H$13,5)=\"ÉCART\",\"À VÉRIFIER\",\"OK\")")
+    last = R[0]
+    rng = f"I{first}:I{last}"
+    for txt, color, fc in [("OK", "C6EFCE", "006100"), ("NON CONFORME", "FFC7CE", "9C0006"),
+                           ("À VÉRIFIER", "FFEB9C", "9C5700"), ("SANS OBJET", "EDEDED", "7F7F7F")]:
+        ws.conditional_formatting.add(rng, FormulaRule(formula=[f'I{first}="{txt}"'], fill=FILL(color),
+                                                       font=Font(name=FONT, bold=True, color=fc)))
+    red_if(ws, f"H{first}:H{last}", f'AND(ISNUMBER(H{first}),H{first}>1)')
+
+    # ---- synthèse
+    R[0] += 1
+    ws.row_breaks.append(Break(id=R[0]))
+    section(ws, row(), "4. SYNTHÈSE ET CONCLUSION", 2, 9)
+    for lab, f in [("Vérifications conformes", f'COUNTIF({rng},"OK")'),
+                   ("Vérifications non conformes", f'COUNTIF({rng},"NON CONFORME")'),
+                   ("Points à vérifier", f'COUNTIF({rng},"À VÉRIFIER")'),
+                   ("Sans objet pour ce projet", f'COUNTIF({rng},"SANS OBJET")')]:
+        r = row()
+        st(ws.cell(r, 2, lab), bold=True)
+        ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=4)
+        st(ws.cell(r, 5), bold=True, h="center", fmt="0")
+        M.disp(VER, f"E{r}", f)
+        if "non conformes" in lab:
+            red_if(ws, f"E{r}", f"E{r}>0")
+            nc = f"E{r}"
+        if "vérifier" in lab:
+            av = f"E{r}"
+    r = row()
+    ws.merge_cells(start_row=r, start_column=2, end_row=r + 2, end_column=10)
+    st(ws.cell(r, 2), bold=True, wrap=True)
+    for rr in (r + 1, r + 2):
+        ws.row_dimensions[rr].height = 18
+    M.disp(VER, f"B{r}",
+           f'IF({nc}=0,IF({av}=0,"CONCLUSION : toutes les vérifications simplifiées sont satisfaites pour le gabarit "&{{gab}}'
+           f'&". Le prédimensionnement est cohérent ; il reste à établir la note de calcul d\'exécution (EC3 / EC1 / BAEL).",'
+           f'"CONCLUSION : vérifications satisfaites, "&{av}&" point(s) à contrôler (voir colonne Recommandation)."),'
+           f'"CONCLUSION : "&{nc}&" vérification(s) NON CONFORME(S). Appliquer les recommandations (forçage des profilés en '
+           f'PRÉDIMENSIONNEMENT, dimensions des fondations en PARAMÈTRES) puis relire ce rapport.")')
+    red_if(ws, f"B{r}", f"{nc}>0")
+    R[0] += 3
+    R[0] += 1
+    r = row()
+    for c0, c1, lab in [(2, 4, "Établi par (nom, date, signature) :"), (5, 7, "Vérifié par :"),
+                        (8, 10, "Visa / Bon pour accord :")]:
+        st(ws.cell(r, c0, lab), bold=True)
+        ws.merge_cells(start_row=r, start_column=c0, end_row=r, end_column=c1)
+        ws.merge_cells(start_row=r + 1, start_column=c0, end_row=r + 3, end_column=c1)
+        st(ws.cell(r + 1, c0))
+    for rr in range(r, r + 4):
+        for cc in range(2, 11):
+            ws.cell(rr, cc).border = BORDER
+    for col, w in zip("ABCDEFGHIJ", [2, 6, 44, 38, 13, 13, 8, 10, 15, 42]):
+        ws.column_dimensions[col].width = w
+    ws.freeze_panes = "A4"
+    page_setup(ws, rows_title="1:2")
+    ws.page_setup.orientation = "landscape"
+
+
 # ============================================================================= DQE
 def build_dqe(wb):
     ws = wb.create_sheet(DQE)
@@ -1412,6 +1828,8 @@ def build_accueil(ws, G_RANGE, alerts):
                            "aucune macro, compatible Excel mobile (Microsoft 365).",
                            "Classeur entièrement modifiable (aucune protection). Saisir de préférence dans les cellules jaunes : "
                            "les autres cellules contiennent les formules de calcul.",
+                           "RAPPORT_VÉRIFICATION : contrôles automatiques EC3 / EC1 / BAEL du gabarit actif "
+                           "(synthèse, recommandations, visa) – imprimable en PDF.",
                            "PDF des plans : feuille PLANS > Fichier > Enregistrer sous > PDF, ou générateur Generateur_Plans.html "
                            "(coller le CODE PLANS ci-dessous puis « Enregistrer en PDF ».",
                            "Estimation de prédimensionnement : à confirmer par une note de calcul (EC3 / EC1 / BAEL) avant exécution."]):
@@ -1485,13 +1903,14 @@ def main(out, gabarit="20 × 40", recalc=True, plans_seuls=False, params=None, p
     build_qc(wb)
     build_go(wb)
     build_dqe(wb)
+    build_verif(wb)
     assign_erows()
     build_recap(wb)
     build_accueil(acc, G_RANGE, alerts)
     plans.build(wb, M, dict(PL=PL, CO=CO, PAR=PAR), st, section, page_setup, protect)
     build_engine(wb)
     write_all(wb)
-    order = [ACC, PAR, BP, BA, PRE, QC, GO, DQE, REC, PL, CO, CA]
+    order = [ACC, PAR, BP, BA, PRE, QC, GO, DQE, REC, VER, PL, CO, CA]
     wb._sheets = [wb[n] for n in order]
     for n in order:
         if proteger and n != CA:
@@ -1507,10 +1926,11 @@ def main(out, gabarit="20 × 40", recalc=True, plans_seuls=False, params=None, p
         sh, co = M.params[name].replace("$", "").split("!")
         wb[sh.strip("'")][co].value = val
     if plans_seuls:
+        seule = plans_seuls if isinstance(plans_seuls, str) else PL
         for n in order:
-            if n != PL:
+            if n != seule:
                 wb[n].sheet_state = "hidden"
-        wb.active = order.index(PL)
+        wb.active = order.index(seule)
     wb.save(out)
     print("Classeur écrit :", out, "–", len(M.vars), "variables moteur")
     return finaliser.finaliser(out, recalc)
@@ -1525,6 +1945,7 @@ if __name__ == "__main__":
     ap.add_argument("--plans-seuls", action="store_true", help="(test) masque les autres feuilles")
     ap.add_argument("--param", action="append", default=[], help="(test) nom=valeur")
     ap.add_argument("--proteger", action="store_true", help="protège les feuilles (seules les cellules jaunes restent modifiables)")
+    ap.add_argument("--feuille-seule", default=None, help="(test) masque toutes les autres feuilles")
     a = ap.parse_args()
     pv = {}
     for kv in a.param:
@@ -1534,4 +1955,4 @@ if __name__ == "__main__":
         except ValueError:
             pass
         pv[k] = v
-    main(a.sortie, a.gabarit, not a.sans_recalcul, a.plans_seuls, pv, a.proteger)
+    main(a.sortie, a.gabarit, not a.sans_recalcul, a.feuille_seule or a.plans_seuls, pv, a.proteger)

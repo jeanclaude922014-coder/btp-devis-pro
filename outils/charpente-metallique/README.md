@@ -39,6 +39,7 @@ Deux possibilités :
 | GROS_ŒUVRE | Terrassements, semelles isolées et filantes, maçonnerie de fondation, dallage, variante agglos, récapitulatif des matériaux |
 | DQE_DEVIS | 5 lots, TOTAL HT, TVA = HT × 0,18, TOTAL TTC |
 | RÉCAP_GABARITS | Comparatif des 7 gabarits et contrôle de cohérence avec le DQE |
+| RAPPORT_VÉRIFICATION | Rapport de vérification automatique du gabarit actif (EC3 / EC1 / BAEL), imprimable en PDF |
 | PLANS | 7 planches A4 paysage avec cartouche (imprimables en PDF) |
 | COORD_PLANS (masquée) | Coordonnées des esquisses, calculées par formules |
 | CALC_GABARITS (masquée) | Moteur de calcul des 7 gabarits × 3 scénarios de façade (paramétrage, bardage, agglos) |
@@ -66,23 +67,54 @@ Hypothèses : paramètres par défaut, à savoir :
 - remblai latérite de 20 cm ;
 - prix unitaires par défaut.
 
-| Gabarit | Système | Acier (t) | kg/m² | Béton (m³) | Aciers HA (kg) | Coût HT (FCFA) | HT / m² |
-|---|---|---:|---:|---:|---:|---:|---:|
-| 10 × 30 | Portique IPE + jarrets | 10,27 | 34,2 | 79,15 | 2 577 | 42 081 885 | 140 273 |
-| 15 × 20 | Portique IPE + jarrets | 11,54 | 38,5 | 76,90 | 2 539 | 43 222 389 | 144 075 |
-| 15 × 30 | Portique IPE + jarrets | 14,31 | 31,8 | 110,92 | 3 663 | 56 330 713 | 125 179 |
-| 20 × 20 | Portique IPE + jarrets | 16,05 | 40,1 | 98,68 | 3 257 | 56 397 658 | 140 994 |
-| 20 × 40 | Portique IPE + jarrets | 25,99 | 32,5 | 188,04 | 6 214 | 94 639 719 | 118 300 |
-| 30 × 40 | Portique IPE renforcé | 44,99 | 37,5 | 271,16 | 8 993 | 146 690 704 | 122 242 |
-| 40 × 40 | Ferme treillis (alerte file centrale) | 62,38 | 39,0 | 354,71 | 11 800 | 197 677 967 | 123 549 |
-| Réf. 40 × 48 (PERSONNALISÉ) | Ferme treillis | 69,37 | 36,1 | 422,19 | 14 011 | 224 723 927 | 117 044 |
+| Gabarit | Système | Acier (t) | kg/m² | Béton (m³) | Aciers HA (kg) | Coût HT (FCFA) | HT / m² | Rapport : non conformes |
+|---|---|---:|---:|---:|---:|---:|---:|---|
+| 10 × 30 | Portique IPE + jarrets | 10,30 | 34,3 | 79,15 | 2 577 | 42 132 082 | 140 440 | aucune |
+| 15 × 20 | Portique IPE + jarrets | 11,32 | 37,7 | 76,90 | 2 539 | 42 818 820 | 142 729 | aucune |
+| 15 × 30 | Portique IPE + jarrets | 14,35 | 31,9 | 110,92 | 3 663 | 56 405 084 | 125 345 | aucune |
+| 20 × 20 | Portique IPE + jarrets | 15,82 | 39,5 | 98,68 | 3 257 | 55 974 805 | 139 937 | aucune |
+| 20 × 40 | Portique IPE + jarrets | 25,90 | 32,4 | 188,04 | 6 214 | 94 472 975 | 118 091 | F2 (soulèvement) |
+| 30 × 40 | Portique IPE renforcé | 50,38 | 42,0 | 271,16 | 8 993 | 156 510 161 | 130 425 | F2 |
+| 40 × 40 | Ferme treillis | 68,32 | 42,7 | 354,71 | 11 800 | 208 484 744 | 130 303 | F2, H4 (file centrale) |
+| Réf. 40 × 48 (PERSONNALISÉ) | Ferme treillis | 75,85 | 39,5 | 422,19 | 14 011 | 236 519 785 | 123 187 | F2, H4 |
 
 Résultat des contrôles :
 
 - **Erreurs de formule** : aucune pour les 10 configurations testées, hors `#N/A` volontaires de COORD_PLANS. Les configurations testées sont les 7 gabarits, la référence 40 × 48, le 40 × 40 en agglos, et le 20 × 40 en façade mixte avec un dallage de 15 cm en nappe double.
-- **Ratios acier** : tous dans la fourchette 18–45 kg/m².
+- **Ratios acier** : tous dans la fourchette 18–45 kg/m² ; le 40 × 40 est proche du haut (42,7 kg/m²), car les diagonales du treillis sont en cornières accolées.
 - **Cohérence moteur / DQE** : écart nul pour chaque gabarit et pour chaque scénario de façade.
 - **Esquisses** : vérifiées lisibles de 10 × 30 à 40 × 40, en bardage, en agglos et en mixte.
+- **Rapport de vérification** : toutes les vérifications de barres sont conformes avec les profilés automatiques. La seule non-conformité récurrente est le soulèvement au vent des semelles de 120 × 120 dès 20 m de portée ; le rapport donne le côté de semelle à adopter (par exemple 175 × 175 pour le 40 × 40).
+
+## Rapport de vérification (feuille RAPPORT_VÉRIFICATION)
+
+Le rapport vérifie automatiquement le gabarit actif et se met à jour à chaque changement de paramètre. Il est imprimable en PDF (environ 4 pages A4 paysage). Un exemple est fourni : `Rapport_verification_exemple_20x40.pdf`.
+
+1. **Identification** : projet, lieu, « Établi par » (cellules jaunes), date, description de l'ouvrage.
+2. **Hypothèses et grandeurs de calcul** :
+   - vent EC1 : qb, qp et pressions nettes ;
+   - charges ;
+   - réactions d'appui ;
+   - élancements.
+
+   Les valeurs d'entrée (vitesse du vent, coefficients, fy, σ admissible du sol, flèches limites…) se règlent dans PARAMÈTRES, section 10.
+3. **Vérifications**, chacune avec sa formule, la sollicitation Ed, la résistance Rd, le taux de travail, un statut coloré (OK, NON CONFORME, À VÉRIFIER, SANS OBJET) et une recommandation :
+   - A. Tôles et pannes : portée, flexion descendante et au soulèvement, flèche.
+   - B. Lisses : flexion et flèche sous vent.
+   - C. Portique IPE : poteau en flexion composée avec flambement ; traverse en about de jarret, à mi-portée et en flèche. Ferme treillis : membrures, diagonales d'about et courantes, montants, poteaux, flèche.
+   - D. Poteaux de pignon : flexion et flèche sous vent.
+   - E. Croix de Saint-André et poutre au vent.
+   - F. Semelles :
+     - contrainte sur la latérite ;
+     - soulèvement, avec le calcul du côté de semelle nécessaire ;
+     - aciers par la méthode des bielles (BAEL) ;
+     - hauteur utile ;
+     - semelle filante.
+   - G. Dallage (épaisseur, sections d'acier) et chaînages.
+   - H. Contrôles généraux : ratio acier, pente, épaisseur des tôles, file centrale, dallage, profilés introuvables, cohérence moteur / DQE.
+4. **Synthèse et conclusion** automatiques, avec cadres « Établi par », « Vérifié par » et « Visa ».
+
+> Il s'agit de vérifications simplifiées de prédimensionnement (EC3 / EC1 / EC0, BAEL 91 mod. 99). La vitesse de vent de 25 m/s et la contrainte admissible de 0,20 MPa sont des valeurs par défaut à confirmer (données météo locales, étude géotechnique). Elles ne remplacent pas la note de calcul d'exécution.
 
 ## Régénérer le classeur
 
