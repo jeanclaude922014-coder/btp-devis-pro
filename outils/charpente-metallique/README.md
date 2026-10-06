@@ -12,7 +12,19 @@ Classeur Excel `Quantitatif_Charpente_Metallique.xlsx`, généré par `generer_c
 2. **PARAMÈTRES** : ajuster les cellules jaunes (trames, ouvertures, façade, dallage, fondations, dosages, prix unitaires). Pour un gabarit PERSONNALISÉ, saisir la portée, la longueur, la hauteur et la pente dans le tableau des colonnes G à K. Les valeurs proposées par défaut sont celles du modèle de référence 40 × 48 m.
 3. Lire les résultats dans ACCUEIL, QUANTITATIF_CHARPENTE, GROS_ŒUVRE, DQE_DEVIS, RÉCAP_GABARITS et PLANS.
 
-Les feuilles sont protégées **sans mot de passe** (Révision > Ôter la protection). Seules les cellules jaunes sont modifiables.
+Le classeur est **entièrement modifiable** (aucune protection). Saisir de préférence dans les cellules jaunes : les autres cellules contiennent les formules. Pour protéger les formules, régénérer le classeur avec l'option `--proteger`.
+
+## Plans en PDF
+
+Deux possibilités :
+
+1. **Depuis Excel** : feuille PLANS > Fichier > Enregistrer sous > PDF. On obtient 7 planches A4 paysage.
+2. **Avec `Generateur_Plans.html`**, qui s'ouvre dans n'importe quel navigateur (PC, tablette, téléphone) et fonctionne sans connexion ni installation.
+   - Dans Excel (ACCUEIL), copier la cellule **CODE PLANS**, la coller dans le générateur et cliquer sur « Appliquer le code ». Les plans reprennent alors exactement le paramétrage du classeur : dimensions, profilés retenus, baies, façade, fondations, aciers.
+   - On peut aussi saisir les paramètres directement dans le panneau de gauche.
+   - Cliquer sur **« Enregistrer en PDF / Imprimer »** et choisir l'imprimante « Enregistrer au format PDF », en A4 paysage.
+   - Les planches sont dessinées en vectoriel : traits nets à l'impression, hachures pour les translucides, le remblai et le sable.
+   - Le cartouche comporte : projet, lieu, date modifiable, mention « esquisse non contractuelle », « Bon pour accord / Date / Signature ».
 
 ## Structure du classeur
 
@@ -27,7 +39,7 @@ Les feuilles sont protégées **sans mot de passe** (Révision > Ôter la protec
 | GROS_ŒUVRE | Terrassements, semelles isolées et filantes, maçonnerie de fondation, dallage, variante agglos, récapitulatif des matériaux |
 | DQE_DEVIS | 5 lots, TOTAL HT, TVA = HT × 0,18, TOTAL TTC |
 | RÉCAP_GABARITS | Comparatif des 7 gabarits et contrôle de cohérence avec le DQE |
-| PLANS | 7 planches A4 paysage avec cartouche |
+| PLANS | 7 planches A4 paysage avec cartouche (imprimables en PDF) |
 | COORD_PLANS (masquée) | Coordonnées des esquisses, calculées par formules |
 | CALC_GABARITS (masquée) | Moteur de calcul des 7 gabarits × 3 scénarios de façade (paramétrage, bardage, agglos) |
 

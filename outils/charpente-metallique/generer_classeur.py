@@ -1410,13 +1410,52 @@ def build_accueil(ws, G_RANGE, alerts):
                            "QUANTITATIF_CHARPENTE · GROS_ŒUVRE · DQE_DEVIS · RÉCAP_GABARITS · PLANS (7 esquisses dynamiques).",
                            "Les esquisses sont des graphiques Nuage de points alimentés par la feuille masquée COORD_PLANS : "
                            "aucune macro, compatible Excel mobile (Microsoft 365).",
-                           "Feuilles protégées sans mot de passe (Révision > Ôter la protection) ; seules les cellules jaunes "
-                           "sont modifiables.",
+                           "Classeur entièrement modifiable (aucune protection). Saisir de préférence dans les cellules jaunes : "
+                           "les autres cellules contiennent les formules de calcul.",
+                           "PDF des plans : feuille PLANS > Fichier > Enregistrer sous > PDF, ou générateur Generateur_Plans.html "
+                           "(coller le CODE PLANS ci-dessous puis « Enregistrer en PDF ».",
                            "Estimation de prédimensionnement : à confirmer par une note de calcul (EC3 / EC1 / BAEL) avant exécution."]):
         st(ws.cell(rw + i, 2, t), size=8, italic=True, border=False)
+    rw += 6
+    st(ws.cell(rw, 2, "CODE PLANS (copier la cellule D ci-contre et la coller dans Generateur_Plans.html)"), bold=True,
+       fill=C_ORANGE_CLAIR)
+    ws.merge_cells(start_row=rw, start_column=2, end_row=rw, end_column=3)
+    st(ws.cell(rw, 4), size=7, fill=C_BLEU_CLAIR)
+    M.disp(ACC, f"D{rw}", code_plans())
     for col, w in zip("ABCDEFGH", [2, 30, 14, 22, 12, 12, 12, 12]):
         ws.column_dimensions[col].width = w
     page_setup(ws, rows_title=None, fit_height=1)
+
+
+CODE_KEYS = [  # clé du générateur HTML, expression, n = numérique / t = texte
+    ("gab", "{gab}", "t"), ("B", "{portee}", "n"), ("L", "{longueur}", "n"), ("H", "{hauteur}", "n"),
+    ("p", "{pente}*100", "n"), ("ep", "{e_port}", "n"), ("epan", "{e_pan}", "n"), ("elis", "{e_lis}", "n"),
+    ("epp", "{e_pp}", "n"), ("deb", "{deb_pign}", "n"), ("sys", "{sys_2030}", "t"), ("fint", "{file_int}", "t"),
+    ("rtr", "{ratio_treil}", "n"), ("pas", "{pas_treil}", "n"), ("rj", "{ratio_jarret}*100", "n"), ("nacc", "{nb_acc}", "n"),
+    ("ppot", "{prof_pot}", "t"), ("ptrav", "{prof_trav}", "t"), ("pmsup", "{prof_msup}", "t"), ("pminf", "{prof_minf}", "t"),
+    ("ppp", "{prof_pp}", "t"), ("ppanne", "{prof_panne}", "t"), ("plisse", "{prof_lisse}", "t"),
+    ("npc", "{nb_pc}", "n"), ("lpc", "{l_pc}", "n"), ("hpc", "{h_pc}", "n"), ("epc", "{emp_pc}", "t"),
+    ("npt", "{nb_pt}", "n"), ("lpt", "{l_pt}", "n"), ("hpt", "{h_pt}", "n"), ("ept", "{emp_pt}", "t"),
+    ("nsky", "{nb_sky}", "n"), ("asky", "{a_sky}", "n"), ("bsky", "{b_sky}", "n"), ("pct", "{pct_transl}*100", "n"),
+    ("sdesc", "{S_desc}", "n"), ("acr", "{acrotere}", "t"), ("hacr", "{h_acr}", "n"), ("fac", "{facade}", "t"),
+    ("hs", "{h_soub}", "n"), ("D", "{D}", "n"), ("eprop", "{e_prop}", "n"), ("a1", "{a1}", "n"), ("hs1", "{h_s1}", "n"),
+    ("f1", "{f1}", "n"), ("a2", "{a2}", "n"), ("hfut", "{h_fut}", "n"), ("bf", "{b_fil}", "n"), ("hfil", "{h_fil}", "n"),
+    ("hmf", "{h_mf}", "n"), ("edal", "{e_dal_c}", "t"), ("erem", "{e_rem_c}", "t"), ("esab", "{e_sable}", "n"),
+    ("ferr", "{ferr}", "t"), ("hix", "{ha_ix}", "t"), ("hiy", "{ha_iy}", "t"), ("hsx", "{ha_sx}", "t"), ("hsy", "{ha_sy}", "t"),
+    ("maille", "{maille_c}", "t"), ("hasem", "{ha_sem}", "t"), ("msem", "{m_sem}", "n"), ("nbf", "{nb_bfut}", "n"),
+    ("hafut", "{ha_fut}", "t"), ("hacad", "{ha_cad}", "t"), ("ecad", "{e_cad_fut}", "n"), ("nfil", "{nb_fil}", "n"),
+    ("hafil", "{ha_fil}", "t"), ("harep", "{ha_rep}", "t"), ("erep", "{e_rep}", "n"), ("dtige", "{d_tige_port}", "t"),
+    ("ltige", "{l_tige_port}", "n"), ("bch", "{b_ch}", "n"), ("hch", "{h_ch}", "n"), ("brd", "{b_rd}", "n"),
+    ("nrd", "{nb_rd}", "n"), ("hachl", "{ha_chl}", "t"), ("hachc", "{ha_chc}", "t"), ("echc", "{e_chc}", "n"),
+]
+
+
+def code_plans():
+    parts = ['"PLAN1"']
+    for k, ex, kind in CODE_KEYS:
+        val = f"FIXED({ex},4,TRUE)" if kind == "n" else ex
+        parts.append(f'";{k}="&{val}')
+    return "&".join(parts)
 
 
 # ============================================================================= ÉCRITURE
@@ -1434,7 +1473,7 @@ def write_all(wb):
             c.number_format = fmt
 
 
-def main(out, gabarit="20 × 40", recalc=True, plans_seuls=False, params=None):
+def main(out, gabarit="20 × 40", recalc=True, plans_seuls=False, params=None, proteger=False):
     GAB_DEFAUT[0] = gabarit
     PARAM_TEST.update(params or {})
     wb = Workbook()
@@ -1455,8 +1494,10 @@ def main(out, gabarit="20 × 40", recalc=True, plans_seuls=False, params=None):
     order = [ACC, PAR, BP, BA, PRE, QC, GO, DQE, REC, PL, CO, CA]
     wb._sheets = [wb[n] for n in order]
     for n in order:
-        if n not in (CA,):
+        if proteger and n != CA:
             protect(wb[n])
+        elif not proteger:
+            wb[n].protection.sheet = False
     wb.active = 0
     wb.calculation.fullCalcOnLoad = True
     wb.properties.creator = ""
@@ -1483,6 +1524,7 @@ if __name__ == "__main__":
     ap.add_argument("--sans-recalcul", action="store_true", help="ne pas injecter les valeurs calculées")
     ap.add_argument("--plans-seuls", action="store_true", help="(test) masque les autres feuilles")
     ap.add_argument("--param", action="append", default=[], help="(test) nom=valeur")
+    ap.add_argument("--proteger", action="store_true", help="protège les feuilles (seules les cellules jaunes restent modifiables)")
     a = ap.parse_args()
     pv = {}
     for kv in a.param:
@@ -1492,4 +1534,4 @@ if __name__ == "__main__":
         except ValueError:
             pass
         pv[k] = v
-    main(a.sortie, a.gabarit, not a.sans_recalcul, a.plans_seuls, pv)
+    main(a.sortie, a.gabarit, not a.sans_recalcul, a.plans_seuls, pv, a.proteger)

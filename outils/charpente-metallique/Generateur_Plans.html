@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Générateur de plans</title>
+<style>
+:root{--bleu:#1F4E79;--orange:#C55A11;--jaune:#FFFF00;--fond:#f4f6f9;--texte:#1a1a1a;--bord:#c9d1db}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--fond);color:var(--texte);font-size:13px}
+header.app{background:var(--bleu);color:#fff;padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+header.app h1{font-size:17px;margin:0}
+.btn{background:var(--orange);color:#fff;border:0;border-radius:4px;padding:9px 14px;font-weight:bold;font-size:13px;cursor:pointer}
+.btn.sec{background:#fff;color:var(--bleu);border:1px solid #fff}
+.layout{display:flex;gap:14px;padding:14px;align-items:flex-start}
+aside{width:340px;flex:0 0 340px;background:#fff;border:1px solid var(--bord);border-radius:6px;padding:10px;max-height:calc(100vh - 90px);overflow:auto;position:sticky;top:10px}
+aside h2{font-size:12px;background:var(--orange);color:#fff;margin:12px -10px 6px;padding:5px 10px}
+aside h2:first-child{margin-top:-10px;border-radius:6px 6px 0 0}
+.f{display:flex;justify-content:space-between;align-items:center;gap:6px;margin:3px 0}
+.f label{flex:1;font-size:12px}
+.f input,.f select{width:120px;background:var(--jaune);border:1px solid #999;padding:3px 4px;font-weight:bold;font-size:12px}
+textarea{width:100%;height:60px;font-size:11px}
+.note{font-size:11px;color:#555;margin:4px 0}
+main{flex:1;min-width:0}
+.page{background:#fff;width:281mm;height:194mm;margin:0 auto 14px;padding:4mm;box-shadow:0 1px 4px rgba(0,0,0,.25);display:flex;flex-direction:column;overflow:hidden}
+.page .bandeau{background:var(--bleu);color:#fff;font-weight:bold;font-size:13px;padding:4px 8px}
+.page svg{width:100%;height:148mm;display:block}
+table.cart{width:100%;border-collapse:collapse;font-size:9.5px;margin-top:2mm}
+table.cart td{border:1px solid #000;padding:2px 4px;vertical-align:middle}
+.cart .t{font-weight:bold;font-size:12px}
+.cart .nc{color:#C00000;font-weight:bold;text-align:center}
+.cart .bpa{background:#FBE5D6;font-weight:bold;text-align:center}
+.cart .leg{font-size:8px;font-style:italic}
+.cart input{border:0;font:inherit;width:100%;background:transparent}
+@media (max-width:900px){.layout{flex-direction:column}aside{width:100%;flex:none;position:static;max-height:none}.page{transform-origin:top left}}
+@page{size:A4 landscape;margin:8mm}
+@media print{
+  body{background:#fff}
+  header.app,aside,.noprint{display:none!important}
+  .layout{padding:0;display:block}
+  .page{box-shadow:none;margin:0;page-break-after:always;break-after:page;width:281mm;height:193mm;padding:0}
+  .page:last-child{page-break-after:auto;break-after:auto}
+}
+</style>
+</head>
+<body>
+<header class="app">
+  <h1>Générateur de plans – bâtiment industriel en charpente métallique</h1>
+  <div>
+    <button class="btn" onclick="window.print()">Enregistrer en PDF / Imprimer</button>
+  </div>
+</header>
+<div class="layout">
+<aside id="panneau">
+  <h2>Import depuis le classeur Excel</h2>
+  <p class="note">Dans Excel (feuille ACCUEIL), copier la cellule « CODE PLANS » puis la coller ici : les plans reprennent exactement le paramétrage du classeur.</p>
+  <textarea id="code" placeholder="PLAN1;gab=20 × 40;B=20;..."></textarea>
+  <button class="btn" style="width:100%;margin-top:4px" onclick="importer()">Appliquer le code</button>
+  <div id="form"></div>
+  <p class="note">Bouton « Enregistrer en PDF » : choisir l'imprimante « Enregistrer au format PDF » (ou « Microsoft Print to PDF »), format A4 paysage, marges par défaut, sans en-têtes ni pieds de page.</p>
+</aside>
+<main id="planches"></main>
+</div>
+<script>
+"use strict";
+// ============================================================ paramètres
+const GABARITS = {"10 × 30":[10,30],"15 × 20":[15,20],"15 × 30":[15,30],"20 × 20":[20,20],"20 × 40":[20,40],"30 × 40":[30,40],"40 × 40":[40,40],"PERSONNALISÉ":null};
+const FACADES = ["Bardage bac acier","Agglos 15 creux","Mixte"];
+const HA = ["HA6","HA8","HA10","HA12","HA14","HA16"];
+const FORM = [
+ ["Projet et gabarit",[
+  ["projet","Projet / ouvrage","Bâtiment industriel","t"],
+  ["lieu","Lieu","Abidjan","t"],
+  ["gab","Gabarit",Object.keys(GABARITS),"s"],
+  ["B","Portée (m)",20],["L","Longueur (m)",40],["H","Hauteur sous sablière (m)",6],["p","Pente (%)",16]]],
+ ["Charpente",[
+  ["ep","Entraxe des portiques (m)",6],["epan","Entraxe des pannes (m)",1.35],["elis","Entraxe des lisses (m)",1.8],
+  ["epp","Espacement poteaux de pignon (m)",6],["deb","Débord des pannes (m)",0.3],
+  ["sys","Système 20–30 m",["IPE renforcé","Ferme treillis"],"s"],["fint","File centrale",["Non","Oui"],"s"],
+  ["rtr","Hauteur ferme = portée / …",30],["pas","Pas des nœuds treillis (m)",2],["rj","Jarret (% portée)",10],["nacc","Cornières accolées",2],
+  ["ppot","Poteaux (vide = auto)","","t"],["ptrav","Traverses (vide = auto)","","t"],["pmsup","Membrure sup. (vide = auto)","","t"],
+  ["pminf","Membrure inf. (vide = auto)","","t"],["ppp","Poteaux de pignon (vide = auto)","","t"],["ppanne","Pannes (vide = auto)","","t"],["plisse","Lisses (vide = auto)","","t"]]],
+ ["Ouvertures et couverture",[
+  ["npc","Portes coulissantes : nombre",1],["lpc","… largeur (m)",4],["hpc","… hauteur (m)",4.5],["epc","… emplacement",["Pignon","Long-pan"],"s"],
+  ["npt","Portillons : nombre",1],["lpt","… largeur (m)",5.5],["hpt","… hauteur (m)",4],["ept","… emplacement",["Long-pan","Pignon"],"s"],
+  ["nsky","Skydomes",4],["asky","Skydome longueur (m)",1.2],["bsky","Skydome largeur (m)",1.2],
+  ["pct","Translucides (%)",10],["sdesc","Surface par descente EP (m²)",180],
+  ["acr","Acrotère",["Non","Oui"],"s"],["hacr","Hauteur d'acrotère (m)",1],
+  ["fac","Type de façade",FACADES,"s"],["hs","Soubassement agglos – mixte (m)",1.5]]],
+ ["Fondations et dallage",[
+  ["D","Profondeur de fondation (m)",1.2],["eprop","Béton de propreté (m)",0.05],
+  ["a1","Semelle portique côté (m)",1.2],["hs1","Semelle portique hauteur (m)",0.4],["f1","Fût portique côté (m)",0.4],
+  ["a2","Semelle pignon côté (m)",0.8],["hfut","Hauteur des fûts (m)",1.2],
+  ["bf","Semelle filante largeur (m)",0.6],["hfil","Semelle filante hauteur (m)",0.2],["hmf","Agglos pleins fondation h (m)",1.0],
+  ["edal","Dallage",["20 cm","15 cm"],"s"],["erem","Remblai latérite",["20 cm","40 cm"],"s"],["esab","Lit de sable (m)",0.05],
+  ["ferr","Ferraillage dallage",["Nappe simple","Nappe double"],"s"],["hix","Nappe inf. X",["HA10","HA8","HA12"],"s"],["hiy","Nappe inf. Y",["HA10","HA8","HA12"],"s"],
+  ["hsx","Nappe sup. X",["HA8","HA10","HA12"],"s"],["hsy","Nappe sup. Y",["HA8","HA10","HA12"],"s"],["maille","Maille dallage",["20 cm","15 cm","25 cm"],"s"],
+  ["hasem","Quadrillage semelles",HA,"s",3],["msem","Maille semelles (m)",0.15],["nbf","Barres par fût",4],["hafut","Aciers fûts",HA,"s",3],
+  ["hacad","Cadres",HA,"s",0],["ecad","Espacement cadres fût (m)",0.15],["nfil","Filants semelle",4],["hafil","Aciers filants",HA,"s",2],
+  ["harep","Répartition",HA,"s",1],["erep","Espacement répartition (m)",0.2],["dtige","Tiges d'ancrage","Rond 24","t"],["ltige","Longueur tiges (m)",0.6]]],
+ ["Mur agglos",[
+  ["bch","Chaînage largeur (m)",0.15],["hch","Chaînage hauteur (m)",0.2],["brd","Raidisseur côté (m)",0.15],["nrd","Raidisseurs / panneau",3],
+  ["hachl","Aciers longitudinaux",HA,"s",2],["hachc","Cadres",HA,"s",0],["echc","Espacement cadres (m)",0.2]]]
+];
+const RULES=[[10,"IPE 220","IPE 200","HEA 180","L 50x5","L 45x4.5"],[15,"IPE 270","IPE 240","HEA 200","L 60x6","L 50x5"],
+ [20,"IPE 330","IPE 300","HEA 220","L 70x7","L 60x6"],[25,"IPE 400","IPE 360","HEA 240","L 70x7","L 60x6"],
+ [30,"IPE 450","IPE 400","HEA 260","L 80x8","L 70x7"],[35,"IPE 500","IPE 450","HEA 280","L 90x9","L 80x8"],
+ [40,"IPE 550","IPE 500","HEA 300","L 100x10","L 90x9"],[50,"IPE 600","IPE 550","HEA 340","L 100x10","L 100x10"],
+ [1e9,"IPE 600","IPE 600","HEA 400","L 100x10","L 100x10"]];
+const RPIG=[[6,"IPE 180"],[8,"IPE 220"],[10,"IPE 270"],[12,"IPE 300"],[1e9,"IPE 360"]];
+const RPAN=[[5,"Z 160","C 140"],[6,"Z 200","C 160"],[7,"Z 220","C 180"],[1e9,"Z 250","C 200"]];
+const HPROF={"IPE 200":200,"IPE 220":220,"IPE 240":240,"IPE 270":270,"IPE 300":300,"IPE 330":330,"IPE 360":360,"IPE 400":400,
+ "IPE 450":450,"IPE 500":500,"IPE 550":550,"IPE 600":600,"HEA 180":171,"HEA 200":190,"HEA 220":210,"HEA 240":230,"HEA 260":250,
+ "HEA 280":270,"HEA 300":290,"HEA 340":330,"HEA 400":390};
+
+const P = {};
+function buildForm(){
+  const f=document.getElementById("form"); let h="";
+  for(const [titre,champs] of FORM){
+    h+=`<h2>${titre}</h2>`;
+    for(const c of champs){
+      const [k,lab,def,type,idx]=c;
+      if(type==="s"){ const opts=def; P[k]=opts[idx||0];
+        h+=`<div class="f"><label for="i_${k}">${lab}</label><select id="i_${k}" data-k="${k}">${opts.map(o=>`<option${o===P[k]?" selected":""}>${o}</option>`).join("")}</select></div>`;
+      } else if(type==="t"){ P[k]=def; h+=`<div class="f"><label for="i_${k}">${lab}</label><input id="i_${k}" data-k="${k}" value="${def}"></div>`;
+      } else { P[k]=def; h+=`<div class="f"><label for="i_${k}">${lab}</label><input id="i_${k}" data-k="${k}" type="number" step="any" value="${def}"></div>`; }
+    }
+  }
+  P.gab="20 × 40";
+  f.innerHTML=h;
+  document.getElementById("i_gab").value=P.gab;
+  f.addEventListener("input",e=>{const k=e.target.dataset.k; if(!k)return;
+    let v=e.target.value; if(e.target.type==="number") v=parseFloat(String(v).replace(",","."))||0;
+    P[k]=v;
+    if(k==="gab"&&GABARITS[v]){P.B=GABARITS[v][0];P.L=GABARITS[v][1];setVal("B");setVal("L");}
+    if((k==="B"||k==="L")&&P.gab!=="PERSONNALISÉ"){const g=GABARITS[P.gab]; if(g&&(g[0]!==P.B||g[1]!==P.L)){P.gab="PERSONNALISÉ";setVal("gab");}}
+    dessiner();});
+}
+function setVal(k){const el=document.getElementById("i_"+k); if(el) el.value=P[k];}
+function importer(){
+  const txt=document.getElementById("code").value.trim(); if(!txt){return;}
+  const parts=txt.replace(/^﻿/,"").split(";"); let n=0;
+  for(const part of parts){const i=part.indexOf("="); if(i<0)continue;
+    const k=part.slice(0,i).trim(), raw=part.slice(i+1).trim(); if(!(k in P))continue;
+    const el=document.getElementById("i_"+k);
+    if(el&&el.type==="number"){P[k]=parseFloat(raw.replace(/\s/g,"").replace(",","."))||0;} else P[k]=raw;
+    if(el&&el.tagName==="SELECT"&&![...el.options].some(o=>o.value===P[k])){const o=document.createElement("option");o.text=P[k];el.add(o);}
+    setVal(k); n++; }
+  document.getElementById("code").value=n+" paramètres importés.";
+  dessiner();
+}
+
+// ============================================================ géométrie (mêmes règles que le classeur)
+function calc(){
+  const g={}, B=+P.B, L=+P.L, H=+P.H, p=Math.max(0.001,P.p/100);
+  Object.assign(g,{B,L,H,p});
+  g.systeme = B<=20 ? "Portique IPE avec jarrets" : (B<=30 ? (P.sys==="Ferme treillis"?"Ferme treillis":"Portique IPE renforcé") : "Ferme treillis");
+  g.treil = g.systeme==="Ferme treillis"?1:0;
+  g.nt=Math.max(1,Math.ceil(L/P.ep-1e-9)); g.N=g.nt+1; g.er=L/g.nt;
+  g.R1=(B/2)/Math.cos(Math.atan(p));
+  g.h0=g.treil?B/P.rtr:0; g.Hm=H+g.h0; g.Hf=g.Hm+p*B/2;
+  g.nip=Math.max(1,Math.ceil(B/P.epp-1e-9)); g.eppr=B/g.nip;
+  g.npan=g.treil?2*Math.ceil(B/2/P.pas-1e-9):0;
+  g.np=Math.ceil(g.R1/P.epan-1e-9)+1; g.epanr=g.R1/(g.np-1);
+  g.nl=g.er>6?2:1;
+  g.nbcv=g.nt<=2?g.nt:2+Math.floor((g.nt-1)/5);
+  g.npv=Math.max(1,Math.round(g.R1/g.er));
+  g.fint=P.fint==="Oui";
+  g.z0=P.fac==="Agglos 15 creux"?g.Hm:(P.fac==="Mixte"?Math.min(P.hs,g.Hm):0);
+  g.kbard=P.fac!=="Agglos 15 creux"; g.kag=P.fac!=="Bardage bac acier"; g.aggFull=P.fac==="Agglos 15 creux";
+  g.nrows=g.kbard?Math.ceil((g.Hm-g.z0)/P.elis-1e-9):0;
+  g.ndesc=Math.max(2,2*Math.ceil(B*L/(2*P.sdesc)-1e-9));
+  g.hacr=P.acr==="Oui"?+P.hacr:0;
+  g.edal=parseInt(P.edal)/100; g.erem=parseInt(P.erem)/100; g.maille=parseInt(P.maille)/100; g.kdbl=P.ferr==="Nappe double";
+  const idx=RULES.findIndex(r=>B<=r[0]);
+  const r=RULES[idx];
+  g.ppot=P.ppot||(g.treil?r[3]:r[1]); g.ptrav=P.ptrav||r[2]; g.pmsup=P.pmsup||r[4]; g.pminf=P.pminf||r[5];
+  g.ppp=P.ppp||RPIG.find(x=>g.Hf<=x[0])[1];
+  const rp=RPAN.find(x=>g.er<=x[0]); g.ppanne=P.ppanne||rp[1]; g.plisse=P.plisse||rp[2];
+  g.htrav=Math.max(0.2,(HPROF[g.ptrav]||300)/1000); g.hpot=Math.max(0.15,(HPROF[g.ppot]||300)/1000);
+  g.lj=P.rj/100*B;
+  // baies : 4 au plus représentées par façade
+  g.doors={};
+  for(const [F,tag,W,ndiv,ediv] of [["Long-pan","LP",L,g.nt,g.er],["Pignon","PG",B,g.nip,g.eppr]]){
+    const nC=P.epc===F?+P.npc:0, nQ=P.ept===F?+P.npt:0, nd=Math.min(4,nC+nQ), list=[];
+    for(let k=1;k<=nd;k++){
+      const coul=k<=nC, w=coul?+P.lpc:+P.lpt, h=coul?+P.hpc:+P.hpt;
+      const lo=(tag==="LP"&&ndiv>=3)?2:1, hi=(tag==="LP"&&ndiv>=3)?ndiv-1:ndiv;
+      const pos=Math.max(lo,Math.min(hi,Math.round(k*ndiv/(nd+1))));
+      const xc=(pos-0.5)*ediv;
+      list.push({coul,w,h,xc,xl:xc-w/2,xr:xc+w/2,t:(coul?"Porte coul. ":"Portillon ")+f2(w)+" × "+f2(h)});
+    }
+    g.doors[tag]=list;
+  }
+  return g;
+}
+const f2=x=>(+x).toFixed(2).replace(".",",");
+const f1=x=>(+x).toFixed(1).replace(".",",");
+
+// ============================================================ dessin SVG
+const C={bleu:"#0070C0",orange:"#ED7D31",gris:"#7F7F7F",rouge:"#C00000",marron:"#C9A27E",noir:"#000",laterite:"#C55A11",transl:"#9DC3E6",beton:"#E7E6E6"};
+const VW=273, VH=148;
+class Vue{
+  constructor(xmin,xmax,ymin,ymax,m){ // m = [gauche, droite, bas, haut] en mm
+    const [ml,mr,mb,mt]=m, dx=Math.max(1e-3,xmax-xmin), dy=Math.max(1e-3,ymax-ymin);
+    this.s=Math.min((VW-ml-mr)/dx,(VH-mb-mt)/dy);
+    this.ox=ml+((VW-ml-mr)-this.s*dx)/2-this.s*xmin;
+    this.oy=mb+((VH-mb-mt)-this.s*dy)/2-this.s*ymin;
+    this.u=1/this.s; this.o=[];
+  }
+  X(x){return (this.ox+this.s*x).toFixed(3)} Y(y){return (VH-(this.oy+this.s*y)).toFixed(3)}
+  pl(pts,col,w=0.3,dash="",fill="none",close=false){
+    const d=pts.map(q=>this.X(q[0])+","+this.Y(q[1])).join(" ");
+    this.o.push(`<${close?"polygon":"polyline"} points="${d}" fill="${fill}" stroke="${col}" stroke-width="${w}"${dash?` stroke-dasharray="${dash}"`:""} stroke-linejoin="round"/>`);
+  }
+  seg(x1,y1,x2,y2,col,w,dash){this.pl([[x1,y1],[x2,y2]],col,w,dash)}
+  rect(x1,y1,x2,y2,col,w=0.3,fill="none",dash=""){this.pl([[x1,y1],[x2,y1],[x2,y2],[x1,y2]],col,w,dash,fill,true)}
+  dot(x,y,col,r=0.6,carre=false){
+    if(carre) this.o.push(`<rect x="${(this.X(x)-r).toFixed(3)}" y="${(this.Y(y)-r).toFixed(3)}" width="${2*r}" height="${2*r}" fill="${col}"/>`);
+    else this.o.push(`<circle cx="${this.X(x)}" cy="${this.Y(y)}" r="${r}" fill="${col}"/>`);
+  }
+  txt(x,y,t,{size=2.6,anchor="middle",rot=0,col="#000",bold=false,dy=0}={}){
+    const X=this.X(x),Y=(+this.Y(y)+dy).toFixed(3);
+    this.o.push(`<text x="${X}" y="${Y}" font-size="${size}" text-anchor="${anchor}" fill="${col}"${bold?' font-weight="bold"':""}${rot?` transform="rotate(${rot} ${X} ${Y})"`:""} font-family="Arial">${esc(t)}</text>`);
+  }
+  coteH(x1,x2,y,t,below=false){const k=1.2*this.u;
+    this.seg(x1,y,x2,y,C.noir,0.2); this.seg(x1,y-k,x1,y+k,C.noir,0.2); this.seg(x2,y-k,x2,y+k,C.noir,0.2);
+    this.txt((x1+x2)/2,y,t,{dy:below?3.4:-1});}
+  coteV(x,y1,y2,t,right=false){const k=1.2*this.u;
+    this.seg(x,y1,x,y2,C.noir,0.2); this.seg(x-k,y1,x+k,y1,C.noir,0.2); this.seg(x-k,y2,x+k,y2,C.noir,0.2);
+    this.txt(x,(y1+y2)/2,t,{rot:-90,dy:right?3.2:-1.2});}
+  svg(){return `<svg viewBox="0 0 ${VW} ${VH}" xmlns="http://www.w3.org/2000/svg">${this.defs||""}${this.o.join("")}</svg>`}
+}
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+// ligne horizontale interrompue par les baies
+function rowCut(v,z,xa,xb,doors,col,w){
+  let x=xa;
+  for(const d of [...doors].sort((a,b)=>a.xl-b.xl)){ if(z<d.h){const l=Math.max(xa,Math.min(xb,d.xl)); if(l>x) v.seg(x,z,l,z,col,w); x=Math.max(x,Math.min(xb,d.xr));} }
+  if(xb>x) v.seg(x,z,xb,z,col,w);
+}
+function bayBraced(g,m){return m===1?1:(m===g.nbcv?g.nt:5*(m-1));}
+
+// ---------------------------------------------------------- P1 implantation
+function P1(g){
+  const v=new Vue(0,g.L,0,g.B,[24,16,18,18]), u=v.u, {B,L,er,nt}=g;
+  for(let i=0;i<=nt;i++) v.seg(er*i,-4*u,er*i,B+4*u,C.noir,0.15,"4 1 1 1");
+  v.seg(-4*u,0,L+4*u,0,C.noir,0.15,"4 1 1 1"); v.seg(-4*u,B,L+4*u,B,C.noir,0.15,"4 1 1 1");
+  const bf=P.bf; v.rect(-bf/2,-bf/2,L+bf/2,B+bf/2,C.gris,0.25,"none","1.5 1"); v.rect(bf/2,bf/2,L-bf/2,B-bf/2,C.gris,0.25,"none","1.5 1");
+  const a1=P.a1,a2=P.a2;
+  for(let i=0;i<=nt;i++){const x=er*i; for(const y of [0,B]) v.rect(x-a1/2,y-a1/2,x+a1/2,y+a1/2,C.gris,0.3,C.beton);
+    if(g.fint) v.rect(x-a1/2,B/2-a1/2,x+a1/2,B/2+a1/2,C.gris,0.3,C.beton);}
+  for(let k=1;k<g.nip;k++) for(const x of [0,L]) v.rect(x-a2/2,k*g.eppr-a2/2,x+a2/2,k*g.eppr+a2/2,C.gris,0.3,C.beton);
+  for(let i=0;i<=nt;i++){v.dot(er*i,0,C.bleu,0.9,true);v.dot(er*i,B,C.bleu,0.9,true); if(g.fint) v.dot(er*i,B/2,C.bleu,0.9,true);
+    v.txt(er*i,B+11*u,String(i+1),{bold:true,size:3});}
+  for(let k=1;k<g.nip;k++){v.dot(0,k*g.eppr,C.bleu,0.9);v.dot(L,k*g.eppr,C.bleu,0.9);}
+  for(const d of g.doors.LP){v.seg(d.xl,-2.5*u,d.xr,-2.5*u,C.noir,0.9); v.txt(d.xc,-2.5*u,d.t,{size:2.2,dy:3});}
+  for(const d of g.doors.PG){v.seg(-2.5*u,d.xl,-2.5*u,d.xr,C.noir,0.9); v.txt(-5*u,d.xc,d.t,{size:2.2,rot:-90,dy:0.8});}
+  v.coteH(0,L,-11*u,"Longueur "+f2(L)+" m",true); v.coteV(-16*u,0,B,"Portée "+f2(B)+" m");
+  v.coteH(0,er,B+6*u,"Entraxe "+f2(er)+" m ("+nt+" travées)");
+  v.txt(L+6*u,0,"A",{bold:true,size:3.2,anchor:"start",dy:1}); v.txt(L+6*u,B,"B",{bold:true,size:3.2,anchor:"start",dy:1});
+  return v;
+}
+// ---------------------------------------------------------- P2 coupe transversale
+function P2(g){
+  const {B,H,Hm,Hf,p}=g, v=new Vue(0,B,-P.D-0.1,Hf,[22,22,14,10]), u=v.u;
+  v.seg(-6*u,0,B+6*u,0,C.noir,0.35);
+  v.pl([[0,0],[0,Hm]],C.bleu,0.8); v.pl([[B,0],[B,Hm]],C.bleu,0.8); v.pl([[0,Hm],[B/2,Hf],[B,Hm]],C.bleu,0.8);
+  if(g.fint) v.seg(B/2,0,B/2,g.treil?H:Hf,C.bleu,0.8);
+  if(g.treil){ v.seg(0,H,B,H,C.bleu,0.8); const a=B/Math.max(1,g.npan), top=x=>Hm+p*Math.min(x,B-x);
+    for(let j=1;j<g.npan;j++) v.seg(j*a,H,j*a,top(j*a),C.bleu,0.35);
+    for(let j=1;j<=g.npan;j++){const x0=(j-1)*a,x1=j*a; if(j<=g.npan/2) v.seg(x0,top(x0),x1,H,C.bleu,0.35); else v.seg(x0,H,x1,top(x1),C.bleu,0.35);} }
+  else { const lj=g.lj, hj=g.htrav; v.seg(0,H-hj,lj,H+p*lj,C.bleu,0.5); v.seg(B,H-hj,B-lj,H+p*lj,C.bleu,0.5);
+    v.pl([[B/2-lj/2,Hf-p*lj/2],[B/2,Hf-hj],[B/2+lj/2,Hf-p*lj/2]],C.bleu,0.5); }
+  for(let j=0;j<g.np;j++){const x=j*(B/2)/Math.max(1,g.np-1); v.dot(x,Hm+p*x+1.2*u,C.bleu,0.55,true); v.dot(B-x,Hm+p*x+1.2*u,C.bleu,0.55,true);}
+  v.pl([[-3.5*u,Hm+1.5*u],[-3.5*u,Hm-0.8*u],[-0.3*u,Hm-0.8*u],[-0.3*u,Hm+1.5*u]],C.bleu,0.4);
+  v.pl([[B+3.5*u,Hm+1.5*u],[B+3.5*u,Hm-0.8*u],[B+0.3*u,Hm-0.8*u],[B+0.3*u,Hm+1.5*u]],C.bleu,0.4);
+  const zs=-P.D+P.eprop;
+  for(const x0 of [0,B].concat(g.fint?[B/2]:[])){ v.rect(x0-P.a1/2,zs,x0+P.a1/2,zs+P.hs1,C.gris,0.3,C.beton); v.rect(x0-P.f1/2,zs+P.hs1,x0+P.f1/2,0,C.gris,0.3,C.beton); }
+  v.coteV(-10*u,0,H,"H sablière "+f2(H)+" m"); v.coteV(B+10*u,0,Hf,"H faîtage "+f2(Hf)+" m",true);
+  v.coteH(0,B,-P.D-4*u,"Portée "+f2(B)+" m",true);
+  v.txt(B/4,Hm+p*B/4+5*u,"Pente "+f1(P.p)+" %",{size:2.8});
+  v.txt(B/2,H/2,g.systeme+" – poteaux "+g.ppot+(g.treil?" – membrures "+P.nacc+" "+g.pmsup+" / "+P.nacc+" "+g.pminf:" – traverses "+g.ptrav),{size:2.8});
+  v.txt(B/2,Hf+7*u,"Pannes "+g.ppanne+" : "+g.np+" par versant, e = "+f2(g.epanr)+" m",{size:2.4});
+  return v;
+}
+// ---------------------------------------------------------- P3 long-pan
+function P3(g){
+  const {L,Hm,er,nt,z0}=g, v=new Vue(0,L,0,Hm+g.hacr,[22,12,14,12]), u=v.u, D=g.doors.LP;
+  v.seg(-5*u,0,L+5*u,0,C.noir,0.35);
+  if(g.kag){ for(let z=0.4;z<g.z0-1e-6;z+=0.4) rowCut(v,z,0,L,D,C.marron,0.18);
+    v.seg(0,P.hch/2,L,P.hch/2,C.gris,0.7); v.seg(0,g.z0-P.hch/2,L,g.z0-P.hch/2,C.gris,0.7); if(g.aggFull) v.seg(0,g.z0/2,L,g.z0/2,C.gris,0.7);}
+  for(let k=0;k<g.nrows;k++) rowCut(v,z0+k*P.elis,0,L,D,C.bleu,0.22);
+  for(let m=1;m<=g.nbcv;m++){const b=bayBraced(g,m),xa=(b-1)*er,xb=b*er; v.seg(xa,0,xb,Hm,C.orange,0.45); v.seg(xb,0,xa,Hm,C.orange,0.45);}
+  for(let i=0;i<=nt;i++) v.seg(er*i,0,er*i,Hm,C.bleu,0.7);
+  v.seg(0,Hm,L,Hm,C.bleu,0.7);
+  if(g.hacr) v.pl([[0,Hm],[0,Hm+g.hacr],[L,Hm+g.hacr],[L,Hm]],C.bleu,0.5,"2 1");
+  for(const d of D){ v.seg(d.xl,0,d.xl,Hm,C.bleu,0.45); v.seg(d.xr,0,d.xr,Hm,C.bleu,0.45); v.seg(d.xl,d.h,d.xr,d.h,C.bleu,0.45);
+    v.seg(d.xl,0,d.xr,d.h,C.noir,0.25,"1 0.6"); v.seg(d.xr,0,d.xl,d.h,C.noir,0.25,"1 0.6");
+    if(d.coul) v.seg(d.xl-0.1,d.h+0.15,d.xr+0.1,d.h+0.15,C.noir,0.45);
+    v.txt(d.xc,d.h+0.15,d.t,{size:2.2,dy:-1}); }
+  v.coteH(0,L,-6*u,"Longueur "+f2(L)+" m",true); v.coteV(-10*u,0,Hm,"H égout "+f2(Hm)+" m");
+  v.coteH(0,er,Hm+g.hacr+4*u,"Entraxe "+f2(er)+" m ("+nt+" travées)");
+  return v;
+}
+// ---------------------------------------------------------- P4 pignon
+function P4(g){
+  const {B,Hm,Hf,p,z0}=g, v=new Vue(0,B,0,Hf,[22,22,14,8]), u=v.u, D=g.doors.PG;
+  const xa=z=>z<=Hm?0:(z-Hm)/p, xb=z=>B-xa(z);
+  v.seg(-5*u,0,B+5*u,0,C.noir,0.35);
+  if(g.kag){ const ztop=g.aggFull?Hf-0.2:g.z0; for(let z=0.4;z<ztop-1e-6;z+=0.4) rowCut(v,z,xa(z),xb(z),D,C.marron,0.18);
+    v.seg(0,P.hch/2,B,P.hch/2,C.gris,0.7); v.seg(0,g.z0-P.hch/2,B,g.z0-P.hch/2,C.gris,0.7);
+    if(g.aggFull){v.seg(0,g.z0/2,B,g.z0/2,C.gris,0.7); v.pl([[0,Hm-P.hch/2],[B/2,Hf-P.hch/2],[B,Hm-P.hch/2]],C.gris,0.7);} }
+  if(g.kbard) for(let k=0;k<16;k++){const z=z0+k*P.elis; if(z>=Hf-0.3)break; rowCut(v,z,xa(z),xb(z),D,C.bleu,0.22);}
+  v.pl([[0,0],[0,Hm],[B/2,Hf],[B,Hm],[B,0]],C.bleu,0.7);
+  for(let k=1;k<g.nip;k++){const y=k*g.eppr; v.seg(y,0,y,Hm+p*Math.min(y,B-y),C.bleu,0.6);}
+  for(const d of D){ const ht=Math.min(Hm,d.h+P.elis); v.seg(d.xl,0,d.xl,ht,C.bleu,0.45); v.seg(d.xr,0,d.xr,ht,C.bleu,0.45); v.seg(d.xl,d.h,d.xr,d.h,C.bleu,0.45);
+    v.seg(d.xl,0,d.xr,d.h,C.noir,0.25,"1 0.6"); v.seg(d.xr,0,d.xl,d.h,C.noir,0.25,"1 0.6");
+    if(d.coul) v.seg(d.xl-0.1,d.h+0.15,d.xr+0.1,d.h+0.15,C.noir,0.45);
+    v.txt(d.xc,d.h+0.15,d.t,{size:2.2,dy:-1}); }
+  v.coteH(0,B,-6*u,"Portée "+f2(B)+" m",true); v.coteV(-10*u,0,Hm,"H égout "+f2(Hm)+" m"); v.coteV(B+10*u,0,Hf,"H faîtage "+f2(Hf)+" m",true);
+  v.txt(B/2,Hf+3*u,"Poteaux de pignon "+g.ppp+" e = "+f2(g.eppr)+" m",{size:2.4});
+  return v;
+}
+// ---------------------------------------------------------- P5 toiture
+function P5(g){
+  const {B,L,er,nt}=g, d=+P.deb, v=new Vue(-d,L+d,0,B,[22,20,16,10]), u=v.u;
+  v.defs=`<defs><pattern id="hach" width="1.2" height="1.2" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="1.2" stroke="${C.transl}" stroke-width="0.35"/></pattern></defs>`;
+  const pct=P.pct/100, w=pct*er;
+  if(pct>0) for(let i=1;i<=nt;i++){const xc=(i-0.5)*er; for(const vv of [0,1]) v.rect(xc-w/2,vv*B/2+0.6*u,xc+w/2,vv*B/2+B/2-0.6*u,C.transl,0.25,"url(#hach)");}
+  for(let j=0;j<g.np;j++){const y=j*(B/2)/Math.max(1,g.np-1); v.seg(-d,y,L+d,y,C.bleu,0.18); v.seg(-d,B-y,L+d,B-y,C.bleu,0.18);}
+  for(let i=1;i<=nt;i++) for(let l=1;l<=g.nl;l++){const x=(i-1)*er+l*er/(g.nl+1); v.seg(x,0,x,B,C.bleu,0.18,"0.6 0.6");}
+  for(let m=1;m<=g.nbcv;m++){const b=bayBraced(g,m),xa=(b-1)*er,xb=b*er;
+    for(const vv of [0,1]) for(let r=1;r<=g.npv;r++){const ya=vv*B/2+(r-1)*(B/2)/g.npv, yb=ya+(B/2)/g.npv; v.seg(xa,ya,xb,yb,C.orange,0.4); v.seg(xa,yb,xb,ya,C.orange,0.4);}}
+  for(let i=0;i<=nt;i++) v.seg(er*i,0,er*i,B,C.bleu,0.6);
+  for(let k=1;k<=P.nsky;k++){const b=Math.max(1,Math.min(nt,Math.round(k*nt/(+P.nsky+1)))), xc=(b-1)*er+0.25*er, yc=k%2===1?B/4:3*B/4;
+    v.rect(xc-P.asky/2-0.2,yc-P.bsky/2-0.2,xc+P.asky/2+0.2,yc+P.bsky/2+0.2,C.bleu,0.4);
+    v.rect(xc-P.asky/2,yc-P.bsky/2,xc+P.asky/2,yc+P.bsky/2,C.bleu,0.3,"#DDEBF7");}
+  v.seg(-d,B/2,L+d,B/2,C.noir,0.7,"2.5 1.2");
+  v.rect(-d,0,L+d,B,C.noir,0.45);
+  const ns=g.ndesc/2; for(let k=1;k<=ns;k++){const x=(k-0.5)*L/ns; v.dot(x,0,"#002060",0.9); v.dot(x,B,"#002060",0.9);}
+  v.coteH(0,L,-7*u,"Longueur "+f2(L)+" m",true); v.coteV(-d-10*u,0,B,"Portée "+f2(B)+" m");
+  v.txt(L+d+2*u,B/2,"Faîtage",{anchor:"start",size:2.4,dy:0.8});
+  v.txt(L+d+2*u,B/4,"Pente "+f1(P.p)+" %",{anchor:"start",size:2.4,dy:0.8});
+  v.txt(L/2,-2.5*u,"● descentes EP ("+g.ndesc+")  ▨ translucides "+f1(P.pct)+" %  ✕ poutre au vent",{size:2.3,dy:3});
+  return v;
+}
+// ---------------------------------------------------------- P6 détail fondation
+function P6(g){
+  const D=+P.D, bf=+P.bf, a1=+P.a1, f1v=+P.f1, cf=0.05, cd=0.03;
+  const zf=-D, zp=zf+P.eprop, zsf=zp+P.hfil, zag=zsf+P.hmf, zr=g.erem, zs=zr+P.esab, zd=zs+g.edal, zsi=zp+P.hs1, zft=zsi+P.hfut;
+  const xB=bf/2+1.6+a1/2, xE=xB+a1/2+0.8;
+  const v=new Vue(-bf/2-0.3,xE,zf-0.1,Math.max(zd,zft)+0.9,[18,95,14,8]), u=v.u;
+  v.defs=`<defs><pattern id="lat" width="2" height="2" patternUnits="userSpaceOnUse" patternTransform="rotate(30)"><line x1="0" y1="0" x2="0" y2="2" stroke="${C.laterite}" stroke-width="0.25"/></pattern>
+  <pattern id="sab" width="1" height="1" patternUnits="userSpaceOnUse"><circle cx="0.5" cy="0.5" r="0.15" fill="#BF9000"/></pattern></defs>`;
+  v.seg(-bf/2-0.3,0,-0.075,0,C.noir,0.2,"4 1 1 1");
+  v.rect(0.075,0,xB-f1v/2,zr,C.laterite,0.2,"url(#lat)"); v.rect(xB+f1v/2,0,xE,zr,C.laterite,0.2,"url(#lat)");
+  v.rect(0.075,zr,xB-f1v/2,zs,"#BF9000",0.15,"url(#sab)"); v.rect(xB+f1v/2,zr,xE,zs,"#BF9000",0.15,"url(#sab)");
+  v.rect(-bf/2-0.05,zf,bf/2+0.05,zp,C.gris,0.3,C.beton); v.rect(-bf/2,zp,bf/2,zsf,C.gris,0.4,C.beton);
+  v.rect(xB-a1/2-0.05,zf,xB+a1/2+0.05,zp,C.gris,0.3,C.beton); v.rect(xB-a1/2,zp,xB+a1/2,zsi,C.gris,0.4,C.beton);
+  v.rect(xB-f1v/2,zsi,xB+f1v/2,zft,C.gris,0.4,C.beton);
+  v.rect(0.075,zs,xB-f1v/2,zd,C.gris,0.4,C.beton); v.rect(xB+f1v/2,zs,xE,zd,C.gris,0.4,C.beton);
+  v.seg(0.075,zs+0.005,xE,zs+0.005,C.noir,0.25,"1.2 0.6");
+  v.rect(-0.075,zsf,0.075,zag,C.marron,0.4,"#F3E6D8"); for(let z=zsf+0.2;z<zag-1e-6;z+=0.2) v.seg(-0.075,z,0.075,z,C.marron,0.2);
+  v.pl([[-0.075,zag],[-0.075,zd+0.6]],C.marron,0.4,"1.5 0.8"); v.pl([[0.075,zag],[0.075,zd+0.6]],C.marron,0.4,"1.5 0.8");
+  const zb=zp+cf;
+  v.seg(-bf/2+cf,zb,bf/2-cf,zb,C.rouge,0.35);
+  for(let k=0;k<+P.nfil;k++) v.dot(-bf/2+cf+k*(bf-2*cf)/Math.max(1,P.nfil-1),zb+0.02,C.rouge,0.45);
+  v.pl([[xB-a1/2+cf,zb+0.15],[xB-a1/2+cf,zb],[xB+a1/2-cf,zb],[xB+a1/2-cf,zb+0.15]],C.rouge,0.35);
+  const nq=Math.floor((a1-2*cf)/P.msem+1e-9); for(let k=0;k<=nq;k++) v.dot(xB-a1/2+cf+k*P.msem,zb+0.02,C.rouge,0.4);
+  for(const sg of [-1,1]){const xb=xB+sg*(f1v/2-cf); v.pl([[xb+sg*0.15,zb+0.02],[xb,zb+0.02],[xb,zft-cf]],C.rouge,0.35);
+    const xt=xB+sg*(f1v/2-0.10); v.seg(xt,zft+0.06,xt,zft-P.ltige+0.06,C.rouge,0.5);}
+  for(let z=zsi+0.05;z<zft-cf;z+=+P.ecad) v.seg(xB-f1v/2+cf,z,xB+f1v/2-cf,z,C.rouge,0.25);
+  v.seg(0.075+cd,zs+cd,xB-f1v/2-cd,zs+cd,C.rouge,0.35); v.seg(xB+f1v/2+cd,zs+cd,xE,zs+cd,C.rouge,0.35);
+  if(g.kdbl){v.seg(0.075+cd,zd-cd,xB-f1v/2-cd,zd-cd,C.rouge,0.35); v.seg(xB+f1v/2+cd,zd-cd,xE,zd-cd,C.rouge,0.35);}
+  for(let x=0.2;x<xE;x+=g.maille){ if(Math.abs(x-xB)<=f1v/2+0.03)continue; v.dot(x,zs+cd+0.015,C.rouge,0.3); if(g.kdbl) v.dot(x,zd-cd-0.015,C.rouge,0.3);}
+  const lpl=0.45; v.seg(xB-lpl/2,zft+0.025,xB+lpl/2,zft+0.025,C.bleu,0.9);
+  v.seg(xB-g.hpot/2,zft+0.05,xB-g.hpot/2,zft+0.85,C.bleu,0.8); v.seg(xB+g.hpot/2,zft+0.05,xB+g.hpot/2,zft+0.85,C.bleu,0.8);
+  v.coteV(-bf/2-0.18,zf,0,"Prof. "+f2(D)+" m");
+  v.coteH(-bf/2,bf/2,zf-0.06,"Semelle filante "+Math.round(bf*100)+" × "+Math.round(P.hfil*100),true);
+  v.coteH(xB-a1/2,xB+a1/2,zf-0.06,"Semelle "+Math.round(a1*100)+" × "+Math.round(a1*100)+" × "+Math.round(P.hs1*100),true);
+  v.txt(-0.075,(zsf+zag)/2,"Agglos 15 pleins h "+f2(P.hmf)+" m",{rot:-90,size:2.2,dy:-1.2});
+  v.txt(0,zf-0.30,"Filants "+P.nfil+" "+P.hafil+" + rép. "+P.harep+" e = "+Math.round(P.erep*100)+" cm",{size:2.2,dy:3});
+  const ytop=Math.max(zd,zft)+0.75;
+  const reps=[[zft+0.06,"Tiges d'ancrage "+P.dtige+" L = "+f2(P.ltige)+" m + platine",xB+f1v/2-0.10],
+    [(zs+zd)/2,"Dallage "+Math.round(g.edal*100)+" cm – "+P.ferr+" – "+P.hix+"/"+P.hiy+(g.kdbl?" + "+P.hsx+"/"+P.hsy:"")+" maille "+Math.round(g.maille*100)+" cm",xE],
+    [zs+0.005,"Polyane sur lit de sable "+Math.round(P.esab*100)+" cm",xE],
+    [zr/2,"Remblai latérite compactée 95 % OPM – "+Math.round(g.erem*100)+" cm",xE],
+    [0,"TN (terrain naturel)",-0.075],
+    [(zsi+zft)/2,"Fût "+Math.round(f1v*100)+" × "+Math.round(f1v*100)+" h "+f2(P.hfut)+" m – "+P.nbf+" "+P.hafut+" + cadres "+P.hacad+" e = "+Math.round(P.ecad*100),xB+f1v/2],
+    [zp+cf,"Quadrillage "+P.hasem+" maille "+Math.round(P.msem*100)+" cm",xB+a1/2-cf],
+    [(zp+zsi)/2,"Semelle isolée béton armé 350 kg/m³ sur propreté 150 kg/m³",xB+a1/2]];
+  reps.forEach(([z,t,xa],k)=>{const yl=ytop-k*6.5*u; v.pl([[xa,z],[xE+1*u,z],[xE+4*u,yl]],C.noir,0.15); v.txt(xE+5*u,yl,t,{anchor:"start",size:2.4,dy:0.8});});
+  return v;
+}
+// ---------------------------------------------------------- P7 mur agglos
+function P7(g){
+  const E=g.er, Hw=Math.max(0.5,g.z0), hch=+P.hch, brd=+P.brd, v=new Vue(0,E,0,Hw+0.5,[20,80,16,10]), u=v.u, cf=0.05;
+  if(!g.kag){ v.txt(E/2,Hw/2,"SANS OBJET : façade en bardage bac acier",{size:5,bold:true,col:C.rouge});
+    v.txt(E/2,Hw/2,"(vue affichée en « Agglos 15 creux » ou « Mixte »)",{size:3.5,col:C.rouge,dy:7}); return v; }
+  v.seg(-3*u,0,E+3*u,0,C.noir,0.35);
+  const zint=Hw/2, nrd=+P.nrd;
+  const xs=[]; for(let j=1;j<=nrd;j++) xs.push(E*j/(nrd+1));
+  for(let z=0.2;z<Hw-hch;z+=0.2){ if(z<=hch)continue; if(g.aggFull&&Math.abs(z-zint)<=hch/2)continue;
+    let x=0; for(const xc of xs){v.seg(x,z,xc-brd/2,z,C.marron,0.2); x=xc+brd/2;} v.seg(x,z,E,z,C.marron,0.2); }
+  v.rect(0,0,E,hch,C.gris,0.4,C.beton); v.rect(0,Hw-hch,E,Hw,C.gris,0.4,C.beton);
+  if(g.aggFull) v.rect(0,zint-hch/2,E,zint+hch/2,C.gris,0.4,C.beton);
+  for(const xc of xs) v.rect(xc-brd/2,hch,xc+brd/2,Hw-hch,C.gris,0.4,C.beton);
+  for(const zc of [hch/2,Hw-hch/2].concat(g.aggFull?[zint]:[])) for(const sg of [-1,1]){const z=zc+sg*(hch/2-cf*0.6); v.seg(0,z,E,z,C.rouge,0.3);}
+  for(const xc of xs) for(const sg of [-1,1]){const x=xc+sg*(brd/2-cf*0.5); v.seg(x,cf,x,Hw-cf,C.rouge,0.3);}
+  v.seg(0,0,0,Hw+0.4,C.bleu,1.1); v.seg(E,0,E,Hw+0.4,C.bleu,1.1);
+  v.coteH(0,E,-6*u,"Panneau entre poteaux "+f2(E)+" m",true); v.coteV(-6*u,0,Hw,"Mur h "+f2(g.z0)+" m");
+  const sec=Math.round(P.bch*100)+" × "+Math.round(hch*100)+" – 4 "+P.hachl+" + cad. "+P.hachc+" e = "+Math.round(P.echc*100);
+  const lx=E+4*u;
+  v.txt(lx,Hw-hch/2,"Chaînage haut "+sec,{anchor:"start",size:2.5,dy:0.8});
+  if(g.aggFull) v.txt(lx,zint,"Chaînage intermédiaire "+sec,{anchor:"start",size:2.5,dy:0.8});
+  v.txt(lx,hch/2,"Chaînage bas "+sec,{anchor:"start",size:2.5,dy:0.8});
+  v.txt(E/2,Hw+3*u,nrd+" raidisseurs "+Math.round(brd*100)+" × "+Math.round(brd*100)+" – 4 "+P.hachl+" + cad. "+P.hachc+" e = "+Math.round(P.echc*100),{size:2.5});
+  return v;
+}
+
+// ============================================================ planches + cartouches
+const LEG="Couleurs : charpente en bleu · contreventements en orange · béton en gris · aciers en rouge · maçonnerie en marron clair · cotes et baies en noir · translucides hachurés en bleu clair · remblai en latérite";
+function legende(k,g){
+  switch(k){
+    case 0: return `Poteaux de portique ■ ${g.ppot} sur semelles ${P.a1*100} × ${P.a1*100} ; poteaux de pignon ● ${g.ppp} sur semelles ${P.a2*100} × ${P.a2*100} ; semelles filantes en pointillés.`;
+    case 4: return `Translucides : ${P.pct} % – skydomes : ${P.nsky} – descentes EP : ${g.ndesc} – poutre au vent : ${g.nbcv} travées – liernes : ${g.nl} ligne(s) par travée.`;
+    case 5: return `Aciers : semelles isolées ${P.hasem} maille ${P.msem*100} cm ; fûts ${P.nbf} ${P.hafut} + cadres ${P.hacad} e = ${P.ecad*100} cm ; semelle filante ${P.nfil} ${P.hafil} + ${P.harep} e = ${P.erep*100} cm ; dallage ${P.ferr} ${P.hix} (X) / ${P.hiy} (Y)${g.kdbl?` + nappe sup. ${P.hsx} / ${P.hsy} + chaises`:""}, maille ${g.maille*100} cm.`;
+    case 6: return `Sections : chaînages ${P.bch*100} × ${P.hch*100} cm et raidisseurs ${P.brd*100} × ${P.brd*100} cm – 4 ${P.hachl} + cadres ${P.hachc} e = ${P.echc*100} cm ; linteaux idem avec appuis de 20 cm.`;
+    default: return `Croix de Saint-André dans les travées d'extrémité et une travée sur 5 (${g.nbcv} travées). ${g.kbard?`Lisses ${g.plisse} e = ${f2(P.elis)} m`:"Façade maçonnée : lisses sans objet"}${g.kag?` ; maçonnerie agglos 15 creux sur ${f2(g.z0)} m.`:"."}`;
+  }
+}
+const TITRES=["VUE EN PLAN – IMPLANTATION","COUPE TRANSVERSALE – PORTIQUE TYPE","ÉLÉVATION LONG-PAN","ÉLÉVATION PIGNON",
+  "VUE EN PLAN TOITURE – CALEPINAGE","COUPE DE FONDATION ET DALLAGE (DÉTAIL)","ÉLÉVATION MUR AGGLOS – PANNEAU TYPE"];
+let DATE=new Date().toLocaleDateString("fr-FR");
+function dessiner(){
+  const g=calc(), vues=[P1,P2,P3,P4,P5,P6,P7].map(f=>f(g));
+  const gabTxt=`Gabarit ${P.gab} : portée ${f2(g.B)} m × longueur ${f2(g.L)} m – H sablière ${f2(g.H)} m – pente ${f1(P.p)} % – ${g.systeme} – façade : ${P.fac}`;
+  document.getElementById("planches").innerHTML=vues.map((v,k)=>`
+  <section class="page">
+    <div class="bandeau">PLANCHE ${k+1} / 7 – ${TITRES[k]}</div>
+    ${v.svg()}
+    <table class="cart">
+      <tr><td colspan="3" class="t">${TITRES[k]}</td><td style="width:16%;text-align:center"><b>Planche n° ${k+1} / 7</b></td><td style="width:16%">Date : <input value="${DATE}" onchange="DATE=this.value"></td></tr>
+      <tr><td colspan="3">${esc(P.projet)} – ${esc(P.lieu)} · ${esc(gabTxt)}</td><td colspan="2" class="nc">ESQUISSE NON CONTRACTUELLE</td></tr>
+      <tr><td colspan="3" class="leg">${LEG}</td><td colspan="2" class="bpa">BON POUR ACCORD</td></tr>
+      <tr><td colspan="3" rowspan="2" style="font-size:9px">${esc(legende(k,g))}</td><td>Date :</td><td></td></tr>
+      <tr><td style="height:9mm">Signature :</td><td></td></tr>
+      <tr><td colspan="5" class="leg">Échelle automatique (même échelle en X et en Y) – cotes en mètres – EC3 / EC1 / BAEL 91 mod. 99 / EC2 – esquisse de prédimensionnement à confirmer par note de calcul.</td></tr>
+    </table>
+  </section>`).join("");
+}
+buildForm(); dessiner();
+</script>
+</body>
+</html>
