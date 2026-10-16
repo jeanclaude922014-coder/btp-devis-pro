@@ -26,6 +26,16 @@ Fichier : `Metrix_Avance_Chantier_BTP.xlsx` (régénérable avec `python3 genere
 | 17_Cloture | Clôture par tronçon (ml achevés) |
 | 18_Charpente_metal | Charpente métallique par repère (pondération au poids) |
 | Plan_controle | Référentiel PA / PC / autocontrôles par composante |
+| 19_Engins / 19b_Engins_journal | Parc matériel : heures, pannes, disponibilité, gasoil, coût, rendement |
 | Personnel, Checklist_lancement, Lexique | Annexes |
 
 Cellules crème / texte bleu = saisie ; cellules grises = formules. Les données pré-remplies sont un exemple (route en terre de 20 km avec ouvrages, bâtiment TCE, clôture et hangar métallique). Dans les suivis 13 à 18, une phase sans objet se saisit « n/a ».
+
+## Fiches Word (dossier `word/`)
+
+Générées par `node word/generer_fiches.js`, avec l'en-tête Moulo Jean Claude :
+
+- `Fiche_Point_Arret.docx` : demande, points vérifiés (EC2 / BAEL, compactage), décision de la mission de contrôle, signatures.
+- `Fiche_NC_et_PV_Levee.docx` : constat, analyse et traitement, vérification, procès-verbal de levée.
+
+Leurs numéros (FPA-…, NC-…) renvoient au registre `12_Controle_qualite` du classeur.

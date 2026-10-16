@@ -149,8 +149,8 @@ D = dt.date
 acc = wb.create_sheet("Accueil")
 # ================================================================ PARAMÈTRES
 par = wb.create_sheet("Paramètres")
-entete(par, "PARAMÈTRES DU CHANTIER & LISTES DE RÉFÉRENCE", 26,
-        "Renseignez ici les données générales du chantier. Les listes (colonnes E à Y) "
+entete(par, "PARAMÈTRES DU CHANTIER & LISTES DE RÉFÉRENCE", 28,
+        "Renseignez ici les données générales du chantier. Les listes (colonnes E à AA) "
         "alimentent les menus déroulants de tous les onglets : ajoutez vos éléments en bas de chaque liste.")
 par.column_dimensions["A"].width = 3
 par.column_dimensions["B"].width = 34
@@ -187,6 +187,10 @@ params = [
      "CBR à 95 % OPM après 4 jours d'imbibition. Valeur usuelle ≥ 30 ; à adapter au CCTP du marché."),
     ("P_TolEp", "Tolérance sur épaisseur de rechargement (m)", 0.02, "dec2",
      "Épaisseur mesurée admise ≥ épaisseur prévue − tolérance."),
+    ("P_TolConso", "Tolérance surconsommation gasoil engins", 0.15, "pct",
+     "Alerte si la consommation réelle (l/h) dépasse la consommation théorique de plus de ce pourcentage."),
+    ("P_DispoMin", "Taux de disponibilité minimal des engins", 0.85, "pct",
+     "Disponibilité = heures de marche / (heures de marche + heures de panne)."),
     ("P_Fc28", "Résistance béton exigée fc28 (MPa)", 25, "int",
      "Classe de résistance des notes de calcul BA (EC2 : C25/30 ; BAEL : fc28 = 25 MPa)."),
 ]
@@ -241,6 +245,8 @@ listes = [
     ("L_Traitement", "Traitement point critique", ["Purge + remblai latéritique", "Rechargement localisé",
                                                    "Pose de buses", "Dalot", "Enrochement / perré",
                                                    "Fossé de crête / divergent"]),
+    ("L_EtatEng", "État engin", ["En service", "En panne", "En réparation", "Non mobilisé", "Restitué"]),
+    ("L_Propriete", "Propriété engin", ["Propre", "Location", "Sous-traitant"]),
     ("L_Unites", "Unités", ["u", "ens", "ff", "m", "ml", "km", "m²", "m³", "kg", "t", "sac", "barre", "l", "j", "h"]),
     ("L_Meteo", "Météo", ["Ensoleillé", "Nuageux", "Pluie faible", "Forte pluie", "Orage", "Harmattan"]),
     ("L_TypeInc", "Types d'incident", ["Sécurité / accident", "Qualité / non-conformité", "Retard",
@@ -989,6 +995,7 @@ LEX = [
     ("Purge", "Enlèvement des matériaux impropres (argile, vase) remplacés par un matériau sain compacté."),
     ("Rechargement", "Apport d'une couche de latérite (ex. 0,20 m) compactée pour reconstituer la couche de roulement."),
     ("Reprofilage lourd", "Scarification et remise en forme de la plateforme à la niveleuse avec apport, arrosage et compactage."),
+    ("Taux de disponibilité", "Heures de marche / (heures de marche + heures de panne) d'un engin."),
     ("TCE", "Tous corps d'état : ensemble des métiers d'un bâtiment (gros œuvre, menuiserie, plomberie, électricité…)."),
 ]
 lx.column_dimensions["A"].width = 26
@@ -1404,6 +1411,113 @@ let, f1, l1 = table(cq, 6, [
 cf_statut(cq, f"N{f1}:N{l1}", rouge=["Non conforme"], orange=["Réserve"], vert=["Conforme"], gris=["En attente"])
 cf_statut(cq, f"R{f1}:R{l1}", rouge=["NC ouverte"], orange=["Réserve ouverte", "À contrôler"], vert=["Clos", "NC levée", "Réserve levée"])
 
+
+# ============================================================ 19 ENGINS
+ENG = [
+    ("NIV-01", "Niveleuse 140 (reprofilage)", "Niveleuse", "Location", FOURN[7], 45_000, 18, "En service"),
+    ("CMP-01", "Compacteur vibrant V5 – 12 t", "Compacteur", "Location", FOURN[7], 30_000, 12, "En panne"),
+    ("CMP-02", "Compacteur vibrant de remplacement", "Compacteur", "Location", FOURN[7], 32_000, 12, "En service"),
+    ("CHG-01", "Chargeuse sur pneus (emprunt)", "Chargeuse", "Location", FOURN[7], 40_000, 16, "En service"),
+    ("CAM-01", "Camion benne 20 m³", "Camion benne", "Propre", "", 15_000, 14, "En service"),
+    ("CAM-02", "Camion benne 20 m³", "Camion benne", "Propre", "", 15_000, 14, "En service"),
+    ("CIT-01", "Camion citerne à eau 10 000 l", "Citerne", "Location", FOURN[7], 20_000, 10, "En service"),
+    ("BET-01", "Bétonnière 350 l (ouvrages)", "Bétonnière", "Propre", "", 3_000, 1.5, "En service"),
+    ("GRU-01", "Camion-grue (montage charpente)", "Grue", "Location", FOURN[7], 55_000, 12, "Non mobilisé"),
+]
+en = wb.create_sheet("19_Engins")
+entete(en, "19 · PARC MATÉRIEL & ENGINS (disponibilité, gasoil, coûts)", 17,
+       "Un engin par ligne. Heures, pannes et gasoil sont totalisés depuis 19b_Engins_journal. Le coût estimé "
+       "(heures × coût horaire) sert à l'analyse : les locations réellement facturées sont suivies dans 05_Factures.")
+en_data = [dict(code=a, des=b, typ=c, prop=d, four=e, taux=f, conso=g, etat=h) for a, b, c, d, e, f, g, h in ENG]
+let, f1, l1 = table(en, 6, [
+    dict(key="code", h="Code engin", w=9, centre=True, name="EN_Code"),
+    dict(key="des", h="Désignation", w=30, name="EN_Des"),
+    dict(key="typ", h="Type", w=13),
+    dict(key="prop", h="Propriété", w=10, dv="L_Propriete", centre=True),
+    dict(key="four", h="Loueur", w=16, dv="L_Fourn", libre=True),
+    dict(key="taux", h="Coût horaire (FCFA/h)", w=11, fmt="fcfa"),
+    dict(key="conso", h="Conso théorique (l/h)", w=9, fmt="dec", centre=True),
+    dict(key="etat", h="État actuel", w=12, dv="L_EtatEng", centre=True, name="EN_Etat"),
+    dict(key="hm", h="Heures de marche", w=9, fmt="dec", name="EN_HM",
+         f='=IF({code}{r}="","",SUMIFS(EJ_HM,EJ_Code,{code}{r}))'),
+    dict(key="hp", h="Heures de panne", w=9, fmt="dec", name="EN_HP",
+         f='=IF({code}{r}="","",SUMIFS(EJ_HP,EJ_Code,{code}{r}))'),
+    dict(key="hi", h="Heures arrêt intempérie", w=9, fmt="dec",
+         f='=IF({code}{r}="","",SUMIFS(EJ_HI,EJ_Code,{code}{r}))'),
+    dict(key="gas", h="Gasoil consommé (l)", w=10, fmt="int",
+         f='=IF({code}{r}="","",SUMIFS(EJ_Gas,EJ_Code,{code}{r}))'),
+    dict(key="cm", h="Conso réelle (l/h)", w=9, fmt="dec", centre=True,
+         f='=IF(OR({code}{r}="",N({hm}{r})=0),"",{gas}{r}/{hm}{r})'),
+    dict(key="ec", h="Écart conso", w=8, fmt="pct", centre=True,
+         f='=IF(OR({cm}{r}="",N({conso}{r})=0),"",{cm}{r}/{conso}{r}-1)'),
+    dict(key="dispo", h="Taux de disponibilité", w=10, fmt="pct", centre=True, name="EN_Dispo",
+         f='=IF(OR({code}{r}="",N({hm}{r})+N({hp}{r})=0),"",{hm}{r}/({hm}{r}+{hp}{r}))'),
+    dict(key="cout", h="Coût estimé (FCFA)", w=13, fmt="fcfa", name="EN_Cout",
+         f='=IF({code}{r}="","",N({hm}{r})*N({taux}{r}))'),
+    dict(key="al", h="Alerte", w=16, centre=True, name="EN_Alerte",
+         f='=IF({code}{r}="","",IF({etat}{r}="En panne","En panne",IF(AND({ec}{r}<>"",N({ec}{r})>P_TolConso),"Surconsommation",'
+           'IF(AND({dispo}{r}<>"",N({dispo}{r})<P_DispoMin),"Disponibilité faible","OK"))))'),
+], en_data, 50)
+cf_statut(en, f"{let['al']}{f1}:{let['al']}{l1}", rouge=["En panne"], orange=["Surconsommation", "Disponibilité faible"], vert=["OK"])
+cf_statut(en, f"{let['etat']}{f1}:{let['etat']}{l1}", rouge=["En panne", "En réparation"], vert=["En service"], gris=["Non mobilisé", "Restitué"])
+
+ej = wb.create_sheet("19b_Engins_journal")
+entete(ej, "19b · RAPPORT JOURNALIER DES ENGINS", 17,
+       "Une ligne par engin et par jour : relevé des compteurs horaires, heures de panne et d'arrêt (pluie), gasoil "
+       "servi, conducteur et production. Le rendement (production / heure) permet de comparer engins et équipes.")
+ej_data = []
+cpt = {"NIV-01": 2150, "CMP-01": 3420, "CMP-02": 5100, "CHG-01": 4310, "CAM-01": 8800, "CAM-02": 9120, "CIT-01": 6200}
+COND = {"NIV-01": "M004", "CMP-01": "M005", "CMP-02": "M005", "CHG-01": "M004", "CAM-01": "M006", "CAM-02": "M006", "CIT-01": "M007"}
+PROD = {"NIV-01": (900, "m de plateforme"), "CMP-01": (850, "m compactés"), "CMP-02": (850, "m compactés"),
+        "CHG-01": (420, "m³ chargés"), "CAM-01": (200, "m³ transportés"), "CAM-02": (200, "m³ transportés"),
+        "CIT-01": (60, "m³ d'eau")}
+CONSO = {e[0]: e[6] for e in ENG}
+for jour in (D(2026, 10, 12), D(2026, 10, 13), D(2026, 10, 14), D(2026, 10, 15), D(2026, 10, 16)):
+    for code in ("NIV-01", "CMP-01", "CMP-02", "CHG-01", "CAM-01", "CAM-02", "CIT-01"):
+        if code == "CMP-02" and jour.day < 16:
+            continue
+        hm, hp, hi, obs = 8, 0, 0, ""
+        if jour.day == 13:
+            hm, hi, obs = 4, 4, "Arrêt pluie"
+        if code == "CMP-01" and jour.day == 16:
+            hm, hp, obs = 2, 6, "Panne flexible hydraulique (INC-04)"
+        if code == "CMP-02" and jour.day == 16:
+            hm, obs = 5, "Remplacement de CMP-01 à partir de 11 h"
+        fact = 1.30 if code == "CAM-02" else 1.0
+        d0 = cpt[code]
+        cpt[code] = d0 + hm
+        q, u = PROD[code]
+        ej_data.append(dict(date=jour, code=code, lot=LOTS[1], loc="T08 – PK 7+000 à 8+000", cd=d0, cf=d0 + hm,
+                            hp=hp or None, hi=hi or None, gas=round(hm * CONSO[code] * fact), cond=COND[code],
+                            prod=round(q * hm / 8), u=u, obs=obs))
+let, f1, l1 = table(ej, 6, [
+    dict(key="date", h="Date", w=11, fmt="date", name="EJ_Date"),
+    dict(key="code", h="Code engin", w=9, dv="EN_Code", centre=True, name="EJ_Code"),
+    dict(key="des", h="Désignation", w=26,
+         f='=IF({code}{r}="","",IFERROR(INDEX(EN_Des,MATCH({code}{r},EN_Code,0)),"Code inconnu"))'),
+    dict(key="lot", h="Lot", w=20, dv="L_Lots"),
+    dict(key="loc", h="Tronçon / PK / ouvrage", w=20),
+    dict(key="cd", h="Compteur début (h)", w=9, fmt="dec"),
+    dict(key="cf", h="Compteur fin (h)", w=9, fmt="dec"),
+    dict(key="hm", h="Heures de marche", w=8, fmt="dec", name="EJ_HM",
+         f='=IF(OR({cd}{r}="",{cf}{r}=""),"",{cf}{r}-{cd}{r})'),
+    dict(key="hp", h="Heures de panne", w=8, fmt="dec", name="EJ_HP"),
+    dict(key="hi", h="Heures arrêt intempérie", w=8, fmt="dec", name="EJ_HI"),
+    dict(key="gas", h="Gasoil servi (l)", w=8, fmt="int", name="EJ_Gas"),
+    dict(key="lh", h="Conso (l/h)", w=7, fmt="dec", centre=True,
+         f='=IF(OR({gas}{r}="",N({hm}{r})=0),"",{gas}{r}/{hm}{r})'),
+    dict(key="cond", h="Conducteur (matricule)", w=10, dv="PE_Mat", centre=True),
+    dict(key="prod", h="Production", w=9, fmt="int"),
+    dict(key="u", h="Unité production", w=14),
+    dict(key="rend", h="Rendement (/h)", w=9, fmt="dec",
+         f='=IF(OR({prod}{r}="",N({hm}{r})=0),"",{prod}{r}/{hm}{r})'),
+    dict(key="obs", h="Observations (pannes, entretien)", w=28),
+], ej_data, 1500)
+ej.conditional_formatting.add(f"{let['cf']}{f1}:{let['cf']}{l1}", FormulaRule(
+    formula=[f'AND({let["cf"]}{f1}<>"",{let["cf"]}{f1}<{let["cd"]}{f1})'], fill=fill("EF9A9A")))
+ej.conditional_formatting.add(f"{let['hp']}{f1}:{let['hp']}{l1}", CellIsRule(
+    operator="greaterThan", formula=["0"], font=Font(name=FONT, bold=True, color=ROUGE)))
+
 # ======================================================== 02 TABLEAU DE BORD
 entete(tb, "02 · TABLEAU DE BORD – PILOTAGE ET AIDE À LA DÉCISION", 13,
        "Synthèse automatique de tous les modules à la date de référence. Aucune saisie sur cet onglet. "
@@ -1481,7 +1595,7 @@ tb.conditional_formatting.add("L8", CellIsRule(operator="lessThan", formula=["0"
 
 # Les 9 questions du pilotage
 r0 = 11
-mput(f"B{r0}:M{r0}", "LES 10 QUESTIONS DU PILOTAGE DE CHANTIER", font(True, "FFFFFF", 11), VERT, al=LEFT)
+mput(f"B{r0}:M{r0}", "LES 11 QUESTIONS DU PILOTAGE DE CHANTIER", font(True, "FFFFFF", 11), VERT, al=LEFT)
 for rng, hd in ((f"B{r0 + 1}", "N°"), (f"C{r0 + 1}:F{r0 + 1}", "Question"), (f"G{r0 + 1}:H{r0 + 1}", "Réponse"),
                 (f"I{r0 + 1}:L{r0 + 1}", "Détail"), (f"M{r0 + 1}", "Signal")):
     mput(rng, hd, font(True, "FFFFFF"), VERT2)
@@ -1520,6 +1634,10 @@ QS.append(("Les travaux sont-ils conformes (contrôles & essais) ?",
            '=IFERROR(COUNTIF(CQ_Res,"Conforme")/(COUNTIF(CQ_Res,"Conforme")+COUNTIF(CQ_Res,"Non conforme")),1)', "pct",
            '=COUNTIF(CQ_Num,"?*")&" contrôle(s) · "&COUNTIF(CQ_Etat,"NC ouverte")&" NC ouverte(s) · "&COUNTIF(CQ_Etat,"Réserve ouverte")&" réserve(s) · "&COUNTIF(CQ_Etat,"À contrôler")&" PA/contrôle(s) en attente · "&COUNTIF(RT_Conf,"Non conforme")&" tronçon(s) route NC"',
            '=IF(COUNTIF(CQ_Etat,"NC ouverte")>0,"ALERTE",IF(COUNTIF(CQ_Etat,"Réserve ouverte")+COUNTIF(CQ_Etat,"À contrôler")>0,"ATTENTION","OK"))'))
+QS.append(("Nos engins sont-ils disponibles et productifs ?",
+           '=IFERROR(SUM(EN_HM)/(SUM(EN_HM)+SUM(EN_HP)),1)', "pct",
+           '=COUNTIF(EN_Etat,"En panne")&" engin(s) en panne · "&SUM(EN_HP)&" h de panne · "&COUNTIF(EN_Alerte,"Surconsommation")&" surconsommation(s) gasoil · coût estimé "&FIXED(SUM(EN_Cout),0)&" FCFA"',
+           '=IF(COUNTIF(EN_Etat,"En panne")>0,"ALERTE",IF(COUNTIF(EN_Alerte,"Surconsommation")+COUNTIF(EN_Alerte,"Disponibilité faible")>0,"ATTENTION","OK"))'))
 # engagé non facturé = engagé BC - factures liées : version simple
 QS[2] = (QS[2][0], QS[2][1], QS[2][2],
          '=ROUND(KPI_Conso*100,0)&" % consommé · "&COUNTIF(BU_Alerte,"Dépassement")&" lot(s) en dépassement · "&COUNTIF(BU_Alerte,"Surconsommation")&" en surconsommation"',
@@ -1715,6 +1833,8 @@ MODS = [
     ("17_Cloture", "Clôture : avancement par tronçon et ml achevés", "Hebdomadaire"),
     ("18_Charpente_metal", "Charpente métallique : avancement par repère, pondéré au poids (kg)", "Hebdomadaire"),
     ("Plan_controle", "Référentiel des points d'arrêt, contrôles et essais par composante", "Au démarrage"),
+    ("19_Engins", "Parc matériel : heures, pannes, disponibilité, gasoil, coût, alertes", "Lecture (calculé)"),
+    ("19b_Engins_journal", "Rapport journalier engins : compteurs, pannes, intempéries, gasoil, production", "Quotidienne"),
     ("Personnel", "Fichier du personnel, taux journaliers, cumul jours et montants dus", "Au recrutement"),
     ("Checklist_lancement", "Check-list de lancement de chantier (administratif, technique, HSE)", "Démarrage"),
     ("Lexique", "Lexique des termes BTP utilisés", "—"),
@@ -1748,7 +1868,7 @@ STEPS = [
     "1. Paramètres : saisir le chantier, la date de démarrage, le délai, les taux ; compléter les listes (lots, équipes, fournisseurs).",
     "2. Personnel et 09_Stock : créer la liste des ouvriers (matricule, taux) et le catalogue des matériaux (code, seuil).",
     "3. 01_Planning, 03_Budget, 04_Situations : saisir les tâches, le budget par lot et le DQE du marché.",
-    "4. Chaque jour : 06_Pointage, 07_Affectation, 09b_Livraisons, 10_Journal, suivis 13 à 18 et registre 12_Controle_qualite.",
+    "4. Chaque jour : 06_Pointage, 07_Affectation, 09b_Livraisons, 10_Journal, 19b_Engins_journal, suivis 13 à 18 et registre 12_Controle_qualite.",
     "5. À chaque achat : 08_Commandes puis 05_Factures ; chaque semaine : mettre à jour le % réalisé du planning.",
     "6. Consulter 02_Tableau_de_bord : les signaux ALERTE / ATTENTION indiquent où agir en priorité.",
     "Les lignes pré-remplies sont un EXEMPLE (route en terre de 20 km + ouvrages + bâtiment) : effacez uniquement les cellules de saisie pour démarrer. Onglets 13 à 18 inutiles pour un chantier ? Masquez-les (clic droit > Masquer).",
@@ -1787,14 +1907,15 @@ acc.oddFooter.left.text = "Auteur : " + AUTEUR
 ordre = ["Accueil", "Paramètres", "02_Tableau_de_bord", "01_Planning", "03_Budget", "04_Situations",
          "05_Factures", "06_Pointage", "07_Affectation", "08_Commandes", "09_Stock", "09b_Livraisons",
          "10_Journal", "11_Incidents", "12_Controle_qualite", "13_Route", "14_Points_critiques", "15_Dalots",
-         "16_Batiment_TCE", "17_Cloture", "18_Charpente_metal", "Plan_controle", "Personnel",
+         "16_Batiment_TCE", "17_Cloture", "18_Charpente_metal", "19_Engins", "19b_Engins_journal",
+         "Plan_controle", "Personnel",
          "Checklist_lancement", "Lexique"]
 assert sorted(ordre) == sorted(wb.sheetnames), set(wb.sheetnames) ^ set(ordre)
 wb._sheets = [wb[n] for n in ordre]
 for n in ordre:
     couleur = {"Accueil": VERT, "Paramètres": ORANGE, "02_Tableau_de_bord": ROUGE,
                "12_Controle_qualite": "6A1B9A", "Plan_controle": "6A1B9A"}.get(n, VERT2)
-    if n[:2] in ("13", "14", "15", "16", "17", "18"):
+    if n[:2] in ("13", "14", "15", "16", "17", "18", "19"):
         couleur = "1565C0"
     wb[n].sheet_properties.tabColor = couleur
 wb.active = 0
