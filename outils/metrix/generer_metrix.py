@@ -4,9 +4,12 @@ Générateur du classeur « METRIX AVANCÉ CHANTIER BTP ».
 Auteur : Moulo Jean Claude – Technicien génie civil BTP, Abidjan.
 
 Usage : python3 generer_metrix.py [chemin_sortie.xlsx]
-Produit un classeur Excel de pilotage de chantier (10 modules + annexes),
-entièrement formulé (aucune valeur calculée en dur), avec un exemple de
-chantier R+1 à Abidjan pré-rempli.
+Produit un classeur Excel de pilotage de chantier (10 modules de gestion,
+contrôle qualité et suivis spécialisés : route en terre / reprofilage lourd,
+points critiques et buses Ø800 / Ø1000, dalots, bâtiment TCE, clôture,
+charpente métallique), entièrement formulé (aucune valeur calculée en dur),
+avec un exemple multi-composantes pré-rempli. Usage : réalisation (entreprise)
+et/ou contrôle (mission de contrôle).
 """
 import sys
 import datetime as dt
@@ -36,6 +39,8 @@ FMT = {
     "pct": '0%;[Red]-0%;"-"',
     "int": '#,##0;[Red]-#,##0;"-"',
     "dec": '#,##0.0;[Red]-#,##0.0;"-"',
+    "dec2": '0.00;[Red]-0.00;"-"',
+    "pk": '0"+"000',
 }
 
 
@@ -63,7 +68,7 @@ def entete(ws, module, ncols, desc=""):
     lignes = [
         ("METRIX AVANCÉ CHANTIER BTP", font(True, "FFFFFF", 16), VERT, 26),
         (module, font(True, "FFFFFF", 12), VERT2, 20),
-        ('="Chantier : "&P_Chantier&"     |     Auteur : ' + AUTEUR + '"',
+        ('="Chantier : "&P_Chantier&"   |   Mission : "&P_Mission&"   |   Auteur : ' + AUTEUR + '"',
          font(True, VERT, 10), VERT_CLAIR, 18),
         (desc, font(False, GRIS_TXT, 9, True), None, 30),
     ]
@@ -144,15 +149,19 @@ D = dt.date
 acc = wb.create_sheet("Accueil")
 # ================================================================ PARAMÈTRES
 par = wb.create_sheet("Paramètres")
-entete(par, "PARAMÈTRES DU CHANTIER & LISTES DE RÉFÉRENCE", 16,
-        "Renseignez ici les données générales du chantier. Les listes (colonnes E à O) "
+entete(par, "PARAMÈTRES DU CHANTIER & LISTES DE RÉFÉRENCE", 26,
+        "Renseignez ici les données générales du chantier. Les listes (colonnes E à Y) "
         "alimentent les menus déroulants de tous les onglets : ajoutez vos éléments en bas de chaque liste.")
 par.column_dimensions["A"].width = 3
 par.column_dimensions["B"].width = 34
 par.column_dimensions["C"].width = 40
 par.column_dimensions["D"].width = 3
 params = [
-    ("P_Chantier", "Intitulé du chantier", "Construction d'une villa R+1 – Cocody Angré (exemple)", None, None),
+    ("P_Chantier", "Intitulé du chantier",
+     "Route en terre A–B (20 km), ouvrages, bâtiment TCE, clôture, hangar (exemple)",
+     None, None),
+    ("P_Mission", "Mission / rôle", "Réalisation & contrôle", None,
+     "Entreprise – réalisation, Mission de contrôle – surveillance, ou Réalisation & contrôle (liste)."),
     ("P_MOA", "Maître d'ouvrage", "À renseigner", None, None),
     ("P_MOE", "Maître d'œuvre / BET", "À renseigner", None, None),
     ("P_Entreprise", "Entreprise titulaire", "À renseigner", None, None),
@@ -160,7 +169,7 @@ params = [
     ("P_Lieu", "Localisation", "Abidjan – Côte d'Ivoire", None, None),
     ("P_Marche_No", "N° du marché / contrat", "À renseigner", None, None),
     ("P_Debut", "Date de démarrage (OS)", D(2026, 8, 3), "date", None),
-    ("P_Delai", "Délai contractuel (jours calendaires)", 180, "int", None),
+    ("P_Delai", "Délai contractuel (jours calendaires)", 270, "int", None),
     ("P_Fin", "Date de fin contractuelle", "=P_Debut+P_Delai-1", "date", "calc"),
     ("P_DateRef", "Date de référence (pilotage)", "=TODAY()", "date",
      "Par défaut = date du jour (AUJOURDHUI). Saisissez une date fixe pour analyser le chantier à une date passée."),
@@ -172,6 +181,14 @@ params = [
     ("P_Heures", "Heures de travail par jour", 8, "int", None),
     ("P_Tol", "Tolérance d'écart avant alerte", 0.10, "pct",
      "Écart toléré entre avancement prévu et réel (ou entre % consommé et % avancé) avant alerte."),
+    ("P_Compacite", "Compacité minimale exigée (% OPM)", 0.95, "pct",
+     "Critère usuel CCTP routes en terre / remblais : ≥ 95 % de l'Optimum Proctor Modifié. À adapter au CCTP."),
+    ("P_CBR", "CBR minimal de la latérite (couche de roulement)", 30, "int",
+     "CBR à 95 % OPM après 4 jours d'imbibition. Valeur usuelle ≥ 30 ; à adapter au CCTP du marché."),
+    ("P_TolEp", "Tolérance sur épaisseur de rechargement (m)", 0.02, "dec2",
+     "Épaisseur mesurée admise ≥ épaisseur prévue − tolérance."),
+    ("P_Fc28", "Résistance béton exigée fc28 (MPa)", 25, "int",
+     "Classe de résistance des notes de calcul BA (EC2 : C25/30 ; BAEL : fc28 = 25 MPa)."),
 ]
 r = 6
 par.cell(r, 2, "DONNÉES GÉNÉRALES").font = font(True, VERT, 11)
@@ -188,24 +205,43 @@ for name, lib, val, fmt, note in params:
     if note and note != "calc":
         b.comment = Comment(note, AUTEUR)
     nom(name, "Paramètres", f"$C${r}")
+    if name == "P_Mission":
+        dvm = DataValidation(type="list", formula1="=L_Mission", allow_blank=True)
+        dvm.add(f"C{r}")
+        par.add_data_validation(dvm)
 par.cell(r + 2, 2, "Contexte ivoirien : grande saison des pluies ≈ avril–juillet, petite saison ≈ octobre–novembre. "
          "Prévoir des marges de délai sur terrassements et bétonnages pendant ces périodes.").font = font(False, GRIS_TXT, 9, True)
 par.merge_cells(start_row=r + 2, start_column=2, end_row=r + 2, end_column=3)
 par.row_dimensions[r + 2].height = 40
 par.cell(r + 2, 2).alignment = LEFT
 
-LOTS = ["L01 Installation chantier", "L02 Terrassements", "L03 Fondations", "L04 Gros œuvre RDC",
-        "L05 Gros œuvre R+1", "L06 Charpente-couverture", "L07 Second œuvre",
-        "L08 Plomberie-électricité", "L09 VRD-assainissement"]
-EQUIPES = ["Équipe A – Maçonnerie", "Équipe B – Ferraillage/Coffrage", "Équipe C – Terrassement/VRD",
-           "Encadrement", "Sous-traitant"]
-FOURN = ["Dépôt ciment Yopougon", "Quincaillerie Adjamé", "Carrière Anyama", "Sablière lagunaire",
-         "Briqueterie Abobo", "Location engins", "Laboratoire essais"]
+LOTS = ["L00 Installation & repli", "R01 Route – reprofilage lourd", "R02 Route – points critiques",
+        "R03 Ouvrages – buses Ø800/Ø1000", "R04 Ouvrages – dalots", "B01 Bâtiment – gros œuvre",
+        "B02 Bâtiment – second œuvre TCE", "C01 Clôture", "M01 Charpente métallique", "S01 Contrôle & essais"]
+EQUIPES = ["Équipe Route – terrassement", "Équipe OH – ouvrages hydrauliques", "Équipe Bâtiment / clôture",
+           "Équipe Charpente métallique", "Encadrement", "Labo / contrôle", "Sous-traitant"]
+FOURN = ["Dépôt ciment", "Quincaillerie générale", "Carrière de granite", "Sablière", "Briqueterie",
+         "Préfabricant buses BA", "Station-service (gasoil)", "Location engins", "Laboratoire géotechnique",
+         "Atelier charpente métallique"]
+COMPOS = ["Installation", "Route en terre", "Points critiques", "Ouvrages hydrauliques – buses", "Dalots",
+          "Bâtiment TCE", "Clôture", "Charpente métallique"]
 listes = [
     ("L_Lots", "Lots", LOTS),
     ("L_Equipes", "Équipes", EQUIPES),
     ("L_Fourn", "Fournisseurs", FOURN),
-    ("L_Unites", "Unités", ["u", "ens", "ff", "m", "m²", "m³", "kg", "t", "sac", "barre", "l", "j", "h"]),
+    ("L_Compos", "Composantes", COMPOS),
+    ("L_Mission", "Mission / rôle", ["Entreprise – réalisation", "Mission de contrôle – surveillance",
+                                     "Réalisation & contrôle"]),
+    ("L_TypeCtrl", "Type de contrôle", ["Point d'arrêt (PA)", "Point critique (PC)", "Autocontrôle",
+                                        "Essai laboratoire", "Contrôle extérieur", "Réception partielle"]),
+    ("L_Interv", "Intervenant", ["Entreprise (autocontrôle)", "Mission de contrôle", "Laboratoire",
+                                 "Maître d'ouvrage"]),
+    ("L_Verdict", "Appréciation", ["Conforme", "Non conforme", "Réserve"]),
+    ("L_Diam", "Diamètre buses", ["Ø800", "Ø1000", "Ø600", "Ø1200"]),
+    ("L_Traitement", "Traitement point critique", ["Purge + remblai latéritique", "Rechargement localisé",
+                                                   "Pose de buses", "Dalot", "Enrochement / perré",
+                                                   "Fossé de crête / divergent"]),
+    ("L_Unites", "Unités", ["u", "ens", "ff", "m", "ml", "km", "m²", "m³", "kg", "t", "sac", "barre", "l", "j", "h"]),
     ("L_Meteo", "Météo", ["Ensoleillé", "Nuageux", "Pluie faible", "Forte pluie", "Orage", "Harmattan"]),
     ("L_TypeInc", "Types d'incident", ["Sécurité / accident", "Qualité / non-conformité", "Retard",
                                         "Intempérie", "Matériel / panne", "Approvisionnement",
@@ -218,7 +254,7 @@ listes = [
 ]
 for j, (name, titre, vals) in enumerate(listes):
     col = 5 + j
-    par.column_dimensions[L(col)].width = 30 if j < 3 else (22 if j in (5,) else 14)
+    par.column_dimensions[L(col)].width = 30 if j < 10 else 16
     h = par.cell(6, col, titre)
     h.font, h.fill, h.alignment, h.border = font(True, "FFFFFF"), fill(VERT2), CENTER, BORDER
     for k in range(25):
@@ -233,18 +269,24 @@ entete(pers, "FICHIER DU PERSONNEL (base du pointage et des affectations)", 10,
        "Un ouvrier par ligne. Le matricule est la clé utilisée dans le pointage. "
        "Taux journalier en FCFA (à adapter aux barèmes en vigueur et aux conventions de l'entreprise).")
 PERSONNEL = [
-    ("M001", "KOFFI Yao", "Chef de chantier", EQUIPES[3], 15000),
-    ("M002", "KOUAMÉ Serge", "Chef d'équipe maçon", EQUIPES[0], 10000),
-    ("M003", "DIABATÉ Moussa", "Maçon", EQUIPES[0], 7000),
-    ("M004", "TRAORÉ Ibrahim", "Maçon", EQUIPES[0], 7000),
-    ("M005", "N'GUESSAN Paul", "Manœuvre", EQUIPES[0], 3500),
-    ("M006", "OUATTARA Lassina", "Manœuvre", EQUIPES[0], 3500),
-    ("M007", "BAMBA Seydou", "Chef d'équipe ferrailleur", EQUIPES[1], 10000),
-    ("M008", "KONÉ Adama", "Ferrailleur", EQUIPES[1], 7000),
-    ("M009", "YAO Kouadio", "Coffreur", EQUIPES[1], 7000),
-    ("M010", "SORO Nanga", "Manœuvre", EQUIPES[1], 3500),
-    ("M011", "GNAHORÉ Didier", "Conducteur d'engin", EQUIPES[2], 8000),
-    ("M012", "ZADI Martial", "Manœuvre", EQUIPES[2], 3500),
+    ("M001", "KOFFI Yao", "Chef de chantier", EQUIPES[4], 20000),
+    ("M002", "TOURÉ Bakary", "Topographe", EQUIPES[4], 15000),
+    ("M003", "KOUASSI Arsène", "Laborantin", EQUIPES[5], 12000),
+    ("M004", "GNAHORÉ Didier", "Conducteur niveleuse", EQUIPES[0], 12000),
+    ("M005", "SANOGO Lamine", "Conducteur compacteur", EQUIPES[0], 10000),
+    ("M006", "DIALLO Ousmane", "Chauffeur camion benne", EQUIPES[0], 8000),
+    ("M007", "ZADI Martial", "Manœuvre", EQUIPES[0], 3500),
+    ("M008", "KOUAMÉ Serge", "Chef d'équipe OH", EQUIPES[1], 10000),
+    ("M009", "BAMBA Seydou", "Ferrailleur", EQUIPES[1], 7000),
+    ("M010", "YAO Kouadio", "Coffreur", EQUIPES[1], 7000),
+    ("M011", "KONÉ Adama", "Maçon", EQUIPES[1], 7000),
+    ("M012", "SORO Nanga", "Manœuvre", EQUIPES[1], 3500),
+    ("M013", "DIABATÉ Moussa", "Chef d'équipe bâtiment", EQUIPES[2], 10000),
+    ("M014", "TRAORÉ Ibrahim", "Maçon", EQUIPES[2], 7000),
+    ("M015", "N'GUESSAN Paul", "Manœuvre", EQUIPES[2], 3500),
+    ("M016", "OUATTARA Lassina", "Manœuvre", EQUIPES[2], 3500),
+    ("M017", "ADOU Franck", "Soudeur-monteur", EQUIPES[3], 9000),
+    ("M018", "AKA Jérôme", "Aide-monteur", EQUIPES[3], 5000),
 ]
 pers_data = [dict(mat=m, nom=n, fct=f, eq=e, taux=t) for m, n, f, e, t in PERSONNEL]
 table(pers, 6, [
@@ -264,30 +306,41 @@ table(pers, 6, [
 
 # ================================================================ 01 PLANNING
 pl = wb.create_sheet("01_Planning")
-NB_SEM = 26
+NB_SEM = 40
 G0 = 12  # première colonne du Gantt (L)
 entete(pl, "01 · PLANNING GANTT DU CHANTIER", G0 + NB_SEM - 1,
        "Saisissez lot, tâche, date de début, durée et % réalisé. Fin, % prévu, écart et statut sont calculés. "
        "Barres : vert foncé = réalisé · vert clair = prévu · rouge = tâche en retard · colonne orange = semaine de la date de référence.")
+E_R, E_OH, E_B, E_CM, E_ENC, E_LAB, E_ST = EQUIPES
 P = [
-    ("L01 Installation chantier", "Installation de chantier, clôture, base vie", EQUIPES[3], D(2026, 8, 3), 7, 1),
-    ("L02 Terrassements", "Décapage terre végétale & implantation", EQUIPES[2], D(2026, 8, 8), 5, 1),
-    ("L02 Terrassements", "Fouilles en rigoles et semelles (sol latéritique)", EQUIPES[2], D(2026, 8, 12), 8, 1),
-    ("L03 Fondations", "Béton de propreté dosé 150 kg/m³", EQUIPES[0], D(2026, 8, 20), 3, 1),
-    ("L03 Fondations", "Semelles isolées & filantes en BA", EQUIPES[1], D(2026, 8, 23), 12, 1),
-    ("L03 Fondations", "Soubassement, longrines & remblai latéritique compacté", EQUIPES[0], D(2026, 9, 4), 12, 1),
-    ("L04 Gros œuvre RDC", "Dallage RDC (hérisson + dalle 10 cm)", EQUIPES[0], D(2026, 9, 16), 7, 1),
-    ("L04 Gros œuvre RDC", "Poteaux & élévation maçonnerie RDC", EQUIPES[0], D(2026, 9, 23), 18, 0.8),
-    ("L05 Gros œuvre R+1", "Coffrage & ferraillage poutres / dalle haute RDC", EQUIPES[1], D(2026, 10, 8), 14, 0.3),
-    ("L05 Gros œuvre R+1", "Coulage dalle haute RDC + cure humide 7 j", EQUIPES[1], D(2026, 10, 22), 9, 0),
-    ("L05 Gros œuvre R+1", "Élévation maçonnerie R+1", EQUIPES[0], D(2026, 11, 2), 18, 0),
-    ("L06 Charpente-couverture", "Chaînage haut, charpente & couverture", EQUIPES[1], D(2026, 11, 20), 15, 0),
-    ("L08 Plomberie-électricité", "Réseaux plomberie & électricité (saignées, gaines)", EQUIPES[4], D(2026, 11, 25), 20, 0),
-    ("L07 Second œuvre", "Enduits intérieurs & extérieurs", EQUIPES[0], D(2026, 12, 7), 18, 0),
-    ("L07 Second œuvre", "Chapes, carrelage & faïence", EQUIPES[4], D(2026, 12, 21), 15, 0),
-    ("L07 Second œuvre", "Menuiseries bois / alu & vitrerie", EQUIPES[4], D(2027, 1, 4), 12, 0),
-    ("L09 VRD-assainissement", "Fosse septique, puisard, caniveaux", EQUIPES[2], D(2027, 1, 5), 14, 0),
-    ("L07 Second œuvre", "Peinture, finitions, nettoyage & réception", EQUIPES[0], D(2027, 1, 14), 14, 0),
+    (LOTS[0], "Installation de chantier, base vie, laboratoire", E_ENC, D(2026, 8, 3), 15, 1),
+    (LOTS[9], "Reconnaissance des emprunts de latérite & essais d'identification", E_LAB, D(2026, 8, 5), 20, 1),
+    (LOTS[1], "Débroussaillage & décapage PK 0+000 à 20+000", E_R, D(2026, 8, 17), 60, 0.95),
+    (LOTS[1], "Scarification & reprofilage lourd PK 0+000 à 20+000", E_R, D(2026, 9, 1), 90, 0.45),
+    (LOTS[1], "Rechargement latéritique ép. 0,20 m + compactage 95 % OPM", E_R, D(2026, 9, 15), 100, 0.3),
+    (LOTS[1], "Fossés latéraux & exutoires", E_R, D(2026, 10, 1), 90, 0.1),
+    (LOTS[2], "Points critiques : purges & remblais latéritiques", E_R, D(2026, 9, 1), 60, 0.5),
+    (LOTS[3], "Pose buses Ø1000 (PC2, PC6)", E_OH, D(2026, 9, 21), 45, 0.5),
+    (LOTS[3], "Pose buses Ø800 (PC3, PC4, PC7)", E_OH, D(2026, 10, 5), 40, 0.25),
+    (LOTS[3], "Têtes de buses, perrés & enrochements", E_OH, D(2026, 11, 2), 40, 0),
+    (LOTS[4], "Dalot D1 – PK 3+200 – 1×(2,00×1,50)", E_OH, D(2026, 8, 24), 40, 1),
+    (LOTS[4], "Dalot D2 – PK 9+750 – 2×(2,50×2,00)", E_OH, D(2026, 9, 21), 55, 0.45),
+    (LOTS[4], "Dalot D3 – PK 16+400 – 1×(3,00×2,00)", E_OH, D(2026, 11, 16), 55, 0),
+    (LOTS[5], "Bâtiment : terrassements & fondations", E_B, D(2026, 8, 24), 30, 1),
+    (LOTS[5], "Bâtiment : élévation maçonnerie & BA", E_B, D(2026, 9, 23), 35, 0.6),
+    (LOTS[5], "Bâtiment : dalle / plancher haut", E_B, D(2026, 10, 28), 20, 0),
+    (LOTS[6], "Bâtiment : charpente-couverture & étanchéité", E_ST, D(2026, 11, 20), 25, 0),
+    (LOTS[6], "Bâtiment : plomberie, électricité, climatisation", E_ST, D(2026, 11, 25), 45, 0),
+    (LOTS[6], "Bâtiment : menuiseries bois, alu & métalliques", E_ST, D(2026, 12, 21), 30, 0),
+    (LOTS[6], "Bâtiment : revêtements, enduits & peinture", E_B, D(2027, 1, 5), 50, 0),
+    (LOTS[7], "Clôture : fouilles, semelles & soubassement", E_B, D(2026, 9, 14), 30, 0.9),
+    (LOTS[7], "Clôture : poteaux BA, élévation & chaînage", E_B, D(2026, 10, 12), 45, 0.15),
+    (LOTS[7], "Clôture : enduits, peinture & portail", E_B, D(2027, 1, 11), 25, 0),
+    (LOTS[8], "Charpente : plans d'exécution & approvisionnement acier", E_CM, D(2026, 9, 1), 30, 1),
+    (LOTS[8], "Charpente : fabrication atelier & anticorrosion", E_CM, D(2026, 10, 1), 45, 0.4),
+    (LOTS[8], "Charpente : montage hangar & couverture", E_CM, D(2026, 11, 16), 35, 0),
+    (LOTS[9], "Contrôles & essais (laboratoire) en continu", E_LAB, D(2026, 8, 10), 255, 0.25),
+    (LOTS[0], "Repli de chantier & réception provisoire", E_ENC, D(2027, 4, 15), 15, 0),
 ]
 pl_data = [dict(no=i + 1, lot=a, tache=b, resp=c, deb=d, dur=e, real=f) for i, (a, b, c, d, e, f) in enumerate(P)]
 NPL = 60
@@ -348,8 +401,9 @@ bu = wb.create_sheet("03_Budget")
 entete(bu, "03 · SUIVI BUDGÉTAIRE PAR LOT", 13,
        "Saisissez le budget prévu (déboursé sec) et les autres dépenses non facturées (caisse, petites dépenses). "
        "Engagé, factures et main-d'œuvre sont totalisés automatiquement depuis les onglets 05, 06 et 08.")
-BUDGET = [2_000_000, 3_500_000, 9_500_000, 14_000_000, 15_000_000, 7_500_000, 14_000_000, 6_000_000, 3_500_000]
-AUTRES = [350_000, 0, 120_000, 0, 0, 0, 0, 0, 0]
+BUDGET = [22_000_000, 190_000_000, 55_000_000, 30_000_000, 85_000_000, 55_000_000, 42_000_000,
+          17_000_000, 34_000_000, 8_000_000]
+AUTRES = [1_500_000, 6_000_000, 0, 0, 0, 0, 0, 0, 0, 500_000]
 NBU = 15
 bu_data = [dict(bud=b, aut=a) for b, a in zip(BUDGET, AUTRES)]
 let, f1, l1 = table(bu, 6, [
@@ -397,7 +451,7 @@ si = wb.create_sheet("04_Situations")
 entete(si, "04 · SITUATIONS DE TRAVAUX (décompte mensuel)", 13,
        "Base : DQE / BPU du marché. Chaque mois, reportez le cumul précédent puis saisissez les quantités exécutées "
        "dans le mois (attachements contradictoires). Le décompte (retenue de garantie, avance, TVA) est calculé en bas.")
-si["A5"], si["C5"] = "Situation n° :", 3
+si["A5"], si["C5"] = "Situation n° :", 2
 si["E5"], si["F5"] = "Période du :", D(2026, 10, 1)
 si["H5"], si["I5"] = "au :", D(2026, 10, 31)
 for a in ("A5", "E5", "H5"):
@@ -406,26 +460,33 @@ for a in ("C5", "F5", "I5"):
     si[a].font, si[a].fill, si[a].border = font(True, "1F3FBF"), fill(SAISIE), BORDER
 si["F5"].number_format = si["I5"].number_format = FMT["date"]
 DQE = [
-    ("1.1", LOTS[0], "Installation et repli de chantier", "ens", 1, 2_500_000, 1, 0),
-    ("2.1", LOTS[1], "Décapage et nivellement de la plateforme", "m²", 400, 1_500, 400, 0),
-    ("2.2", LOTS[1], "Fouilles en terrain latéritique", "m³", 180, 6_500, 180, 0),
-    ("2.3", LOTS[1], "Remblai latéritique compacté à 95 % OPM", "m³", 150, 9_000, 150, 0),
-    ("3.1", LOTS[2], "Béton de propreté dosé à 150 kg/m³", "m³", 12, 75_000, 12, 0),
-    ("3.2", LOTS[2], "Béton armé en fondations dosé à 350 kg/m³", "m³", 45, 185_000, 45, 0),
-    ("3.3", LOTS[2], "Maçonnerie de soubassement en agglos pleins", "m²", 160, 14_000, 160, 0),
-    ("4.1", LOTS[3], "Dallage RDC ép. 10 cm sur hérisson", "m²", 180, 15_000, 180, 0),
-    ("4.2", LOTS[3], "Béton armé poteaux et poutres RDC", "m³", 22, 210_000, 8, 6),
-    ("4.3", LOTS[3], "Maçonnerie agglos creux de 15 RDC", "m²", 420, 9_500, 180, 150),
-    ("5.1", LOTS[4], "Dalle haute RDC en BA ép. 16 cm", "m²", 180, 32_000, 0, 0),
-    ("5.2", LOTS[4], "Béton armé et maçonnerie R+1", "ens", 1, 13_500_000, 0, 0),
-    ("6.1", LOTS[5], "Charpente et couverture bac alu", "m²", 220, 32_000, 0, 0),
-    ("7.1", LOTS[6], "Enduits intérieurs et extérieurs", "m²", 1400, 3_500, 0, 0),
-    ("7.2", LOTS[6], "Carrelage et faïence", "m²", 320, 14_000, 0, 0),
-    ("7.3", LOTS[6], "Menuiseries bois et aluminium", "ens", 1, 6_500_000, 0, 0),
-    ("7.4", LOTS[6], "Peinture intérieure et extérieure", "m²", 1600, 2_200, 0, 0),
-    ("8.1", LOTS[7], "Plomberie sanitaire", "ens", 1, 3_800_000, 0, 0),
-    ("8.2", LOTS[7], "Électricité courants forts / faibles", "ens", 1, 3_500_000, 0, 0),
-    ("9.1", LOTS[8], "VRD et assainissement autonome", "ens", 1, 3_800_000, 0, 0),
+    ("1.1", LOTS[0], "Installation et repli de chantier", "ff", 1, 30_000_000, 0.6, 0.1),
+    ("1.2", LOTS[9], "Laboratoire de chantier, essais et contrôles", "ff", 1, 6_000_000, 0.2, 0.1),
+    ("2.1", LOTS[1], "Débroussaillage, dessouchage et décapage", "m²", 160_000, 150, 120_000, 30_000),
+    ("2.2", LOTS[1], "Scarification, reprofilage lourd et compactage de la plateforme", "km", 20, 4_500_000, 6, 2.5),
+    ("2.3", LOTS[1], "Rechargement en latérite ép. 0,20 m (extraction, transport, mise en œuvre)", "m³", 20_000, 5_200, 6_000, 1_800),
+    ("2.4", LOTS[1], "Fossés latéraux et exutoires", "ml", 12_000, 1_500, 0, 1_200),
+    ("3.1", LOTS[2], "Purge des matériaux impropres aux points critiques", "m³", 3_000, 3_500, 1_200, 400),
+    ("3.2", LOTS[2], "Remblai latéritique compacté à 95 % OPM", "m³", 6_000, 7_500, 2_000, 1_000),
+    ("3.3", LOTS[2], "Enrochements et perrés secs", "m³", 300, 45_000, 0, 0),
+    ("4.1", LOTS[3], "Fourniture et pose de buses BA Ø800", "ml", 48, 120_000, 0, 12),
+    ("4.2", LOTS[3], "Fourniture et pose de buses BA Ø1000", "ml", 60, 165_000, 12, 12),
+    ("4.3", LOTS[3], "Têtes de buses en béton armé (murs de tête et en aile)", "u", 10, 850_000, 0, 0),
+    ("5.1", LOTS[4], "Béton de propreté dosé à 150 kg/m³ (dalots)", "m³", 20, 85_000, 12, 2),
+    ("5.2", LOTS[4], "Béton armé dosé à 350 kg/m³ pour dalots", "m³", 260, 220_000, 70, 45),
+    ("5.3", LOTS[4], "Aciers HA pour dalots", "kg", 26_000, 1_100, 7_000, 4_500),
+    ("5.4", LOTS[4], "Remblais techniques compactés", "m³", 900, 9_000, 300, 0),
+    ("5.5", LOTS[4], "Perrés maçonnés", "m²", 250, 25_000, 80, 0),
+    ("6.1", LOTS[5], "Bâtiment – gros œuvre (terrassements, fondations, élévation, dalle)", "ens", 1, 62_000_000, 0.3, 0.15),
+    ("6.2", LOTS[6], "Bâtiment – charpente, couverture et étanchéité", "ens", 1, 9_000_000, 0, 0),
+    ("6.3", LOTS[6], "Bâtiment – menuiseries bois, aluminium et métalliques", "ens", 1, 8_500_000, 0, 0),
+    ("6.4", LOTS[6], "Bâtiment – plomberie sanitaire", "ens", 1, 6_000_000, 0, 0),
+    ("6.5", LOTS[6], "Bâtiment – électricité CFO / CFA et climatisation", "ens", 1, 7_500_000, 0, 0),
+    ("6.6", LOTS[6], "Bâtiment – revêtements, enduits et peinture", "ens", 1, 9_000_000, 0, 0),
+    ("7.1", LOTS[7], "Clôture agglos + poteaux BA, h = 2,50 m", "ml", 400, 45_000, 0, 120),
+    ("7.2", LOTS[7], "Portail métallique 6 m", "u", 1, 2_500_000, 0, 0),
+    ("8.1", LOTS[8], "Charpente métallique hangar (fourniture, fabrication, montage)", "kg", 18_000, 1_850, 0, 4_000),
+    ("8.2", LOTS[8], "Couverture et bardage bac aluminium", "m²", 600, 12_000, 0, 0),
 ]
 si_data = [dict(no=a, lot=b, des=c, u=d, qm=e, pu=f, qp=g, qmois=h) for a, b, c, d, e, f, g, h in DQE]
 NSI = 60
@@ -490,17 +551,23 @@ entete(fa, "05 · FACTURES FOURNISSEURS & ÉCHÉANCIER DE PAIEMENT", 18,
        "Saisissez chaque facture reçue et les paiements effectués. Statut et retards sont calculés "
        "par rapport à la date de référence. Les montants HT alimentent le suivi budgétaire (03).")
 FACT = [
-    ("FA-0812", D(2026, 8, 12), FOURN[0], LOTS[2], "Ciment CPJ 42.5 – 300 sacs", "BC-001", 1_560_000, 30, 1_840_800, D(2026, 9, 10)),
-    ("LOC-0815", D(2026, 8, 15), FOURN[5], LOTS[1], "Location niveleuse + compacteur 5 j", "", 1_200_000, 30, 1_416_000, D(2026, 9, 14)),
-    ("FQ-2201", D(2026, 8, 22), FOURN[1], LOTS[2], "Acier HA12 – 120 barres", "BC-002", 672_000, 30, 792_960, D(2026, 9, 20)),
-    ("FQ-2202", D(2026, 8, 22), FOURN[1], LOTS[2], "Acier HA10 – 150 barres", "BC-003", 585_000, 30, 690_300, D(2026, 9, 20)),
-    ("CA-0904", D(2026, 9, 4), FOURN[2], LOTS[2], "Gravier 5/15 – 30 m³", "BC-004", 540_000, 30, 300_000, D(2026, 9, 30)),
-    ("SL-0904", D(2026, 9, 4), FOURN[3], LOTS[2], "Sable lagunaire – 40 m³", "BC-005", 360_000, 30, 424_800, D(2026, 9, 28)),
-    ("BR-0926", D(2026, 9, 26), FOURN[4], LOTS[3], "Agglos creux 15 – 2 500 u", "BC-006", 875_000, 30, None, None),
-    ("FA-1010", D(2026, 10, 10), FOURN[0], LOTS[4], "Ciment CPJ 42.5 – 250 sacs", "BC-007", 1_300_000, 15, None, None),
-    ("FQ-1013", D(2026, 10, 13), FOURN[1], LOTS[4], "Acier HA14 – 60 barres (livraison partielle)", "BC-008", 468_000, 30, None, None),
+    ("SS-0805", D(2026, 8, 5), FOURN[6], LOTS[1], "Gasoil 20 000 l", "BC-010", 14_300_000, 30, 14_300_000, D(2026, 8, 20)),
+    ("DC-0812", D(2026, 8, 12), FOURN[0], LOTS[4], "Ciment CPJ 42.5 – 600 sacs", "BC-001", 3_120_000, 30, 3_681_600, D(2026, 9, 10)),
+    ("QG-0815", D(2026, 8, 15), FOURN[1], LOTS[4], "Acier HA12 – 400 barres", "BC-002", 2_240_000, 30, 2_643_200, D(2026, 9, 12)),
+    ("QG-0816", D(2026, 8, 15), FOURN[1], LOTS[4], "Acier HA16 – 300 barres", "BC-003", 2_940_000, 30, 3_469_200, D(2026, 9, 12)),
+    ("SB-0825", D(2026, 8, 25), FOURN[3], LOTS[4], "Sable – 120 m³", "BC-005", 1_440_000, 30, 1_699_200, D(2026, 9, 20)),
+    ("CG-0826", D(2026, 8, 26), FOURN[2], LOTS[4], "Gravier 5/15 – 200 m³", "BC-007", 4_400_000, 30, 2_000_000, D(2026, 9, 25)),
+    ("QG-0826", D(2026, 8, 26), FOURN[1], LOTS[5], "Acier HA10 – 250 barres", "BC-004", 975_000, 30, 1_150_500, D(2026, 9, 20)),
+    ("LE-0831", D(2026, 8, 31), FOURN[7], LOTS[1], "Location niveleuse, compacteur, citernes – août", "", 18_500_000, 30, 21_830_000, D(2026, 9, 29)),
+    ("BR-0910", D(2026, 9, 10), FOURN[4], LOTS[5], "Agglos creux 15 – 6 000 u", "BC-012", 2_250_000, 30, 2_655_000, D(2026, 10, 5)),
+    ("DC-0920", D(2026, 9, 20), FOURN[0], LOTS[4], "Ciment CPJ 42.5 – 400 sacs", "BC-006", 2_080_000, 30, None, None),
+    ("SS-0926", D(2026, 9, 26), FOURN[6], LOTS[1], "Gasoil 15 000 l", "BC-011", 10_725_000, 30, 10_725_000, D(2026, 10, 6)),
+    ("LE-0930", D(2026, 9, 30), FOURN[7], LOTS[1], "Location niveleuse, compacteur, citernes – septembre", "", 24_000_000, 30, 10_000_000, D(2026, 10, 10)),
+    ("PB-1001", D(2026, 10, 1), FOURN[5], LOTS[3], "Buses BA Ø1000 – 36 éléments", "BC-008", 4_500_000, 30, None, None),
+    ("AC-1005", D(2026, 10, 5), FOURN[9], LOTS[8], "Acompte 30 % fourniture acier charpente", "", 9_990_000, 15, None, None),
+    ("LG-1010", D(2026, 10, 10), FOURN[8], LOTS[9], "Essais Proctor, CBR, densités, écrasements – septembre", "", 1_850_000, 30, None, None),
 ]
-fa_data = [dict(num=a, date=b, four=c, lot=d, obj=e, bc=f, ht=g, tx=0.18, delai=h, paye=i, dpay=j)
+fa_data = [dict(num=a, date=b, four=c, lot=d, obj=e, bc=f, ht=g, tx=0 if c == FOURN[6] else 0.18, delai=h, paye=i, dpay=j)
            for a, b, c, d, e, f, g, h, i, j in FACT]
 let, f1, l1 = table(fa, 6, [
     dict(key="num", h="N° facture", w=11, name="FA_Num"),
@@ -536,16 +603,18 @@ entete(pt, "06 · POINTAGE JOURNALIER DES OUVRIERS", 12,
        "Une ligne par ouvrier et par jour. Saisissez date, matricule, lot, tâche, présence (P / A / 1/2) et heures. "
        "Nom, équipe, taux et coût sont repris du fichier Personnel. Le coût alimente le budget par lot.")
 pt_data = []
-ASSIGN = {EQUIPES[0]: (LOTS[3], "Poteaux & élévation maçonnerie RDC"),
-          EQUIPES[1]: (LOTS[4], "Coffrage & ferraillage poutres / dalle haute RDC"),
-          EQUIPES[2]: (LOTS[3], "Approvisionnement poste maçonnerie"),
-          EQUIPES[3]: (LOTS[0], "Encadrement, réception des livraisons")}
+ASSIGN = {E_R: (LOTS[1], "Rechargement latéritique ép. 0,20 m + compactage 95 % OPM"),
+          E_OH: (LOTS[4], "Dalot D2 – PK 9+750 – 2×(2,50×2,00)"),
+          E_B: (LOTS[5], "Bâtiment : élévation maçonnerie & BA"),
+          E_CM: (LOTS[8], "Charpente : fabrication atelier & anticorrosion"),
+          E_ENC: (LOTS[0], "Installation de chantier, base vie, laboratoire"),
+          E_LAB: (LOTS[9], "Contrôles & essais (laboratoire) en continu")}
 for jour in (D(2026, 10, 15), D(2026, 10, 16)):
     for m, n_, f_, e, t in PERSONNEL:
         pres, h = "P", 8
-        if m == "M006" and jour.day == 16:
+        if m == "M007" and jour.day == 16:
             pres, h = "A", 0
-        if m == "M012" and jour.day == 15:
+        if m == "M016" and jour.day == 15:
             pres, h = "1/2", 4
         pt_data.append(dict(date=jour, mat=m, lot=ASSIGN[e][0], tache=ASSIGN[e][1], pres=pres, h=h))
 let, f1, l1 = table(pt, 6, [
@@ -575,10 +644,12 @@ entete(af, "07 · AFFECTATION DES ÉQUIPES (qui travaille, où, sur quelle tâch
 af_data = []
 for jour in (D(2026, 10, 15), D(2026, 10, 16)):
     af_data += [
-        dict(date=jour, eq=EQUIPES[0], chef="KOUAMÉ Serge", tache="Poteaux & élévation maçonnerie RDC", lot=LOTS[3], zone="Façade nord – axes 1 à 3", prev=5),
-        dict(date=jour, eq=EQUIPES[1], chef="BAMBA Seydou", tache="Coffrage & ferraillage poutres / dalle haute RDC", lot=LOTS[4], zone="Travées A-B", prev=4),
-        dict(date=jour, eq=EQUIPES[2], chef="GNAHORÉ Didier", tache="Approvisionnement poste maçonnerie", lot=LOTS[3], zone="Aire de stockage", prev=2),
-        dict(date=jour, eq=EQUIPES[3], chef="KOFFI Yao", tache="Encadrement, réception des livraisons", lot=LOTS[0], zone="Tout le chantier", prev=1),
+        dict(date=jour, eq=E_R, chef="GNAHORÉ Didier", tache=ASSIGN[E_R][1], lot=LOTS[1], zone="Tronçon T08 – PK 7+000 à 8+000", prev=4),
+        dict(date=jour, eq=E_OH, chef="KOUAMÉ Serge", tache=ASSIGN[E_OH][1], lot=LOTS[4], zone="Dalot D2 – PK 9+750 (piédroits)", prev=5),
+        dict(date=jour, eq=E_B, chef="DIABATÉ Moussa", tache=ASSIGN[E_B][1], lot=LOTS[5], zone="Bâtiment – façade nord", prev=4),
+        dict(date=jour, eq=E_CM, chef="ADOU Franck", tache=ASSIGN[E_CM][1], lot=LOTS[8], zone="Atelier – fermes F1", prev=2),
+        dict(date=jour, eq=E_ENC, chef="KOFFI Yao", tache=ASSIGN[E_ENC][1], lot=LOTS[0], zone="Tout le chantier + topographie T09", prev=2),
+        dict(date=jour, eq=E_LAB, chef="KOUASSI Arsène", tache=ASSIGN[E_LAB][1], lot=LOTS[9], zone="T08 – densités en place", prev=1),
     ]
 let, f1, l1 = table(af, 6, [
     dict(key="date", h="Date", w=11, fmt="date", name="AF_Date"),
@@ -608,16 +679,19 @@ entete(bc, "08 · BONS DE COMMANDE (BC) & SUIVI DES LIVRAISONS", 16,
        "Une ligne par article commandé. Les quantités livrées sont reprises des entrées de stock (09b) "
        "portant le même N° BC et le même code article. Les montants HT forment l'« engagé » du budget.")
 BCS = [
-    ("BC-001", D(2026, 8, 5), FOURN[0], LOTS[2], "CIM42", 300, 5_200, D(2026, 8, 10)),
-    ("BC-002", D(2026, 8, 18), FOURN[1], LOTS[2], "HA12", 120, 5_600, D(2026, 8, 21)),
-    ("BC-003", D(2026, 8, 18), FOURN[1], LOTS[2], "HA10", 150, 3_900, D(2026, 8, 21)),
-    ("BC-004", D(2026, 9, 1), FOURN[2], LOTS[2], "GRA", 30, 18_000, D(2026, 9, 3)),
-    ("BC-005", D(2026, 9, 1), FOURN[3], LOTS[2], "SAB", 40, 9_000, D(2026, 9, 3)),
-    ("BC-006", D(2026, 9, 20), FOURN[4], LOTS[3], "AGG15", 3000, 350, D(2026, 9, 25)),
-    ("BC-007", D(2026, 10, 5), FOURN[0], LOTS[4], "CIM42", 250, 5_200, D(2026, 10, 10)),
-    ("BC-008", D(2026, 10, 6), FOURN[1], LOTS[4], "HA14", 100, 7_800, D(2026, 10, 12)),
-    ("BC-009", D(2026, 10, 12), FOURN[1], LOTS[4], "HA8", 200, 2_600, D(2026, 10, 20)),
-    ("BC-010", D(2026, 10, 13), FOURN[1], LOTS[4], "PLA", 150, 2_500, D(2026, 10, 15)),
+    ("BC-001", D(2026, 8, 6), FOURN[0], LOTS[4], "CIM42", 600, 5_200, D(2026, 8, 12)),
+    ("BC-002", D(2026, 8, 10), FOURN[1], LOTS[4], "HA12", 400, 5_600, D(2026, 8, 14)),
+    ("BC-003", D(2026, 8, 10), FOURN[1], LOTS[4], "HA16", 300, 9_800, D(2026, 8, 14)),
+    ("BC-004", D(2026, 8, 20), FOURN[1], LOTS[5], "HA10", 250, 3_900, D(2026, 8, 24)),
+    ("BC-005", D(2026, 8, 20), FOURN[3], LOTS[4], "SAB", 120, 12_000, D(2026, 8, 25)),
+    ("BC-006", D(2026, 9, 15), FOURN[0], LOTS[4], "CIM42", 400, 5_200, D(2026, 9, 19)),
+    ("BC-007", D(2026, 8, 20), FOURN[2], LOTS[4], "GRA", 200, 22_000, D(2026, 8, 26)),
+    ("BC-008", D(2026, 9, 10), FOURN[5], LOTS[3], "BUS1000", 60, 125_000, D(2026, 9, 30)),
+    ("BC-009", D(2026, 9, 20), FOURN[5], LOTS[3], "BUS800", 48, 85_000, D(2026, 10, 10)),
+    ("BC-010", D(2026, 8, 4), FOURN[6], LOTS[1], "GASOIL", 20_000, 715, D(2026, 8, 5)),
+    ("BC-011", D(2026, 9, 25), FOURN[6], LOTS[1], "GASOIL", 15_000, 715, D(2026, 9, 26)),
+    ("BC-012", D(2026, 9, 1), FOURN[4], LOTS[5], "AGG15", 6_000, 375, D(2026, 9, 8)),
+    ("BC-013", D(2026, 10, 12), FOURN[1], LOTS[7], "HA8", 300, 2_600, D(2026, 10, 20)),
 ]
 bc_data = [dict(num=a, date=b, four=c, lot=d, code=e, q=f, pu=g, dprev=h) for a, b, c, d, e, f, g, h in BCS]
 let, f1, l1 = table(bc, 6, [
@@ -654,17 +728,19 @@ entete(st, "09 · STOCK DES MATÉRIAUX (état en temps réel)", 12,
        "Catalogue des articles. Entrées et sorties sont totalisées depuis l'onglet 09b_Livraisons. "
        "Fixez un seuil d'alerte réaliste (délai d'approvisionnement × consommation journalière).")
 ART = [
-    ("CIM42", "Ciment CPJ 42.5 (sac 50 kg)", "sac", 0, 80, 5_200),
-    ("HA8", "Acier HA8 (barre 12 m)", "barre", 0, 40, 2_600),
+    ("CIM42", "Ciment CPJ 42.5 (sac 50 kg)", "sac", 0, 150, 5_200),
+    ("HA8", "Acier HA8 (barre 12 m)", "barre", 120, 40, 2_600),
     ("HA10", "Acier HA10 (barre 12 m)", "barre", 0, 30, 3_900),
-    ("HA12", "Acier HA12 (barre 12 m)", "barre", 0, 30, 5_600),
-    ("HA14", "Acier HA14 (barre 12 m)", "barre", 0, 20, 7_800),
-    ("SAB", "Sable lagunaire", "m³", 0, 8, 9_000),
-    ("GRA", "Gravier concassé 5/15", "m³", 0, 6, 18_000),
-    ("AGG15", "Agglos creux de 15", "u", 0, 300, 350),
-    ("PLA", "Planche de coffrage", "u", 0, 40, 2_500),
-    ("FIL", "Fil à ligaturer recuit", "kg", 25, 10, 1_500),
-    ("POI", "Pointes assorties", "kg", 20, 10, 1_200),
+    ("HA12", "Acier HA12 (barre 12 m)", "barre", 0, 50, 5_600),
+    ("HA16", "Acier HA16 (barre 12 m)", "barre", 0, 40, 9_800),
+    ("SAB", "Sable", "m³", 0, 15, 12_000),
+    ("GRA", "Gravier concassé 5/15", "m³", 0, 20, 22_000),
+    ("BUS800", "Buse BA Ø800 (élément 1 m)", "u", 0, 6, 85_000),
+    ("BUS1000", "Buse BA Ø1000 (élément 1 m)", "u", 0, 6, 125_000),
+    ("GASOIL", "Gasoil engins", "l", 0, 5_000, 715),
+    ("AGG15", "Agglos creux de 15", "u", 0, 500, 375),
+    ("PLA", "Planche de coffrage", "u", 100, 30, 2_500),
+    ("FIL", "Fil à ligaturer recuit", "kg", 50, 15, 1_500),
 ]
 st_data = [dict(code=a, des=b, u=c, si=d, seuil=e, pu=f) for a, b, c, d, e, f in ART]
 let, f1, l1 = table(st, 6, [
@@ -695,25 +771,33 @@ entete(mv, "09b · MOUVEMENTS DE STOCK (livraisons reçues & sorties chantier)",
        "Entrée = livraison fournisseur (indiquez le N° BC et le N° de bon de livraison). "
        "Sortie = consommation sur chantier (indiquez le lot destinataire).")
 MV = [
-    (D(2026, 8, 10), "Entrée", "CIM42", 300, "BC-001", "BL-4471", ""),
-    (D(2026, 8, 21), "Entrée", "HA12", 120, "BC-002", "BL-1022", ""),
-    (D(2026, 8, 21), "Entrée", "HA10", 150, "BC-003", "BL-1022", ""),
-    (D(2026, 8, 23), "Sortie", "HA12", 110, "", "BS-001", LOTS[2]),
-    (D(2026, 8, 23), "Sortie", "HA10", 100, "", "BS-001", LOTS[2]),
-    (D(2026, 8, 24), "Sortie", "FIL", 8, "", "BS-002", LOTS[2]),
-    (D(2026, 8, 24), "Sortie", "POI", 6, "", "BS-002", LOTS[2]),
-    (D(2026, 9, 3), "Entrée", "GRA", 30, "BC-004", "BL-0903", ""),
-    (D(2026, 9, 3), "Entrée", "SAB", 40, "BC-005", "BL-0377", ""),
-    (D(2026, 9, 5), "Sortie", "CIM42", 270, "", "BS-003", LOTS[2]),
-    (D(2026, 9, 5), "Sortie", "GRA", 20, "", "BS-003", LOTS[2]),
-    (D(2026, 9, 5), "Sortie", "SAB", 30, "", "BS-003", LOTS[2]),
-    (D(2026, 9, 26), "Entrée", "AGG15", 2500, "BC-006", "BL-2601", ""),
-    (D(2026, 10, 2), "Sortie", "AGG15", 2300, "", "BS-004", LOTS[3]),
-    (D(2026, 10, 10), "Entrée", "CIM42", 250, "BC-007", "BL-4590", ""),
-    (D(2026, 10, 13), "Entrée", "HA14", 60, "BC-008", "BL-1101", ""),
-    (D(2026, 10, 15), "Sortie", "CIM42", 120, "", "BS-005", LOTS[3]),
-    (D(2026, 10, 16), "Sortie", "CIM42", 80, "", "BS-006", LOTS[4]),
-    (D(2026, 10, 16), "Sortie", "HA14", 20, "", "BS-006", LOTS[4]),
+    (D(2026, 8, 5), "Entrée", "GASOIL", 20_000, "BC-010", "BL-S801", ""),
+    (D(2026, 8, 12), "Entrée", "CIM42", 600, "BC-001", "BL-C112", ""),
+    (D(2026, 8, 14), "Entrée", "HA12", 400, "BC-002", "BL-Q214", ""),
+    (D(2026, 8, 14), "Entrée", "HA16", 300, "BC-003", "BL-Q214", ""),
+    (D(2026, 8, 24), "Entrée", "HA10", 250, "BC-004", "BL-Q224", ""),
+    (D(2026, 8, 25), "Entrée", "SAB", 120, "BC-005", "BL-S025", ""),
+    (D(2026, 8, 26), "Entrée", "GRA", 200, "BC-007", "BL-G026", ""),
+    (D(2026, 8, 31), "Sortie", "GASOIL", 16_500, "", "BS-GO-08", LOTS[1]),
+    (D(2026, 9, 5), "Sortie", "CIM42", 520, "", "BS-001", LOTS[4]),
+    (D(2026, 9, 5), "Sortie", "HA12", 360, "", "BS-001", LOTS[4]),
+    (D(2026, 9, 5), "Sortie", "HA16", 180, "", "BS-001", LOTS[4]),
+    (D(2026, 9, 5), "Sortie", "GRA", 170, "", "BS-001", LOTS[4]),
+    (D(2026, 9, 5), "Sortie", "SAB", 95, "", "BS-001", LOTS[4]),
+    (D(2026, 9, 8), "Entrée", "AGG15", 6_000, "BC-012", "BL-B908", ""),
+    (D(2026, 9, 10), "Sortie", "HA10", 150, "", "BS-002", LOTS[5]),
+    (D(2026, 9, 19), "Entrée", "CIM42", 400, "BC-006", "BL-C419", ""),
+    (D(2026, 9, 26), "Entrée", "GASOIL", 15_000, "BC-011", "BL-S926", ""),
+    (D(2026, 9, 30), "Sortie", "GASOIL", 15_000, "", "BS-GO-09", LOTS[1]),
+    (D(2026, 10, 1), "Entrée", "BUS1000", 36, "BC-008", "BL-P101", ""),
+    (D(2026, 10, 2), "Sortie", "BUS1000", 24, "", "BS-003", LOTS[3]),
+    (D(2026, 10, 3), "Sortie", "AGG15", 4_800, "", "BS-004", LOTS[5]),
+    (D(2026, 10, 5), "Entrée", "BUS800", 12, "BC-009", "BL-P105", ""),
+    (D(2026, 10, 6), "Sortie", "BUS800", 12, "", "BS-005", LOTS[3]),
+    (D(2026, 10, 15), "Sortie", "CIM42", 330, "", "BS-006", LOTS[4]),
+    (D(2026, 10, 15), "Sortie", "PLA", 40, "", "BS-006", LOTS[4]),
+    (D(2026, 10, 15), "Sortie", "FIL", 30, "", "BS-006", LOTS[4]),
+    (D(2026, 10, 16), "Sortie", "HA8", 100, "", "BS-007", LOTS[7]),
 ]
 mv_data = [dict(date=a, type=b, code=c, q=d, bc=e, bl=f, lot=g, rec="KOFFI Yao") for a, b, c, d, e, f, g in MV]
 let, f1, l1 = table(mv, 6, [
@@ -741,11 +825,11 @@ entete(jo, "10 · JOURNAL DE CHANTIER", 12,
        "Une ligne par jour. Effectif et livraisons sont calculés depuis le pointage et les mouvements de stock. "
        "Notez systématiquement les intempéries (pluies) : elles justifient les demandes de prolongation de délai.")
 JO = [
-    (D(2026, 10, 12), "Ensoleillé", 32, "Élévation agglos RDC façade est ; préparation coffrage poutres", "", "Non", "RAS – port EPI vérifié", 0),
-    (D(2026, 10, 13), "Forte pluie", 27, "Arrêt partiel matin ; ferraillage poutres l'après-midi", "", "Oui", "Évacuation eaux pluviales des fouilles", 3),
-    (D(2026, 10, 14), "Nuageux", 30, "Ferraillage poutres travées A-B ; élévation axes 1-2", "Visite MOE – contrôle ferraillage", "Non", "RAS", 0),
-    (D(2026, 10, 15), "Ensoleillé", 33, "Élévation axes 2-3 ; coffrage poutres", "", "Non", "Arrosage des maçonneries (chaleur)", 0),
-    (D(2026, 10, 16), "Pluie faible", 29, "Coffrage poutres ; élévation axes 3 ; contrôle aplomb poteaux", "", "Oui", "Rappel consignes travail en hauteur", 1),
+    (D(2026, 10, 12), "Ensoleillé", 33, "Rechargement T07 (PK 6+000–7+000) 1 000 m³ ; coffrage piédroits D2 ; élévation bâtiment", "", "Non", "RAS – port EPI vérifié", 0),
+    (D(2026, 10, 13), "Forte pluie", 27, "Arrêt rechargement 4 h ; ferraillage piédroits D2 ; fabrication fermes atelier", "", "Oui", "Évacuation eaux pluviales ; latérite T08 détrempée", 4),
+    (D(2026, 10, 14), "Nuageux", 30, "Compactage T08 ; essais densité en place (93,5 % OPM : non conforme)", "Visite MDC – contrôle compactage T08", "Oui", "Signalisation de la zone de travaux", 0),
+    (D(2026, 10, 15), "Ensoleillé", 33, "Reprise T08 (scarification, aération) ; débroussaillage T19 ; poteaux clôture tronçon A", "", "Oui", "Arrosage piste (poussière riverains)", 0),
+    (D(2026, 10, 16), "Pluie faible", 29, "Recompactage T08 ; ferraillage piédroits D2 (PA en attente) ; élévation bâtiment", "", "Oui", "Panne compacteur – zone balisée", 1),
 ]
 jo_data = [dict(date=a, meteo=b, t=c, trav=d, vis=e, inc=f, hse=g, hp=h, red=AUTEUR) for a, b, c, d, e, f, g, h in JO]
 let, f1, l1 = table(jo, 6, [
@@ -773,15 +857,18 @@ entete(inc, "11 · FICHES INCIDENTS / ALERTES", 15,
        "Documentez tout incident (sécurité, qualité, retard, intempérie, approvisionnement…) avec sa cause, "
        "l'action corrective, le responsable et l'échéance. Une échéance dépassée non close passe en rouge.")
 INC = [
-    ("INC-01", D(2026, 10, 13), "Intempérie", "Moyenne", LOTS[3], "Forte pluie : fouilles VRD inondées, arrêt 3 h",
-     "Pluies de la petite saison", "Pompage, arrêt des travaux exposés", "Demande de prolongation à documenter (journal)",
-     "KOFFI Yao", D(2026, 10, 20), "En cours", 45_000),
-    ("INC-02", D(2026, 10, 15), "Approvisionnement", "Majeure", LOTS[4], "Planches de coffrage BC-010 non livrées",
-     "Rupture chez le fournisseur", "Relance fournisseur", "Recherche d'un fournisseur alternatif",
-     "Moulo Jean Claude", D(2026, 10, 17), "Ouvert", 0),
-    ("INC-03", D(2026, 10, 16), "Qualité / non-conformité", "Mineure", LOTS[3], "Défaut d'aplomb poteau P7 (12 mm)",
-     "Coffrage mal contreventé", "Marquage du poteau", "Ragréage et contrôle systématique au fil à plomb",
-     "KOUAMÉ Serge", D(2026, 10, 19), "Ouvert", 25_000),
+    ("INC-01", D(2026, 10, 13), "Intempérie", "Moyenne", LOTS[1], "Forte pluie : arrêt rechargement 4 h, latérite T08 détrempée",
+     "Petite saison des pluies", "Arrêt des engins, drainage provisoire", "Journal des intempéries pour demande de prolongation",
+     "KOFFI Yao", D(2026, 10, 20), "En cours", 1_200_000),
+    ("INC-02", D(2026, 10, 14), "Qualité / non-conformité", "Majeure", LOTS[1], "Compacité 93,5 % OPM sur T08 (< 95 %)",
+     "Teneur en eau trop élevée après la pluie", "Point d'arrêt : pas de couche suivante", "Scarifier, aérer, recompacter, nouvel essai de densité",
+     AUTEUR, D(2026, 10, 18), "Ouvert", 850_000),
+    ("INC-03", D(2026, 10, 15), "Approvisionnement", "Majeure", LOTS[3], "Buses Ø800 BC-009 : 12 livrées sur 48, pose PC4 bloquée",
+     "Retard de production du préfabricant", "Relance écrite du fournisseur", "Pénalités / recherche d'un second préfabricant",
+     AUTEUR, D(2026, 10, 20), "Ouvert", 0),
+    ("INC-04", D(2026, 10, 16), "Matériel / panne", "Moyenne", LOTS[1], "Panne compacteur V5 (flexible hydraulique)",
+     "Usure – entretien préventif non fait", "Location d'un compacteur de remplacement", "Planning d'entretien des engins",
+     "GNAHORÉ Didier", D(2026, 10, 18), "En cours", 450_000),
 ]
 in_data = [dict(num=a, date=b, type=c, grav=d, lot=e, des=f, cause=g, mes=h, act=i, resp=j, ech=k, stat=l, cout=m)
            for a, b, c, d, e, f, g, h, i, j, k, l, m in INC]
@@ -836,6 +923,16 @@ CK = [
     ("HSE", "Plan de circulation et signalisation du chantier"),
     ("Qualité", "PAQ établi : points d'arrêt (fond de fouille, ferraillage avant coulage)"),
     ("Qualité", "Journal de chantier (10) ouvert, réunion de lancement tenue, PV diffusé"),
+    ("Route", "Emprunts de latérite identifiés, autorisés (propriétaires / administration) et essayés (Proctor, CBR)"),
+    ("Route", "Piquetage de l'axe, profils en travers et repères PK posés (topographie)"),
+    ("Route", "Inventaire contradictoire des points critiques et des ouvrages existants (PV)"),
+    ("Route", "Engins mobilisés et vérifiés : niveleuse, compacteur, chargeuse, camions, citerne à eau"),
+    ("Route", "Signalisation temporaire et déviations (sécurité usagers et riverains)"),
+    ("Ouvrages", "Plans d'exécution dalots et têtes de buses validés (BA : EC2 / BAEL)"),
+    ("Ouvrages", "Préfabricant de buses Ø800 / Ø1000 retenu, classe des buses et délais confirmés"),
+    ("Charpente", "Plans d'atelier et notes de calcul charpente métallique validés (EC3)"),
+    ("Contrôle", "Plan de contrôle (onglet Plan_controle) validé par la mission de contrôle"),
+    ("Contrôle", "Liste des points d'arrêt et circuit de levée (entreprise / MDC) diffusés"),
 ]
 ck_data = [dict(dom=a, item=b, stat="À faire") for a, b in CK]
 let, f1, l1 = table(ck, 6, [
@@ -881,6 +978,18 @@ LEX = [
     ("Point d'arrêt", "Contrôle obligatoire avant de poursuivre (ex. réception ferraillage avant coulage)."),
     ("Retenue de garantie", "Pourcentage (souvent 5 %) retenu sur les paiements jusqu'à la levée des réserves."),
     ("Situation de travaux", "Décompte périodique des travaux exécutés, servant à la facturation au client."),
+    ("Buse", "Conduite préfabriquée en béton armé (ici Ø800 et Ø1000) assurant le passage des eaux sous la chaussée."),
+    ("Dalot", "Ouvrage hydraulique cadre en béton armé (radier, piédroits, dalle) de section rectangulaire."),
+    ("Emprunt", "Gisement de matériaux (latérite) exploité pour les remblais et le rechargement."),
+    ("EC3", "Eurocode 3 (NF EN 1993) : calcul des structures en acier (charpente métallique)."),
+    ("MDC", "Mission de contrôle : surveille et valide l'exécution pour le compte du maître d'ouvrage."),
+    ("Mur de tête / en aile", "Murs en BA aux extrémités d'une buse ou d'un dalot, protégeant le remblai de l'érosion."),
+    ("Perré", "Revêtement de talus ou de lit (moellons maçonnés ou secs) contre l'érosion."),
+    ("Point critique (route)", "Section dégradée de route en terre (bourbier, ravinement, zone inondable) à traiter spécifiquement."),
+    ("Purge", "Enlèvement des matériaux impropres (argile, vase) remplacés par un matériau sain compacté."),
+    ("Rechargement", "Apport d'une couche de latérite (ex. 0,20 m) compactée pour reconstituer la couche de roulement."),
+    ("Reprofilage lourd", "Scarification et remise en forme de la plateforme à la niveleuse avec apport, arrosage et compactage."),
+    ("TCE", "Tous corps d'état : ensemble des métiers d'un bâtiment (gros œuvre, menuiserie, plomberie, électricité…)."),
 ]
 lx.column_dimensions["A"].width = 26
 lx.column_dimensions["B"].width = 100
@@ -889,6 +998,411 @@ for i, hd in enumerate(["Terme", "Définition"]):
 for i, (t, d_) in enumerate(LEX):
     a, b = lx.cell(7 + i, 1, t), lx.cell(7 + i, 2, d_)
     a.font, a.border, b.border, b.alignment = font(True, VERT), BORDER, BORDER, LEFT
+
+# ======================================================= SUIVIS SPÉCIALISÉS
+from openpyxl.formatting.rule import ColorScaleRule, DataBarRule
+
+
+def suivi(nom_onglet, titre, desc, prefix, ident, phases, extras, data, n, id_key, pond_key):
+    """Onglet de suivi par phases pondérées. Une phase sans objet se saisit « n/a »
+    (elle est alors exclue du calcul de l'avancement de la ligne)."""
+    ws = wb.create_sheet(nom_onglet)
+    c_p1 = len(ident) + 1
+    p1, pn = L(c_p1), L(c_p1 + len(phases) - 1)
+    W = f"${p1}$6:${pn}$6"
+    cols = list(ident)
+    for i, (lib, _) in enumerate(phases):
+        cols.append(dict(key=f"p{i + 1}", h=lib, w=11, fmt="pct", centre=True))
+    cols.append(dict(key="av", h="Avancement pondéré", w=11, fmt="pct", name=f"{prefix}_Av",
+                     f='=IF({' + id_key + '}{r}="","",IFERROR(SUMPRODUCT(' + W + ',' + p1 + '{r}:' + pn + '{r})/SUMPRODUCT('
+                       + W + '*(' + p1 + '{r}:' + pn + '{r}<>"n/a")),0))'))
+    cols.append(dict(key="stat", h="Statut", w=12, name=f"{prefix}_Stat", centre=True,
+                     f='=IF({' + id_key + '}{r}="","",IF({av}{r}>=1,"Terminé",IF({av}{r}>0,"En cours","Non démarré")))'))
+    cols += extras
+    entete(ws, titre, len(cols), desc)
+    let, f1, l1 = table(ws, 7, cols, data, n)
+    ws.row_dimensions[7].height = 46
+    # ligne des poids de phases
+    ws.cell(6, c_p1 - 1, "Poids des phases →").font = font(True, VERT)
+    ws.cell(6, c_p1 - 1).alignment = Alignment(horizontal="right")
+    for i, (_, w) in enumerate(phases):
+        c = ws.cell(6, c_p1 + i, w)
+        c.number_format, c.font, c.fill, c.border, c.alignment = FMT["pct"], font(True, "1F3FBF"), fill(SAISIE), BORDER, CENTER
+    c = ws.cell(6, c_p1 + len(phases), f"=SUM({W})")
+    c.number_format, c.font, c.border, c.alignment = FMT["pct"], font(True), BORDER, CENTER
+    ws.conditional_formatting.add(c.coordinate, FormulaRule(formula=[f"ROUND({c.coordinate},4)<>1"], fill=fill("EF9A9A")))
+    c.comment = Comment("La somme des poids doit faire 100 %.", AUTEUR)
+    # avancement global de l'onglet
+    ws.merge_cells("A5:B5")
+    ws["A5"] = "AVANCEMENT GLOBAL :"
+    ws["A5"].font = font(True, VERT, 11)
+    pr = f"${let[pond_key]}${f1}:${let[pond_key]}${l1}"
+    ar = f"${let['av']}${f1}:${let['av']}${l1}"
+    g = ws["C5"]
+    g.value = f"=IFERROR(SUMPRODUCT({pr},{ar})/SUM({pr}),0)"
+    g.number_format, g.font, g.fill, g.border = FMT["pct"], font(True, VERT, 12), fill(VERT_CLAIR), BORDER
+    nom(f"{prefix}_Glob", ws.title, "$C$5")
+    nom(f"{prefix}_Pond", ws.title, pr)
+    ws.cell(5, 4, "(pondéré par : " + next(c["h"] for c in cols if c["key"] == pond_key) + ")").font = font(False, GRIS_TXT, 9, True)
+    rng = f"{p1}{f1}:{pn}{l1}"
+    ws.conditional_formatting.add(rng, CellIsRule(operator="equal", formula=['"n/a"'], fill=fill("E0E0E0"),
+                                                  font=Font(name=FONT, color="9E9E9E")))
+    ws.conditional_formatting.add(rng, ColorScaleRule(start_type="num", start_value=0, start_color="FFFFFF",
+                                                      end_type="num", end_value=1, end_color="81C784"))
+    ws.conditional_formatting.add(f"{let['av']}{f1}:{let['av']}{l1}", DataBarRule(
+        start_type="num", start_value=0, end_type="num", end_value=1, color="43A047"))
+    cf_statut(ws, f"{let['stat']}{f1}:{let['stat']}{l1}", orange=["En cours"], vert=["Terminé"], gris=["Non démarré"])
+    ws.freeze_panes = ws.cell(f1, 2)
+    return ws, let, f1, l1
+
+
+def phases_data(rows, keys, nph):
+    out = []
+    for row in rows:
+        d = dict(zip(keys, row[:len(keys)]))
+        for i, v in enumerate(row[len(keys):len(keys) + nph]):
+            d[f"p{i + 1}"] = v
+        for k, v in zip(("x1", "x2", "x3", "x4"), row[len(keys) + nph:]):
+            d[k] = v
+        out.append(d)
+    return out
+
+
+# ---------------------------------------------------------- 13 ROUTE
+RT_PH = [("Débroussaillage & décapage", 0.05), ("Scarification", 0.10), ("Reprofilage lourd (mise en forme)", 0.20),
+         ("Rechargement latéritique", 0.35), ("Arrosage & compactage", 0.20), ("Fossés & exutoires", 0.10)]
+rt_rows = []
+for k in range(20):
+    if k < 5:
+        ph, vmo, ctl = [1, 1, 1, 1, 1, 1], 1000, (0.962 + k * 0.003, 38 + k, 0.20)
+    elif k == 5:
+        ph, vmo, ctl = [1, 1, 1, 1, 1, 0.5], 1000, (0.958, 35, 0.19)
+    elif k == 6:
+        ph, vmo, ctl = [1, 1, 1, 1, 1, 0], 1000, (0.964, 41, 0.19)
+    elif k == 7:
+        ph, vmo, ctl = [1, 1, 1, 0.8, 0.5, 0], 800, (0.935, 36, 0.20)
+    elif k == 8:
+        ph, vmo, ctl = [1, 1, 0.6, 0, 0, 0], None, (None, None, None)
+    elif k == 9:
+        ph, vmo, ctl = [1, 0.8, 0.3, 0, 0, 0], None, (None, None, None)
+    elif k < 18:
+        ph, vmo, ctl = [1, 0, 0, 0, 0, 0], None, (None, None, None)
+    elif k == 18:
+        ph, vmo, ctl = [0.5, 0, 0, 0, 0, 0], None, (None, None, None)
+    else:
+        ph, vmo, ctl = [0, 0, 0, 0, 0, 0], None, (None, None, None)
+    rt_rows.append([f"T{k + 1:02d}", k * 1000, (k + 1) * 1000, 5.0, 0.20, vmo] + ph + list(ctl))
+ws_rt, let, f1, l1 = suivi(
+    "13_Route", "13 · ROUTE EN TERRE – REPROFILAGE LOURD & RECHARGEMENT (suivi par tronçon)",
+    "Un tronçon par ligne (PK en mètres, affichés 0+000). Saisissez le % de chaque phase (n/a si sans objet) et les "
+    "résultats de contrôle. Conformité : compacité ≥ seuil, CBR ≥ seuil, épaisseur ≥ prévue − tolérance (Paramètres).",
+    "RT",
+    [dict(key="tr", h="Tronçon", w=8, centre=True, name="RT_Tr"),
+     dict(key="pkd", h="PK début", w=9, fmt="pk", centre=True),
+     dict(key="pkf", h="PK fin", w=9, fmt="pk", centre=True),
+     dict(key="lg", h="Longueur (km)", w=8, fmt="dec2", name="RT_Long",
+          f='=IF(OR({pkd}{r}="",{pkf}{r}=""),"",({pkf}{r}-{pkd}{r})/1000)'),
+     dict(key="larg", h="Largeur rechargée (m)", w=8, fmt="dec"),
+     dict(key="ep", h="Ép. rechargement prévue (m)", w=9, fmt="dec2"),
+     dict(key="vp", h="Volume latérite prévu (m³)", w=10, fmt="int", name="RT_VolPrev",
+          f='=IF({lg}{r}="","",{lg}{r}*1000*N({larg}{r})*N({ep}{r}))'),
+     dict(key="vmo", h="Volume mis en œuvre (m³)", w=10, fmt="int", name="RT_VolMO")],
+    RT_PH,
+    [dict(key="km", h="km réalisés (équivalent)", w=9, fmt="dec2", name="RT_Km",
+          f='=IF({av}{r}="","",{lg}{r}*{av}{r})'),
+     dict(key="x1", h="Compacité mesurée (% OPM)", w=9, fmt="pct"),
+     dict(key="x2", h="CBR mesuré", w=7, fmt="int", centre=True),
+     dict(key="x3", h="Épaisseur mesurée (m)", w=8, fmt="dec2"),
+     dict(key="conf", h="Conformité", w=13, centre=True, name="RT_Conf",
+          f='=IF(AND({x1}{r}="",{x2}{r}="",{x3}{r}=""),"",IF(AND(OR({x1}{r}="",{x1}{r}>=P_Compacite),'
+            'OR({x2}{r}="",{x2}{r}>=P_CBR),OR({x3}{r}="",{x3}{r}>=N({ep}{r})-P_TolEp)),"Conforme","Non conforme"))'),
+     dict(key="obs", h="Observations", w=24)],
+    phases_data(rt_rows, ["tr", "pkd", "pkf", "larg", "ep", "vmo"], 6), 80, "tr", "lg")
+cf_statut(ws_rt, f"{let['conf']}{f1}:{let['conf']}{l1}", rouge=["Non conforme"], vert=["Conforme"])
+
+# ------------------------------------------------- 14 POINTS CRITIQUES & BUSES
+PC_PH = [("Purge & terrassement", 0.20), ("Remblai latéritique compacté", 0.25), ("Fouille & lit de pose", 0.10),
+         ("Pose & jointoiement buses", 0.20), ("Remblai sur buses", 0.10), ("Têtes / perrés / enrochements", 0.15)]
+NA = "n/a"
+pc_rows = [
+    ["PC1", 2350, "Bourbier (zone hydromorphe)", "Purge + remblai latéritique", 120, None, None, None, None, None, 9_000_000,
+     1, 1, NA, NA, NA, NA, "Conforme"],
+    ["PC2", 4800, "Traversée de bas-fond", "Pose de buses", 60, "Ø1000", 2, 12, 24, 2, 14_000_000,
+     1, 1, 1, 1, 1, 0.3, "Conforme"],
+    ["PC3", 6100, "Ravinement transversal", "Pose de buses", 30, "Ø800", 1, 12, 12, 2, 6_500_000,
+     1, 1, 1, 1, 1, 1, "Conforme"],
+    ["PC4", 8400, "Passage d'eau (radier submersible)", "Pose de buses", 40, "Ø800", 2, 12, 0, 2, 9_000_000,
+     1, 0.5, 0.3, 0, 0, 0, "En attente"],
+    ["PC5", 11200, "Zone inondable", "Purge + remblai latéritique", 250, None, None, None, None, None, 16_000_000,
+     0.6, 0.3, NA, NA, NA, NA, "En attente"],
+    ["PC6", 13650, "Traversée de cours d'eau temporaire", "Pose de buses", 50, "Ø1000", 3, 12, 0, 2, 15_000_000,
+     0.3, 0, 0, 0, 0, 0, None],
+    ["PC7", 15900, "Ravinement transversal", "Pose de buses", 30, "Ø800", 1, 12, 0, 2, 5_000_000,
+     0, 0, 0, 0, 0, 0, None],
+    ["PC8", 18300, "Bourbier", "Purge + remblai latéritique", 150, None, None, None, None, None, 10_000_000,
+     0, 0, NA, NA, NA, NA, None],
+]
+ws_pc, let, f1, l1 = suivi(
+    "14_Points_critiques", "14 · POINTS CRITIQUES & OUVRAGES BUSES (Ø800 / Ø1000)",
+    "Un point critique par ligne. Pour un traitement sans buses, saisir « n/a » dans les phases buses. "
+    "ml de buses prévus = nb de lignes × longueur par ligne ; saisissez les ml réellement posés. Pondération : montant estimé.",
+    "PC",
+    [dict(key="num", h="N° PC", w=7, centre=True, name="PC_Num"),
+     dict(key="pk", h="PK", w=8, fmt="pk", centre=True),
+     dict(key="nat", h="Nature du désordre", w=24),
+     dict(key="trait", h="Traitement retenu", w=22, dv="L_Traitement", libre=True),
+     dict(key="lgt", h="Longueur traitée (m)", w=8, fmt="int"),
+     dict(key="diam", h="Ø buses", w=7, dv="L_Diam", centre=True, name="PC_Diam"),
+     dict(key="nl", h="Nb lignes", w=6, fmt="int", centre=True),
+     dict(key="lu", h="Long. par ligne (ml)", w=7, fmt="dec"),
+     dict(key="mlp", h="ml buses prévus", w=8, fmt="dec", name="PC_MlPrev",
+          f='=IF({diam}{r}="","",N({nl}{r})*N({lu}{r}))'),
+     dict(key="mlo", h="ml buses posés", w=8, fmt="dec", name="PC_MlPose"),
+     dict(key="tete", h="Têtes de buses (u)", w=7, fmt="int", centre=True),
+     dict(key="mont", h="Montant estimé (FCFA)", w=13, fmt="fcfa")],
+    PC_PH,
+    [dict(key="x1", h="Contrôle MDC", w=12, dv="L_Verdict", libre=True, centre=True),
+     dict(key="obs", h="Observations", w=24)],
+    phases_data(pc_rows, ["num", "pk", "nat", "trait", "lgt", "diam", "nl", "lu", "mlo", "tete", "mont"], 6),
+    60, "num", "mont")
+cf_statut(ws_pc, f"{let['x1']}{f1}:{let['x1']}{l1}", rouge=["Non conforme"], orange=["Réserve"], vert=["Conforme"])
+ws_pc.conditional_formatting.add(f"{let['mlo']}{f1}:{let['mlo']}{l1}", FormulaRule(
+    formula=[f'AND(ISNUMBER({let["mlp"]}{f1}),N({let["mlo"]}{f1})>{let["mlp"]}{f1})'], fill=fill("EF9A9A")))
+# Récapitulatif buses (sous le titre)
+for i, (d_, lbl) in enumerate((("Ø800", "Buses Ø800"), ("Ø1000", "Buses Ø1000"))):
+    c0 = 13 + i * 3
+    ws_pc.cell(5, c0, lbl + " posées (ml) :").font = font(True, VERT)
+    c = ws_pc.cell(5, c0 + 2, f'=SUMIFS(PC_MlPose,PC_Diam,"{d_}")&" / "&SUMIFS(PC_MlPrev,PC_Diam,"{d_}")')
+    c.font, c.fill, c.border = font(True), fill(VERT_CLAIR), BORDER
+
+# ---------------------------------------------------------------- 15 DALOTS
+DA_PH = [("Implantation & fouilles", 0.05), ("Béton de propreté", 0.05), ("Radier (ferraillage + coulage)", 0.20),
+         ("Piédroits", 0.20), ("Dalle / tablier", 0.25), ("Murs de tête & en aile", 0.15),
+         ("Remblais techniques & perrés", 0.10)]
+da_rows = [
+    ["D1", 3200, "1×(2,00×1,50)", 9, 55, 5500, 22_000_000, 1, 1, 1, 1, 1, 1, 1, 19.5, 27.8],
+    ["D2", 9750, "2×(2,50×2,00)", 10, 120, 12000, 46_000_000, 1, 1, 1, 0.6, 0, 0, 0, 18.2, None],
+    ["D3", 16400, "1×(3,00×2,00)", 10, 85, 8500, 33_000_000, 0, 0, 0, 0, 0, 0, 0, None, None],
+]
+ws_da, let, f1, l1 = suivi(
+    "15_Dalots", "15 · SUIVI DES DALOTS (ouvrages hydrauliques en béton armé)",
+    "Un dalot par ligne. Ferraillages et coffrages = points d'arrêt à lever par la mission de contrôle avant coulage "
+    "(onglet 12). Béton : conformité si fc28 moyen ≥ fc28 exigé (Paramètres, EC2 / BAEL).",
+    "DA",
+    [dict(key="num", h="Ouvrage", w=8, centre=True, name="DA_Num"),
+     dict(key="pk", h="PK", w=8, fmt="pk", centre=True),
+     dict(key="type", h="Section (nb × l × h)", w=15, centre=True),
+     dict(key="lg", h="Longueur (m)", w=8, fmt="dec"),
+     dict(key="vb", h="Béton prévu (m³)", w=8, fmt="int"),
+     dict(key="ac", h="Acier prévu (kg)", w=9, fmt="int"),
+     dict(key="mont", h="Montant (FCFA)", w=13, fmt="fcfa")],
+    DA_PH,
+    [dict(key="x1", h="fc 7 j moyen (MPa)", w=8, fmt="dec", centre=True),
+     dict(key="x2", h="fc 28 j moyen (MPa)", w=8, fmt="dec", centre=True),
+     dict(key="conf", h="Conformité béton", w=14, centre=True,
+          f='=IF({num}{r}="","",IF({x2}{r}="",IF({x1}{r}="","","En attente 28 j"),IF({x2}{r}>=P_Fc28,"Conforme","Non conforme")))'),
+     dict(key="obs", h="Observations", w=24)],
+    phases_data(da_rows, ["num", "pk", "type", "lg", "vb", "ac", "mont"], 7), 30, "num", "mont")
+cf_statut(ws_da, f"{let['conf']}{f1}:{let['conf']}{l1}", rouge=["Non conforme"], orange=["En attente 28 j"], vert=["Conforme"])
+
+# ------------------------------------------------------------ 16 BÂTIMENT TCE
+bt_rows = [
+    ["Terrassements & fouilles", "Entreprise", 3_500_000, D(2026, 8, 24), D(2026, 9, 2), 1],
+    ["Fondations (semelles, longrines, soubassement)", "Entreprise", 11_500_000, D(2026, 9, 3), D(2026, 9, 22), 1],
+    ["Élévation maçonnerie & BA (poteaux, poutres)", "Entreprise", 27_000_000, D(2026, 9, 23), D(2026, 10, 27), 0.6],
+    ["Dalle / plancher haut", "Entreprise", 20_000_000, D(2026, 10, 28), D(2026, 11, 16), 0],
+    ["Charpente & couverture", "Sous-traitant", 6_500_000, D(2026, 11, 20), D(2026, 12, 14), 0],
+    ["Étanchéité", "Sous-traitant", 2_500_000, D(2026, 12, 1), D(2026, 12, 14), 0],
+    ["Menuiserie bois", "Sous-traitant", 3_500_000, D(2026, 12, 21), D(2027, 1, 19), 0],
+    ["Menuiserie aluminium & vitrerie", "Sous-traitant", 3_500_000, D(2026, 12, 21), D(2027, 1, 19), 0],
+    ["Menuiserie métallique (portes, grilles)", "Sous-traitant", 1_500_000, D(2026, 12, 21), D(2027, 1, 19), 0],
+    ["Plomberie sanitaire", "Sous-traitant", 6_000_000, D(2026, 11, 25), D(2027, 1, 8), 0],
+    ["Électricité CFO / CFA", "Sous-traitant", 6_000_000, D(2026, 11, 25), D(2027, 1, 8), 0],
+    ["Climatisation / ventilation", "Sous-traitant", 1_500_000, D(2027, 1, 11), D(2027, 1, 29), 0],
+    ["Carrelage & faïence", "Entreprise", 5_000_000, D(2027, 1, 5), D(2027, 2, 5), 0],
+    ["Faux plafonds", "Sous-traitant", 1_500_000, D(2027, 1, 20), D(2027, 2, 5), 0],
+    ["Enduits", "Entreprise", 1_500_000, D(2027, 1, 5), D(2027, 1, 29), 0],
+    ["Peinture", "Entreprise", 1_000_000, D(2027, 2, 1), D(2027, 2, 23), 0],
+]
+ws_bt, let, f1, l1 = suivi(
+    "16_Batiment_TCE", "16 · BÂTIMENT TOUS CORPS D'ÉTAT (TCE)",
+    "Un corps d'état par ligne avec son montant (pondération), ses dates et son % réalisé. "
+    "Les réserves relevées aux réceptions par corps d'état se suivent dans la colonne « Réserves ».",
+    "BT",
+    [dict(key="ce", h="Corps d'état", w=36, name="BT_CE"),
+     dict(key="ent", h="Entreprise / sous-traitant", w=16),
+     dict(key="mont", h="Montant HT (FCFA)", w=14, fmt="fcfa"),
+     dict(key="deb", h="Début", w=11, fmt="date"),
+     dict(key="fin", h="Fin", w=11, fmt="date")],
+    [("% réalisé", 1.0)],
+    [dict(key="mr", h="Montant réalisé (FCFA)", w=14, fmt="fcfa",
+          f='=IF({av}{r}="","",N({mont}{r})*{av}{r})'),
+     dict(key="ret", h="Retard ?", w=9, centre=True,
+          f='=IF(OR({ce}{r}="",{fin}{r}=""),"",IF(AND(P_DateRef>{fin}{r},{av}{r}<1),"En retard",""))'),
+     dict(key="x1", h="Réserves (nb)", w=8, fmt="int", centre=True),
+     dict(key="obs", h="Observations", w=26)],
+    phases_data(bt_rows, ["ce", "ent", "mont", "deb", "fin"], 1), 40, "ce", "mont")
+cf_statut(ws_bt, f"{let['ret']}{f1}:{let['ret']}{l1}", rouge=["En retard"])
+
+# ---------------------------------------------------------------- 17 CLÔTURE
+CL_PH = [("Implantation & fouilles", 0.10), ("Semelle filante", 0.15), ("Soubassement", 0.15), ("Poteaux BA", 0.15),
+         ("Élévation maçonnerie", 0.20), ("Chaînage haut", 0.10), ("Enduits & peinture", 0.15)]
+cl_rows = [
+    ["A – Façade principale", 80, 2.5, "Agglos 15 + poteaux BA / 3 m", 1, 1, 1, 0.6, 0.3, 0, 0],
+    ["B – Côté est", 100, 2.5, "Agglos 15 + poteaux BA / 3 m", 1, 1, 1, 0.2, 0, 0, 0],
+    ["C – Côté arrière", 100, 2.5, "Agglos 15 + poteaux BA / 3 m", 1, 1, 0.8, 0, 0, 0, 0],
+    ["D – Côté ouest", 114, 2.5, "Agglos 15 + poteaux BA / 3 m", 1, 1, 0.5, 0, 0, 0, 0],
+    ["Portail métallique 6 m", 6, 2.5, "Portail 2 vantaux + piliers BA", 0, 0, NA, 0, NA, NA, 0],
+]
+ws_cl, let, f1, l1 = suivi(
+    "17_Cloture", "17 · CONSTRUCTION DE LA CLÔTURE (suivi par tronçon)",
+    "Un tronçon par ligne (longueur en ml = pondération). Saisissez le % de chaque phase ; « n/a » si sans objet.",
+    "CL",
+    [dict(key="tr", h="Tronçon / élément", w=24, name="CL_Tr"),
+     dict(key="lg", h="Longueur (ml)", w=9, fmt="dec"),
+     dict(key="h", h="Hauteur (m)", w=7, fmt="dec2"),
+     dict(key="type", h="Constitution", w=26)],
+    CL_PH,
+    [dict(key="mla", h="ml achevés (équivalent)", w=10, fmt="dec", name="CL_Ml",
+          f='=IF({av}{r}="","",N({lg}{r})*{av}{r})'),
+     dict(key="obs", h="Observations", w=24)],
+    phases_data(cl_rows, ["tr", "lg", "h", "type"], 7), 30, "tr", "lg")
+
+# ------------------------------------------------------ 18 CHARPENTE MÉTALLIQUE
+CM_PH = [("Approvisionnement acier", 0.10), ("Fabrication atelier", 0.30), ("Anticorrosion / peinture", 0.10),
+         ("Transport", 0.05), ("Levage & montage", 0.30), ("Boulonnage / serrage contrôlé", 0.10), ("Réception", 0.05)]
+cm_rows = [
+    ["P1", "Poteaux", "HEA 200 – S275", 12, 254, 1, 1, 0.5, 0, 0, 0, 0],
+    ["F1", "Fermes treillis 20 m", "Cornières L – S275", 6, 1150, 1, 0.5, 0, 0, 0, 0, 0],
+    ["PA", "Pannes", "IPE 120 – S235", 66, 52, 1, 0.2, 0, 0, 0, 0, 0],
+    ["LS", "Lisses de bardage", "UPN 100 – S235", 48, 53, 1, 0, 0, 0, 0, 0, 0],
+    ["CV", "Contreventements (palées, poutres au vent)", "Cornières / tirants", 1, 1200, 0.5, 0, 0, 0, 0, 0, 0],
+    ["AN", "Platines, tiges d'ancrage & goussets", "Tôles S275 / tiges", 1, 650, 1, 1, 1, 1, NA, NA, 0],
+]
+ws_cm, let, f1, l1 = suivi(
+    "18_Charpente_metal", "18 · CHARPENTE MÉTALLIQUE (hangar) – suivi par repère",
+    "Un repère (famille d'éléments) par ligne. Pondération = poids total (kg). Contrôles : certificats matière, "
+    "soudures, peinture, ancrages, verticalité, serrage (onglet 12, référentiel EC3 / CCTP).",
+    "CM",
+    [dict(key="rep", h="Repère", w=7, centre=True, name="CM_Rep"),
+     dict(key="des", h="Désignation", w=30),
+     dict(key="prof", h="Profilé / nuance", w=18),
+     dict(key="q", h="Quantité", w=7, fmt="int", centre=True),
+     dict(key="pu", h="Poids unitaire (kg)", w=9, fmt="int"),
+     dict(key="pt", h="Poids total (kg)", w=10, fmt="int",
+          f='=IF({rep}{r}="","",N({q}{r})*N({pu}{r}))')],
+    CM_PH,
+    [dict(key="kg", h="kg réalisés (équivalent)", w=10, fmt="int", name="CM_Kg",
+          f='=IF({av}{r}="","",{pt}{r}*{av}{r})'),
+     dict(key="obs", h="Observations", w=24)],
+    phases_data(cm_rows, ["rep", "des", "prof", "q", "pu"], 7), 40, "rep", "pt")
+
+# ------------------------------------------------------- PLAN DE CONTRÔLE
+pc_ = wb.create_sheet("Plan_controle")
+entete(pc_, "PLAN DE CONTRÔLE – référentiel des points d'arrêt, contrôles et essais", 7,
+       "Référentiel type à adapter au CCTP du marché et au PAQ. PA = point d'arrêt (levée écrite obligatoire avant de "
+       "poursuivre) · PC = point critique (contrôle avec information préalable) · AC = autocontrôle de l'entreprise.")
+PLAN = [
+    ("Route en terre", "Emprunt de latérite", "Identification : granulométrie, limites d'Atterberg, Proctor modifié, CBR", "CBR à 95 % OPM ≥ 30 ; IP ≤ 25 ; Dmax ≤ 50 mm (selon CCTP)", "1 série / 2 000 m³ et à chaque changement de faciès", "PA", "CCTP / guide AGEROUTE"),
+    ("Route en terre", "Scarification & reprofilage", "Profil en travers (bombement)", "Pente transversale 4 % ± 1 %", "Tous les 50 m", "AC", "CCTP"),
+    ("Route en terre", "Rechargement latéritique", "Épaisseur mise en œuvre", "≥ épaisseur prévue − 2 cm", "Tous les 100 m", "AC", "CCTP"),
+    ("Route en terre", "Arrosage & compactage", "Teneur en eau de mise en œuvre", "w = wOPM ± 2 %", "Chaque planche", "AC", "CCTP"),
+    ("Route en terre", "Arrosage & compactage", "Densité en place (gammadensimètre ou densitomètre à sable)", "≥ 95 % OPM", "1 mesure / 250 m de couche", "PA", "CCTP"),
+    ("Route en terre", "Fossés & exutoires", "Pente longitudinale et débouché", "Pente ≥ 0,5 % ; exutoire dégagé", "Chaque tronçon", "AC", "CCTP"),
+    ("Route en terre", "Réception de tronçon", "Uni / flaches, profil, assainissement", "Pas de flache > 2 cm sous règle de 3 m", "Chaque km", "PC", "CCTP"),
+    ("Points critiques", "Purge", "Fond de purge", "Matériaux impropres évacués, fond sain et portant", "Chaque point", "PA", "CCTP"),
+    ("Points critiques", "Remblai latéritique", "Compactage par couches", "Couches ≤ 20 cm ; ≥ 95 % OPM", "Chaque couche", "PA", "CCTP"),
+    ("Ouvrages hydrauliques – buses", "Réception des buses", "État, classe, dimensions", "Sans fissure ni épaufrure ; classe conforme à la commande", "Chaque livraison", "AC", "CCTP / fiche fabricant"),
+    ("Ouvrages hydrauliques – buses", "Fouille & lit de pose", "Cote fil d'eau, pente, lit de pose", "Pente 1 à 3 % ; lit de pose conforme au plan", "Chaque ligne", "PA", "Plans d'exécution"),
+    ("Ouvrages hydrauliques – buses", "Pose & jointoiement", "Alignement, emboîtement, joints", "Joints au mortier pleins ; alignement ± 2 cm", "Chaque ligne", "PC", "CCTP"),
+    ("Ouvrages hydrauliques – buses", "Remblai sur buses", "Compactage latéral symétrique et couverture", "Couverture ≥ 0,60 m (ou selon plan) avant passage d'engins lourds", "Chaque ligne", "PA", "CCTP"),
+    ("Ouvrages hydrauliques – buses", "Têtes de buses", "Ferraillage, coffrage, béton", "Conforme aux plans BA ; enrobage ≥ 3 cm", "Chaque tête", "PA", "EC2 / BAEL"),
+    ("Dalots", "Implantation", "Axe, biais, cotes fil d'eau", "± 2 cm en plan ; ± 1 cm en altimétrie", "Chaque ouvrage", "PA", "Plans d'exécution"),
+    ("Dalots", "Fond de fouille", "Nature et portance du sol", "Sol sain conforme aux hypothèses de la note de calcul", "Chaque ouvrage", "PA", "Note de calcul"),
+    ("Dalots", "Ferraillage (radier, piédroits, dalle)", "Diamètres, espacements, recouvrements, enrobages", "Conforme aux plans BA ; enrobage ≥ 3 cm (milieu humide)", "Avant chaque coulage", "PA", "EC2 / BAEL"),
+    ("Dalots", "Coffrage", "Stabilité, étanchéité, cotes", "± 1 cm", "Avant chaque coulage", "PA", "CCTP"),
+    ("Dalots", "Béton frais", "Affaissement au cône d'Abrams", "6 à 10 cm (selon formulation)", "Chaque gâchée / toupie", "AC", "NF EN 12350-2"),
+    ("Dalots", "Béton durci", "Écrasement d'éprouvettes 16×32", "fc28 ≥ fc28 exigé (25 MPa)", "3 éprouvettes à 7 j et 28 j par coulage", "PC", "EC2 / BAEL"),
+    ("Dalots", "Cure du béton", "Cure humide, protection solaire", "≥ 7 jours", "Chaque coulage", "AC", "EC2"),
+    ("Dalots", "Remblais techniques", "Compactage symétrique par couches", "Couches ≤ 20 cm ; ≥ 95 % OPM", "Chaque couche", "PA", "CCTP"),
+    ("Bâtiment TCE", "Fondations", "Fond de fouille et ferraillage des semelles", "Conforme aux plans", "Chaque semelle", "PA", "EC2 / BAEL"),
+    ("Bâtiment TCE", "Béton", "Affaissement et éprouvettes", "Idem dalots", "Chaque coulage", "PC", "EC2 / BAEL"),
+    ("Bâtiment TCE", "Maçonnerie", "Aplomb, alignement, joints", "Aplomb ≤ 1 cm / 2,5 m", "Chaque niveau", "AC", "DTU 20.1"),
+    ("Bâtiment TCE", "Étanchéité", "Essai de mise en eau", "48 h sans fuite", "Chaque terrasse", "PA", "DTU 43.1"),
+    ("Bâtiment TCE", "Plomberie", "Essai de pression des réseaux", "Sans chute de pression (valeur et durée selon CCTP)", "Avant fermeture des saignées", "PA", "CCTP"),
+    ("Bâtiment TCE", "Électricité", "Continuité de terre, isolement", "Résistance de terre et isolement selon CCTP / NF C 15-100", "Avant mise sous tension", "PA", "NF C 15-100"),
+    ("Bâtiment TCE", "Réception TCE", "Visite de réception par corps d'état", "Levée de toutes les réserves", "Fin de chaque lot", "PC", "Marché"),
+    ("Clôture", "Fondation", "Fouille et semelle filante", "Profondeur et largeur conformes aux plans", "Chaque tronçon", "AC", "Plans"),
+    ("Clôture", "Poteaux BA", "Aplomb, entraxe", "± 1 cm ; entraxe conforme", "Chaque tronçon", "AC", "Plans"),
+    ("Clôture", "Élévation", "Alignement, hauteur", "± 2 cm", "Chaque tronçon", "AC", "Plans"),
+    ("Charpente métallique", "Approvisionnement", "Certificats matière (nuance S235 / S275)", "Conformes à la commande", "Chaque lot de profilés", "PA", "EC3 / NF EN 10025"),
+    ("Charpente métallique", "Fabrication", "Soudures (visuel, ressuage si demandé)", "Sans défaut ; cordons conformes aux plans d'atelier", "Chaque élément", "PC", "EC3 / NF EN 1090"),
+    ("Charpente métallique", "Anticorrosion", "Épaisseur de peinture", "≥ épaisseur prescrite (nombre de couches)", "Chaque élément", "AC", "CCTP"),
+    ("Charpente métallique", "Ancrages", "Position des tiges et platines", "± 5 mm ; calage conforme", "Avant montage", "PA", "Plans"),
+    ("Charpente métallique", "Montage", "Verticalité des poteaux, alignement", "≤ H/300 (selon CCTP)", "Chaque file", "PC", "EC3 / NF EN 1090"),
+    ("Charpente métallique", "Boulonnage", "Serrage contrôlé", "Couple conforme aux plans", "100 % des assemblages", "PA", "EC3"),
+]
+pc_data = [dict(comp=a, oper=b, ctl=c, crit=d, freq=e, typ=f, ref=g) for a, b, c, d, e, f, g in PLAN]
+let, f1, l1 = table(pc_, 6, [
+    dict(key="comp", h="Composante", w=22, dv="L_Compos"),
+    dict(key="oper", h="Phase / opération", w=26, name="PCT_Oper"),
+    dict(key="ctl", h="Contrôle / essai", w=38),
+    dict(key="crit", h="Critère d'acceptation", w=44),
+    dict(key="freq", h="Fréquence", w=26),
+    dict(key="typ", h="Type", w=6, centre=True),
+    dict(key="ref", h="Référence", w=18),
+], pc_data, 80)
+cf_statut(pc_, f"F{f1}:F{l1}", rouge=["PA"], orange=["PC"], gris=["AC"])
+
+# --------------------------------------------- 12 CONTRÔLE QUALITÉ (registre)
+cq = wb.create_sheet("12_Controle_qualite")
+entete(cq, "12 · REGISTRE DES CONTRÔLES, ESSAIS & POINTS D'ARRÊT (réalisation et contrôle)", 19,
+       "Une ligne par contrôle. Résultat automatique si une valeur mesurée est saisie (comparée aux bornes mini / maxi), "
+       "sinon appréciation visuelle. Une non-conformité reste « ouverte » tant que la date de levée n'est pas saisie.")
+CQ = [
+    ("CQ-001", D(2026, 8, 14), COMPOS[1], "Emprunt E1 – PK 5+500", "Emprunt de latérite", "Essai laboratoire", "Laboratoire", "CBR à 95 % OPM ≥ 30", 30, None, 42, "CBR", None, "Emprunt agréé", "", None, "Rapport LG-0814"),
+    ("CQ-002", D(2026, 9, 2), COMPOS[4], "Dalot D1 – PK 3+200", "Ferraillage (radier, piédroits, dalle)", "Point d'arrêt (PA)", "Mission de contrôle", "Conforme aux plans BA, enrobage ≥ 3 cm", None, None, None, "", "Conforme", "PA levé – coulage autorisé", "", None, "PV PA-012"),
+    ("CQ-003", D(2026, 9, 3), COMPOS[4], "Dalot D1 – radier", "Béton frais", "Autocontrôle", "Entreprise (autocontrôle)", "Affaissement 6 à 10 cm", 6, 10, 8, "cm", None, "", "", None, ""),
+    ("CQ-004", D(2026, 10, 1), COMPOS[4], "Dalot D1 – radier", "Béton durci", "Essai laboratoire", "Laboratoire", "fc28 ≥ 25 MPa", 25, None, 27.8, "MPa", None, "", "", None, "Rapport LG-1001"),
+    ("CQ-005", D(2026, 9, 28), COMPOS[1], "T05 – PK 4+000 à 5+000", "Arrosage & compactage", "Essai laboratoire", "Laboratoire", "Densité ≥ 95 % OPM", 95, None, 97.1, "% OPM", None, "", "", None, "Rapport LG-0928"),
+    ("CQ-006", D(2026, 10, 8), COMPOS[1], "T07 – PK 6+000 à 7+000", "Rechargement latéritique", "Autocontrôle", "Entreprise (autocontrôle)", "Épaisseur ≥ 0,18 m", 0.18, None, 0.19, "m", None, "", "", None, ""),
+    ("CQ-007", D(2026, 10, 14), COMPOS[1], "T08 – PK 7+000 à 8+000", "Arrosage & compactage", "Point d'arrêt (PA)", "Mission de contrôle", "Densité ≥ 95 % OPM", 95, None, 93.5, "% OPM", None, "Reprise : scarification, aération, recompactage", AUTEUR, None, "Fiche NC-003"),
+    ("CQ-008", D(2026, 10, 5), COMPOS[3], "PC3 – PK 6+100 – buses Ø800", "Pose & jointoiement", "Point critique (PC)", "Mission de contrôle", "Pente 1 à 3 %", 1, 3, 1.8, "%", None, "", "", None, ""),
+    ("CQ-009", D(2026, 10, 12), COMPOS[3], "PC2 – PK 4+800 – buses Ø1000", "Remblai sur buses", "Point d'arrêt (PA)", "Mission de contrôle", "Couverture ≥ 0,60 m", 0.6, None, 0.55, "m", None, "Rechargement complémentaire 10 cm", AUTEUR, D(2026, 10, 15), "Fiche NC-002"),
+    ("CQ-010", D(2026, 10, 9), COMPOS[5], "Bâtiment – semelles axes A à D", "Fondations", "Point d'arrêt (PA)", "Mission de contrôle", "Ferraillage conforme aux plans", None, None, None, "", "Conforme", "PA levé", "", None, "PV PA-018"),
+    ("CQ-011", D(2026, 10, 13), COMPOS[7], "Lot profilés HEA 200", "Approvisionnement", "Point d'arrêt (PA)", "Mission de contrôle", "Certificats matière S275", None, None, None, "", "Réserve", "Fournir les certificats manquants (2 barres)", "ADOU Franck", None, ""),
+    ("CQ-012", D(2026, 10, 15), COMPOS[6], "Clôture – tronçon A", "Poteaux BA", "Autocontrôle", "Entreprise (autocontrôle)", "Écart d'aplomb ≤ 1 cm", None, 1, 0.5, "cm", None, "", "", None, ""),
+    ("CQ-013", D(2026, 10, 16), COMPOS[4], "Dalot D2 – PK 9+750 – piédroits", "Ferraillage (radier, piédroits, dalle)", "Point d'arrêt (PA)", "Mission de contrôle", "Conforme aux plans BA, enrobage ≥ 3 cm", None, None, None, "", None, "Visite MDC demandée le 16/10", "", None, ""),
+]
+cq_data = [dict(num=a, date=b, comp=c, loc=d, oper=e, typ=f, interv=g, crit=h, vmin=i, vmax=j, vmes=k, u=l, verd=m,
+                act=n, resp=o, dlev=p, ref=q) for a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q in CQ]
+let, f1, l1 = table(cq, 6, [
+    dict(key="num", h="N°", w=8, centre=True, name="CQ_Num"),
+    dict(key="date", h="Date", w=11, fmt="date"),
+    dict(key="comp", h="Composante", w=20, dv="L_Compos", name="CQ_Comp"),
+    dict(key="loc", h="Ouvrage / PK / localisation", w=26),
+    dict(key="oper", h="Opération contrôlée", w=24, dv="PCT_Oper", libre=True),
+    dict(key="typ", h="Type de contrôle", w=16, dv="L_TypeCtrl", name="CQ_Type"),
+    dict(key="interv", h="Intervenant", w=18, dv="L_Interv", name="CQ_Interv"),
+    dict(key="crit", h="Critère d'acceptation", w=24),
+    dict(key="vmin", h="Valeur mini", w=7, fmt="dec2", centre=True),
+    dict(key="vmax", h="Valeur maxi", w=7, fmt="dec2", centre=True),
+    dict(key="vmes", h="Valeur mesurée", w=8, fmt="dec2", centre=True),
+    dict(key="u", h="Unité", w=7, centre=True),
+    dict(key="verd", h="Appréciation visuelle", w=11, dv="L_Verdict", centre=True),
+    dict(key="res", h="Résultat", w=12, centre=True, name="CQ_Res",
+         f='=IF({num}{r}="","",IF(ISNUMBER({vmes}{r}),IF(AND(OR({vmin}{r}="",{vmes}{r}>={vmin}{r}),'
+           'OR({vmax}{r}="",{vmes}{r}<={vmax}{r})),"Conforme","Non conforme"),IF({verd}{r}="","En attente",{verd}{r})))'),
+    dict(key="act", h="Décision / action corrective", w=28),
+    dict(key="resp", h="Responsable", w=15),
+    dict(key="dlev", h="Date de levée", w=11, fmt="date"),
+    dict(key="etat", h="État", w=14, centre=True, name="CQ_Etat",
+         f='=IF({num}{r}="","",IF({res}{r}="Non conforme",IF({dlev}{r}="","NC ouverte","NC levée"),'
+           'IF({res}{r}="Réserve",IF({dlev}{r}="","Réserve ouverte","Réserve levée"),IF({res}{r}="En attente","À contrôler","Clos"))))'),
+    dict(key="ref", h="Réf. PV / rapport", w=14),
+], cq_data, 500)
+cf_statut(cq, f"N{f1}:N{l1}", rouge=["Non conforme"], orange=["Réserve"], vert=["Conforme"], gris=["En attente"])
+cf_statut(cq, f"R{f1}:R{l1}", rouge=["NC ouverte"], orange=["Réserve ouverte", "À contrôler"], vert=["Clos", "NC levée", "Réserve levée"])
 
 # ======================================================== 02 TABLEAU DE BORD
 entete(tb, "02 · TABLEAU DE BORD – PILOTAGE ET AIDE À LA DÉCISION", 13,
@@ -967,7 +1481,7 @@ tb.conditional_formatting.add("L8", CellIsRule(operator="lessThan", formula=["0"
 
 # Les 9 questions du pilotage
 r0 = 11
-mput(f"B{r0}:M{r0}", "LES 9 QUESTIONS DU PILOTAGE DE CHANTIER", font(True, "FFFFFF", 11), VERT, al=LEFT)
+mput(f"B{r0}:M{r0}", "LES 10 QUESTIONS DU PILOTAGE DE CHANTIER", font(True, "FFFFFF", 11), VERT, al=LEFT)
 for rng, hd in ((f"B{r0 + 1}", "N°"), (f"C{r0 + 1}:F{r0 + 1}", "Question"), (f"G{r0 + 1}:H{r0 + 1}", "Réponse"),
                 (f"I{r0 + 1}:L{r0 + 1}", "Détail"), (f"M{r0 + 1}", "Signal")):
     mput(rng, hd, font(True, "FFFFFF"), VERT2)
@@ -1002,6 +1516,10 @@ QS = [
      '=COUNTIF(JO_Incident,"Oui")&" signalé(s) au journal · "&COUNTIF(IN_Num,"?*")&" fiche(s) établie(s) · "&COUNTIFS(IN_Grav,"Majeure",IN_Statut,"<>Clos")&" majeure(s) ouverte(s)"',
      '=IF(COUNTIFS(IN_Grav,"Majeure",IN_Statut,"<>Clos")>0,"ALERTE",IF(COUNTIF(JO_Incident,"Oui")>COUNTIF(IN_Num,"?*"),"ATTENTION",IF(COUNTIFS(IN_Num,"<>",IN_Statut,"<>Clos")>0,"ATTENTION","OK")))'),
 ]
+QS.append(("Les travaux sont-ils conformes (contrôles & essais) ?",
+           '=IFERROR(COUNTIF(CQ_Res,"Conforme")/(COUNTIF(CQ_Res,"Conforme")+COUNTIF(CQ_Res,"Non conforme")),1)', "pct",
+           '=COUNTIF(CQ_Num,"?*")&" contrôle(s) · "&COUNTIF(CQ_Etat,"NC ouverte")&" NC ouverte(s) · "&COUNTIF(CQ_Etat,"Réserve ouverte")&" réserve(s) · "&COUNTIF(CQ_Etat,"À contrôler")&" PA/contrôle(s) en attente · "&COUNTIF(RT_Conf,"Non conforme")&" tronçon(s) route NC"',
+           '=IF(COUNTIF(CQ_Etat,"NC ouverte")>0,"ALERTE",IF(COUNTIF(CQ_Etat,"Réserve ouverte")+COUNTIF(CQ_Etat,"À contrôler")>0,"ATTENTION","OK"))'))
 # engagé non facturé = engagé BC - factures liées : version simple
 QS[2] = (QS[2][0], QS[2][1], QS[2][2],
          '=ROUND(KPI_Conso*100,0)&" % consommé · "&COUNTIF(BU_Alerte,"Dépassement")&" lot(s) en dépassement · "&COUNTIF(BU_Alerte,"Surconsommation")&" en surconsommation"',
@@ -1021,8 +1539,40 @@ for v, c in (("OK", VERT2), ("ATTENTION", ORANGE), ("ALERTE", ROUGE)):
 tb.conditional_formatting.add(f"G{rq1}", CellIsRule(operator="equal", formula=['"NON – retard"'],
                                                     font=Font(name=FONT, bold=True, color=ROUGE, size=11)))
 
+# Avancement par composante (suivis spécialisés)
+rc = rq2 + 2
+mput(f"B{rc}:M{rc}", "AVANCEMENT PHYSIQUE PAR COMPOSANTE (onglets 13 à 18 et 12)", font(True, "FFFFFF", 11), VERT, al=LEFT)
+for rng, hd in ((f"B{rc + 1}:E{rc + 1}", "Composante"), (f"F{rc + 1}", "Unité"), (f"G{rc + 1}:H{rc + 1}", "Prévu"),
+                (f"I{rc + 1}:J{rc + 1}", "Réalisé"), (f"K{rc + 1}", "Avancement"), (f"L{rc + 1}:M{rc + 1}", "Statut")):
+    mput(rng, hd, font(True, "FFFFFF", 9), VERT2)
+COMP_ROWS = [
+    ("Route en terre – reprofilage lourd (13)", "km", "=SUM(RT_Long)", "=SUMPRODUCT(RT_Long,RT_Av)", "=RT_Glob", "dec2"),
+    ("Route – rechargement latéritique (13)", "m³", "=SUM(RT_VolPrev)", "=SUM(RT_VolMO)", None, "int"),
+    ("Points critiques traités (14)", "u", '=COUNTIF(PC_Num,"?*")', '=COUNTIF(PC_Stat,"Terminé")', "=PC_Glob", "int"),
+    ("Buses Ø800 posées (14)", "ml", '=SUMIFS(PC_MlPrev,PC_Diam,"Ø800")', '=SUMIFS(PC_MlPose,PC_Diam,"Ø800")', None, "dec"),
+    ("Buses Ø1000 posées (14)", "ml", '=SUMIFS(PC_MlPrev,PC_Diam,"Ø1000")', '=SUMIFS(PC_MlPose,PC_Diam,"Ø1000")', None, "dec"),
+    ("Dalots achevés (15)", "u", '=COUNTIF(DA_Num,"?*")', '=COUNTIF(DA_Stat,"Terminé")', "=DA_Glob", "int"),
+    ("Bâtiment tous corps d'état (16)", "FCFA", "=SUM(BT_Pond)", "=SUMPRODUCT(BT_Pond,BT_Av)", "=BT_Glob", "fcfa"),
+    ("Clôture (17)", "ml", "=SUM(CL_Pond)", "=SUM(CL_Ml)", "=CL_Glob", "dec"),
+    ("Charpente métallique (18)", "kg", "=SUM(CM_Pond)", "=SUM(CM_Kg)", "=CM_Glob", "int"),
+    ("Contrôles conformes / réalisés (12)", "u",
+     '=COUNTIF(CQ_Res,"Conforme")+COUNTIF(CQ_Res,"Non conforme")', '=COUNTIF(CQ_Res,"Conforme")', None, "int"),
+]
+for i, (lib, u, prev, real, pct, fmt) in enumerate(COMP_ROWS):
+    r = rc + 2 + i
+    mput(f"B{r}:E{r}", lib, font(True), al=LEFT)
+    mput(f"F{r}", u, font(False, GRIS_TXT, 9))
+    mput(f"G{r}:H{r}", prev, fmt=fmt)
+    mput(f"I{r}:J{r}", real, fmt=fmt)
+    mput(f"K{r}", pct or f"=IF(N(G{r})=0,0,I{r}/G{r})", font(True, VERT), fmt="pct")
+    mput(f"L{r}:M{r}", f'=IF(K{r}>=1,"Terminé",IF(K{r}>0,"En cours","Non démarré"))', font(True))
+rc1, rc2 = rc + 2, rc + 1 + len(COMP_ROWS)
+tb.conditional_formatting.add(f"K{rc1}:K{rc2}", DataBarRule(start_type="num", start_value=0, end_type="num",
+                                                            end_value=1, color="43A047"))
+cf_statut(tb, f"L{rc1}:L{rc2}", orange=["En cours"], vert=["Terminé"], gris=["Non démarré"])
+
 # Synthèse par lot
-r1 = rq2 + 2
+r1 = rc2 + 2
 mput(f"B{r1}:M{r1}", "SYNTHÈSE PAR LOT (budget / dépenses / avancement)", font(True, "FFFFFF", 11), VERT, al=LEFT)
 for rng, hd in ((f"B{r1 + 1}:D{r1 + 1}", "Lot"), (f"E{r1 + 1}:F{r1 + 1}", "Budget HT"), (f"G{r1 + 1}:H{r1 + 1}", "Dépensé"),
                 (f"I{r1 + 1}:J{r1 + 1}", "Reste"), (f"K{r1 + 1}", "% consommé"), (f"L{r1 + 1}", "Avanc. physique"),
@@ -1127,7 +1677,7 @@ acc.column_dimensions["C"].width = 70
 acc.column_dimensions["D"].width = 22
 for i, (txt, ft, bg, h) in enumerate([
         ("METRIX AVANCÉ CHANTIER BTP", font(True, "FFFFFF", 22), VERT, 40),
-        ("Pilotage complet de chantier : planning · budget · équipes · stock · factures · commandes · avancement · journal",
+        ("Réalisation & contrôle : route en terre · points critiques & buses · dalots · bâtiment TCE · clôture · charpente métallique",
          font(True, "FFFFFF", 11), VERT2, 22),
         ("Auteur : " + AUTEUR + " – Technicien génie civil BTP, Abidjan (Côte d'Ivoire)", font(True, VERT, 10), VERT_CLAIR, 18),
 ], start=1):
@@ -1145,8 +1695,8 @@ r = 8
 acc.cell(r, 2, "SOMMAIRE (cliquez pour ouvrir)").font = font(True, VERT, 12)
 MODS = [
     ("Paramètres", "Données du chantier, taux (TVA 18 %, retenue 5 %…), listes déroulantes", "À remplir en 1er"),
-    ("02_Tableau_de_bord", "Les 9 questions du pilotage + synthèse par lot + alertes + graphiques", "Lecture seule"),
-    ("01_Planning", "Planning Gantt sur 26 semaines, % prévu / réalisé, tâches en retard", "Hebdomadaire"),
+    ("02_Tableau_de_bord", "Les 10 questions du pilotage, avancement par composante, synthèse par lot, alertes, graphiques", "Lecture seule"),
+    ("01_Planning", "Planning Gantt sur 40 semaines, % prévu / réalisé, tâches en retard", "Hebdomadaire"),
     ("03_Budget", "Budget par lot : engagé, factures, main-d'œuvre, reste, surconsommation", "Budget au départ"),
     ("04_Situations", "Situations de travaux mensuelles : DQE, attachements, décompte TTC", "Mensuelle"),
     ("05_Factures", "Factures fournisseurs, échéances, paiements, retards", "À chaque facture"),
@@ -1157,6 +1707,14 @@ MODS = [
     ("09b_Livraisons", "Entrées (livraisons) et sorties de matériaux", "À chaque mouvement"),
     ("10_Journal", "Journal de chantier : météo, effectif, travaux, visites, HSE", "Quotidienne"),
     ("11_Incidents", "Fiches incidents / alertes avec actions correctives", "Dès qu'un incident survient"),
+    ("12_Controle_qualite", "Registre des contrôles, essais et points d'arrêt (entreprise et mission de contrôle)", "À chaque contrôle"),
+    ("13_Route", "Route en terre : reprofilage lourd, rechargement, compactage par tronçon (PK)", "Quotidienne"),
+    ("14_Points_critiques", "Points critiques : purges, remblais, buses Ø800 / Ø1000, têtes de buses", "Quotidienne"),
+    ("15_Dalots", "Dalots : phases (radier, piédroits, dalle, murs), béton fc7 / fc28", "Quotidienne"),
+    ("16_Batiment_TCE", "Bâtiment tous corps d'état : montants, dates, % réalisé, réserves", "Hebdomadaire"),
+    ("17_Cloture", "Clôture : avancement par tronçon et ml achevés", "Hebdomadaire"),
+    ("18_Charpente_metal", "Charpente métallique : avancement par repère, pondéré au poids (kg)", "Hebdomadaire"),
+    ("Plan_controle", "Référentiel des points d'arrêt, contrôles et essais par composante", "Au démarrage"),
     ("Personnel", "Fichier du personnel, taux journaliers, cumul jours et montants dus", "Au recrutement"),
     ("Checklist_lancement", "Check-list de lancement de chantier (administratif, technique, HSE)", "Démarrage"),
     ("Lexique", "Lexique des termes BTP utilisés", "—"),
@@ -1190,10 +1748,12 @@ STEPS = [
     "1. Paramètres : saisir le chantier, la date de démarrage, le délai, les taux ; compléter les listes (lots, équipes, fournisseurs).",
     "2. Personnel et 09_Stock : créer la liste des ouvriers (matricule, taux) et le catalogue des matériaux (code, seuil).",
     "3. 01_Planning, 03_Budget, 04_Situations : saisir les tâches, le budget par lot et le DQE du marché.",
-    "4. Chaque jour : 06_Pointage, 07_Affectation, 09b_Livraisons, 10_Journal (et 11_Incidents si besoin).",
+    "4. Chaque jour : 06_Pointage, 07_Affectation, 09b_Livraisons, 10_Journal, suivis 13 à 18 et registre 12_Controle_qualite.",
     "5. À chaque achat : 08_Commandes puis 05_Factures ; chaque semaine : mettre à jour le % réalisé du planning.",
     "6. Consulter 02_Tableau_de_bord : les signaux ALERTE / ATTENTION indiquent où agir en priorité.",
-    "Les lignes pré-remplies sont un EXEMPLE (villa R+1 à Cocody Angré) : effacez uniquement les cellules de saisie pour démarrer votre chantier.",
+    "Les lignes pré-remplies sont un EXEMPLE (route en terre de 20 km + ouvrages + bâtiment) : effacez uniquement les cellules de saisie pour démarrer. Onglets 13 à 18 inutiles pour un chantier ? Masquez-les (clic droit > Masquer).",
+    "Mission de contrôle : utilisez surtout 01, 04, 10, 11, 12, 13 à 18 et Plan_controle ; choisissez votre rôle dans Paramètres.",
+    "Phases sans objet dans les suivis 13 à 18 : saisir « n/a » (la phase est alors exclue du calcul d'avancement).",
     "Date de référence = date du jour par défaut ; elle peut être forcée dans Paramètres pour analyser une date passée.",
     "Compatible Excel 2010+ et LibreOffice ; importable dans Google Sheets (les mises en forme conditionnelles restent actives).",
 ]
@@ -1209,7 +1769,10 @@ for i, s in enumerate([
         "Structures BA : dimensionnement et vérifications selon EC2 (NF EN 1992-1-1) et BAEL 91 révisé 99.",
         "Sols latéritiques : remblais compactés par couches de 20 cm à 95 % OPM, contrôle CBR ; purge des poches argileuses.",
         "Climat tropical chaud et humide : cure humide du béton ≥ 7 jours, bétonnage aux heures fraîches, enrobage adapté.",
-        "Saisons des pluies (avril–juillet, octobre–novembre) : tracer les intempéries au journal pour justifier les prolongations."]):
+        "Saisons des pluies (avril–juillet, octobre–novembre) : tracer les intempéries au journal pour justifier les prolongations.",
+        "Routes en terre : rechargement latéritique CBR ≥ 30 à 95 % OPM, bombement 4 %, fossés et exutoires avant la saison des pluies.",
+        "Buses Ø800 / Ø1000 : lit de pose réglé, pente 1 à 3 %, remblai latéral symétrique, couverture ≥ 0,60 m avant passage d'engins.",
+        "Charpente métallique : calcul et contrôles selon EC3 (NF EN 1993) / NF EN 1090 ; protection anticorrosion renforcée (climat humide)."]):
     c = acc.cell(r + 1 + i, 2, "• " + s)
     acc.merge_cells(start_row=r + 1 + i, start_column=2, end_row=r + 1 + i, end_column=4)
     c.font, c.alignment = font(), LEFT
@@ -1223,10 +1786,17 @@ acc.oddFooter.left.text = "Auteur : " + AUTEUR
 # Ordre et couleur des onglets
 ordre = ["Accueil", "Paramètres", "02_Tableau_de_bord", "01_Planning", "03_Budget", "04_Situations",
          "05_Factures", "06_Pointage", "07_Affectation", "08_Commandes", "09_Stock", "09b_Livraisons",
-         "10_Journal", "11_Incidents", "Personnel", "Checklist_lancement", "Lexique"]
+         "10_Journal", "11_Incidents", "12_Controle_qualite", "13_Route", "14_Points_critiques", "15_Dalots",
+         "16_Batiment_TCE", "17_Cloture", "18_Charpente_metal", "Plan_controle", "Personnel",
+         "Checklist_lancement", "Lexique"]
+assert sorted(ordre) == sorted(wb.sheetnames), set(wb.sheetnames) ^ set(ordre)
 wb._sheets = [wb[n] for n in ordre]
 for n in ordre:
-    wb[n].sheet_properties.tabColor = {"Accueil": VERT, "Paramètres": ORANGE, "02_Tableau_de_bord": ROUGE}.get(n, VERT2)
+    couleur = {"Accueil": VERT, "Paramètres": ORANGE, "02_Tableau_de_bord": ROUGE,
+               "12_Controle_qualite": "6A1B9A", "Plan_controle": "6A1B9A"}.get(n, VERT2)
+    if n[:2] in ("13", "14", "15", "16", "17", "18"):
+        couleur = "1565C0"
+    wb[n].sheet_properties.tabColor = couleur
 wb.active = 0
 wb.properties.creator = AUTEUR
 wb.properties.title = "Metrix Avancé Chantier BTP"
