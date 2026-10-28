@@ -16,7 +16,13 @@ export type Prim =
   | { t: "circle"; c: Pt; r: number; layer: Layer; hollow?: boolean }
   | { t: "text"; p: Pt; h: number; s: string; layer: Layer; align?: "left" | "center" | "right"; rot?: number; bold?: boolean };
 
-export type Sheet = { id: string; title: string; scale: number; origin: Pt; width: number; height: number; prims: Prim[] };
+export type Sheet = {
+  id: string; title: string; scale: number; origin: Pt; width: number; height: number; prims: Prim[];
+  /** Planche reprise en image dans la note de calcul. */
+  role?: "coffrage" | "ferraillage";
+  /** Échelle affichée (« 1/50 », « VAR ») quand elle diffère de l'échelle de mise en page. */
+  scaleLabel?: string;
+};
 
 export const LAYER_COLORS: Record<Layer, { aci: number; css: string }> = {
   CADRE: { aci: 7, css: "#0f172a" },

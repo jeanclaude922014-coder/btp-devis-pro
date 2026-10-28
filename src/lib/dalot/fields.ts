@@ -75,6 +75,20 @@ export const FIELDS: FieldDef[] = [
   { key: "entreprise", section: "general", group: "Cartouche des plans", label: "Entreprise", kind: "text", default: "" },
   { key: "pk", section: "general", group: "Cartouche des plans", label: "PK de l'ouvrage", kind: "text", default: "" },
   { key: "numPlan", section: "general", group: "Cartouche des plans", label: "Numéro de plan (préfixe)", kind: "text", default: "D01", help: "Les planches sont numérotées D01.1, D01.2, D01.3…" },
+  {
+    key: "modelePlans", section: "general", group: "Cartouche des plans", label: "Modèle de plans", kind: "select", default: "cafe",
+    options: [
+      { value: "cafe", label: "Modèle Bangolo – Bloléquin (8 planches A3 : garde, coffrage, coupes, ferraillage, nomenclatures, têtes)" },
+      { value: "paia", label: "Modèle PAIA Damé – Massakro (8 planches A3 : coffrage, corps, garde-corps, têtes et nomenclatures)" },
+      { value: "engc", label: "Modèle ENGC / KKP D07 (coffrage, ferraillage, nomenclature A4)" },
+    ],
+    help: "Reproduit la mise en page, le cartouche et la numérotation des repères des plans types.",
+  },
+  { key: "ministere", section: "general", group: "Cartouche des plans", label: "Ministère de tutelle", kind: "text", default: "Ministère d'État, Ministère de l'Agriculture et du Développement Rural" },
+  { key: "marche", section: "general", group: "Cartouche des plans", label: "Intitulé du marché (bandeau du cartouche)", kind: "text", default: "Travaux de construction d'ouvrages hydrauliques en Côte d'Ivoire" },
+  { key: "itineraire", section: "general", group: "Cartouche des plans", label: "Itinéraire", kind: "text", default: "", help: "Vide : la localisation est reprise." },
+  { key: "departement", section: "general", group: "Cartouche des plans", label: "Département", kind: "text", default: "" },
+  { key: "datePlan", section: "general", group: "Cartouche des plans", label: "Date des plans", kind: "text", default: "", help: "Ex. « Juillet 2026 ». Vide : mois en cours." },
 
   // ── Hydrologie et hydraulique ─────────────────────────────
   { key: "hyActif", section: "hydro", group: "Étude hydraulique", label: "Justifier la capacité hydraulique de l'ouvrage", kind: "bool", default: true },
@@ -201,6 +215,7 @@ export const FIELDS: FieldDef[] = [
   { key: "becheProf", section: "tetes", group: "Radiers de tête et bêches", label: "Profondeur des bêches parafouilles", unit: "m", kind: "number", default: 0.8, min: 0, max: 3, step: 0.05 },
   { key: "becheEp", section: "tetes", group: "Radiers de tête et bêches", label: "Épaisseur des bêches", unit: "m", kind: "number", default: 0.25, min: 0.15, max: 0.6, step: 0.01 },
   { key: "guideRoues", section: "tetes", group: "Équipements", label: "Guide-roues sur murs de tête", kind: "bool", default: true },
+  { key: "gardeCorps", section: "tetes", group: "Équipements", label: "Garde-corps en béton armé (poteaux et lisse)", kind: "bool", default: false, help: "Garde-corps de 1,00 m sur les deux rives de la dalle : poteaux 20 × 20 tous les 1,00 m environ, lisse 20 × 15." },
 
   // ── Talus du remblai ──────────────────────────────────────
   { key: "talusActif", section: "talus", group: "Stabilité du remblai d'accès", label: "Vérifier la stabilité du talus (Fellenius)", kind: "bool", default: true },
@@ -277,6 +292,7 @@ export type DalotInput = {
     projet: string; dossier: string; ouvrage: string; localisation: string;
     maitreOuvrage: string; maitreOeuvre: string; auteur: string; indice: string;
     entreprise: string; pk: string; numPlan: string;
+    modelePlans: "cafe" | "paia" | "engc"; ministere: string; marche: string; itineraire: string; departement: string; datePlan: string;
   };
   openings: number[];
   hInt: number;
@@ -297,7 +313,7 @@ export type DalotInput = {
   tanDiff: number; pas: number;
   tetes: {
     murs: boolean; angle: number; long: number; ep: number; semelle: number; semEp: number; patin: number; beche: number;
-    murTeteEp: number; revanche: number; radierLong: number; becheProf: number; becheEp: number; guideRoues: boolean;
+    murTeteEp: number; revanche: number; radierLong: number; becheProf: number; becheEp: number; guideRoues: boolean; gardeCorps: boolean;
   };
   talus: { actif: boolean; pente: number; phi: number; c: number };
   hydro: {
@@ -351,6 +367,8 @@ export function toInput(spec: DalotSpec): DalotInput {
       projet: str(v.projet), dossier: str(v.dossier), ouvrage: str(v.ouvrage), localisation: str(v.localisation),
       maitreOuvrage: str(v.maitreOuvrage), maitreOeuvre: str(v.maitreOeuvre), auteur: str(v.auteur) || "Moulo Jean Claude",
       indice: str(v.indice), entreprise: str(v.entreprise), pk: str(v.pk), numPlan: str(v.numPlan) || "D01",
+      modelePlans: v.modelePlans === "paia" || v.modelePlans === "engc" ? v.modelePlans : "cafe",
+      ministere: str(v.ministere), marche: str(v.marche), itineraire: str(v.itineraire), departement: str(v.departement), datePlan: str(v.datePlan),
     },
     openings,
     hInt: num(v.hInt, 1.5),
@@ -383,7 +401,7 @@ export function toInput(spec: DalotSpec): DalotInput {
       semelle: num(v.aileSemelle, 2.4), semEp: num(v.aileSemEp, 0.3), patin: num(v.aileTalon, 0.4), beche: num(v.aileBeche, 0),
       murTeteEp: num(v.murTeteEp, 0.2), revanche: num(v.murTeteRevanche, 0.2),
       radierLong: num(v.radierTeteLong, 1.5), becheProf: num(v.becheProf, 0.8), becheEp: num(v.becheEp, 0.25),
-      guideRoues: v.guideRoues === true,
+      guideRoues: v.guideRoues === true, gardeCorps: v.gardeCorps === true,
     },
     talus: { actif: v.talusActif === true, pente: num(v.talusPente, 1.5), phi: num(v.talusPhi, 30), c: num(v.talusC, 0) },
     hydro: {
@@ -418,6 +436,7 @@ const RURAL: Record<string, FieldValue> = {
   soilPreset: "laterite_compacte", ks: 10000, qadm: 0.18, phiSol: 30, cSol: 0, gammaSol: 20, talusPhi: 30,
   aileAngle: 30, aileEp: 0.25, radierTeteLong: 1.5, becheProf: 1, becheEp: 0.25,
   localisation: "Route Bangolo – Bloléquin (Guémon / Cavally)", maitreOuvrage: "Conseil Café-Cacao",
+  itineraire: "Bangolo – Bloléquin", modelePlans: "cafe",
   hyActif: true, hyMethode: "rationnelle", hyT: 10, hyMa: 350, hyMb: 0.38, hyK: 70, hyI: 0.6,
 };
 
@@ -428,8 +447,9 @@ export const DALOT_PRESETS: DalotPreset[] = [
   },
   {
     id: "r200x200", label: "Dalot 2,00 × 2,00 — route Bangolo – Bloléquin",
-    description: "Note et plan types : voiles 20 cm, dalle et radier 25 cm, L = 7,00 m, FeE500, C25/30, enrobage 3 cm, remblai 0,60 m. BV 1,20 km² → Qp ≈ 9,9 m³/s.",
-    values: { ...RURAL, projet: "Dalot 2,00 × 2,00", nCells: 1, opening: 2, hInt: 2, es: 0.25, er: 0.25, eExt: 0.2, eInt: 0.2, aileLong: 3.4, aileEp: 0.25, hyA: 1.2, hyL: 1.7, hyDH: 32, hyC: 0.3 },
+    description: "Note et plan types : voiles 20 cm, dalle et radier 25 cm, L = 7,00 m, ailes 3,81 m à 30 gr, radiers de tête 3,40 m, bêches 25 × 100, FeE500, C25/30, enrobage 3 cm, remblai 0,60 m. BV 1,20 km² → Qp ≈ 9,9 m³/s.",
+    values: { ...RURAL, projet: "Dalot 2,00 × 2,00", nCells: 1, opening: 2, hInt: 2, es: 0.25, er: 0.25, eExt: 0.2, eInt: 0.2, aileLong: 3.81, aileAngle: 27, aileEp: 0.2,
+      radierTeteLong: 3.4, becheProf: 1, becheEp: 0.25, murTeteEp: 0.25, hyA: 1.2, hyL: 1.7, hyDH: 32, hyC: 0.3 },
   },
   {
     id: "r300x200", label: "Dalot 3,00 × 2,00 — route Bangolo – Bloléquin",
@@ -446,14 +466,17 @@ export const DALOT_PRESETS: DalotPreset[] = [
     description: "D'après le plan D07 : piédroits 25 cm, dalle et radier 30 cm, L = 7,00 m, murs en aile de 4,00 m à 30°, bêches 20 × 120, guide-roues 25 × 40, chaussée sur la dalle.",
     values: { ...RURAL, projet: "Dalot double 2 × 3,00 × 3,00", nCells: 2, opening: 3, hInt: 3, es: 0.3, er: 0.3, eExt: 0.25, eInt: 0.25, L: 7,
       hr: 0, ech: 0, aileLong: 4, aileEp: 0.2, becheProf: 1.2, becheEp: 0.2, radierTeteLong: 2, guideRoues: true, hyActif: false,
-      maitreOuvrage: "", localisation: "Côte d'Ivoire", numPlan: "D07" },
+      maitreOuvrage: "", localisation: "Côte d'Ivoire", numPlan: "D07", modelePlans: "engc" },
   },
   {
     id: "r3x400x400", label: "Dalot triple 3 × 4,00 × 4,00, L = 8,50 m — Damé – Massakro",
-    description: "D'après le plan PAIA : piédroits 35 cm, dalle et radier 40 cm, L = 8,50 m, murs en aile de 6,60 m, garde-corps ; chaussée sur la dalle.",
+    description: "D'après le plan PAIA : piédroits 35 cm, dalle et radier 40 cm, L = 8,50 m, murs en aile de 7,41 m à 30 gr (6,60 m en plan), radiers de tête 6,60 m, bêches 25 × 130, garde-corps ; chaussée sur la dalle.",
     values: { ...RURAL, projet: "Dalot 3 × 4,00 × 4,00", nCells: 3, opening: 4, hInt: 4, es: 0.4, er: 0.4, eExt: 0.35, eInt: 0.35, L: 8.5,
-      hr: 0, ech: 0, aileLong: 6.6, aileEp: 0.3, becheProf: 1.3, becheEp: 0.25, radierTeteLong: 2.5, guideRoues: true, hyActif: false,
-      maitreOuvrage: "Ministère de l'Agriculture", localisation: "Damé – Massakro (Agnibilékro), PK 6+400", pk: "PK 6+400", numPlan: "D01" },
+      hr: 0, ech: 0, aileLong: 7.41, aileAngle: 27, aileEp: 0.3, becheProf: 1.3, becheEp: 0.25, radierTeteLong: 6.6, hyActif: false,
+      maitreOuvrage: "Ministère de l'Agriculture", localisation: "Damé – Massakro (Agnibilékro), PK 6+400", pk: "PK 6+400", numPlan: "D01",
+      modelePlans: "paia", gardeCorps: true, guideRoues: false, ministere: "Ministère de l'Agriculture", maitreOeuvre: "PAIA",
+      marche: "Travaux de reprofilage lourd et traitement de points critiques sur 102,21 km de piste — Lot 1",
+      itineraire: "Damé – Massakro", departement: "Agnibilékro" },
   },
 ];
 

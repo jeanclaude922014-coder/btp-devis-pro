@@ -470,7 +470,7 @@ export function PlansPanel({ study }: { study: Study }) {
       </div>
     }>
       <div className="mb-3 flex flex-wrap gap-1">
-        {sheets.map((s, i) => <button key={s.id} onClick={() => setSel(i)} className={`rounded px-2 py-1 text-xs font-medium ${sel === i ? "bg-blue-800 text-white" : "bg-slate-100 text-slate-600"}`}>{i + 1}. {s.title} (1/{s.scale})</button>)}
+        {sheets.map((s, i) => <button key={s.id} onClick={() => setSel(i)} className={`rounded px-2 py-1 text-xs font-medium ${sel === i ? "bg-blue-800 text-white" : "bg-slate-100 text-slate-600"}`}>{i + 1}. {s.title} ({s.scaleLabel ?? `1/${s.scale}`})</button>)}
       </div>
       <div className="overflow-hidden rounded border border-slate-200 bg-white" dangerouslySetInnerHTML={{ __html: svg }} />
       <p className="mt-2 text-xs text-slate-500">
@@ -542,8 +542,8 @@ export function NotePanel({ study }: { study: Study }) {
     try {
       const sheets = buildSheets(study);
       const images: NoteImages = {
-        coffrage: await svgToPng(sheetToSvg(sheets[0], { background: "#ffffff" }), 1600),
-        ferraillage: await svgToPng(sheetToSvg(sheets[1], { background: "#ffffff" }), 1600),
+        coffrage: await svgToPng(sheetToSvg(sheets.find((s) => s.role === "coffrage") ?? sheets[0], { background: "#ffffff" }), 1600),
+        ferraillage: await svgToPng(sheetToSvg(sheets.find((s) => s.role === "ferraillage") ?? sheets[1], { background: "#ffffff" }), 1600),
         moments: await svgToPng(envelopeSvg(study.analysis, study.analysis.elu, "M"), 1400),
         tranchant: await svgToPng(envelopeSvg(study.analysis, study.analysis.elu, "V"), 1400),
         convois: [],

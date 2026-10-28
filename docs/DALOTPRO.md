@@ -64,3 +64,24 @@ Chaque vérification porte un statut **Conforme**, **Non conforme**, **Non véri
 - Convois Eurocodes LM1 (TS + UDL) et LM2 ; poussée au repos K0, active Ka ou encadrement Kmin/Kmax ; tassement
   œdométrique ; schémas cotés des convois (écran et note) ; diagrammes de moments et maquette DXF 3D dans la vue 3D.
 - Contrôle sur le plan ENGC du dalot 2 × 3,00 × 3,00 : 3 664 kg d'acier pour le corps contre 3 689 kg sur la nomenclature.
+
+## Version 3 — modèles de plans des dossiers types
+
+Champ « Modèle de plans » (Données générales › Cartouche des plans) :
+
+- **Bangolo – Bloléquin** (par défaut) : 8 planches A3 — page de garde avec tableau des indices, vue en plan
+  et détail du raccord, coupes A-A / B-B et élévation de la tête, plan de ferraillage avec peignes de
+  répartition et hypothèses de calcul, nomenclature du corps (position, nuance, nombre par élément / éléments /
+  total, schéma coté, récapitulatifs), ferraillage de la tête et détail de l'aile, ferraillage du mur en aile
+  et section 2-2, grille tête. Repères des têtes « 1a, 2a… ». Cartouche en bandeau : République, ministère,
+  maître d'ouvrage délégué, marché, itinéraire, entreprise, indice, date, format.
+- **PAIA Damé – Massakro** : titre, ensemble coffrage (coupes AA et BB, vue en plan, détail 1), corps
+  d'ouvrage coté, nomenclature du corps, garde-corps (coupe B-B, coupes 1-1 et 2-2) et sa nomenclature,
+  ouvrages de tête (vue en plan, élévation, détail 1, coupe A-A) et leur nomenclature.
+- **ENGC / KKP D07** : dossier précédent (coffrage, ferraillage, nomenclature A4).
+
+Nouveaux champs : ministère, intitulé du marché, itinéraire, département, date des plans ; garde-corps en
+béton armé (poteaux 20 × 20 tous les 1,00 m environ, lisse 20 × 15, h = 1,00 m), métrés et nomenclature.
+Les préréglages 2,00 × 2,00 et 3 × 4,00 × 4,00 reprennent les cotes des plans d'origine (ailes à 30 gr,
+radiers de tête 3,40 m et 6,60 m, bêches 25 × 100 et 25 × 130) ; `npm run verif:dalot` vérifie les 8 planches
+et ces cotes.

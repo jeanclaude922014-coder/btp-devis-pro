@@ -7,6 +7,7 @@
 import { defaultSpec, seriesSpec, specFromPreset, toInput } from "../src/lib/dalot/fields";
 import { addMemberLoad, addTopLoad, buildFrame, emptyLoad, solve } from "../src/lib/dalot/frame";
 import { runStudy } from "../src/lib/dalot/engine";
+import { buildSheets } from "../src/lib/dalot/plans";
 
 let failed = 0;
 const check = (label: string, got: number, want: number, tol: number) => {
@@ -52,6 +53,22 @@ for (const n of [2, 3, 4]) for (const L of [7, 8]) {
 const demo = runStudy(defaultSpec());
 if (!demo.ok || demo.study.status !== "conforme") { failed++; console.log("ÉCHEC  l'ouvrage de démonstration doit être conforme"); }
 else console.log("OK   ouvrage de démonstration conforme");
+
+// 4. Dossiers de plans sur les modèles types : 8 planches chacun, cotes de la vue en plan.
+for (const [id, model, ids] of [
+  ["r200x200", "cafe", ["garde", "vue-plan", "coupes", "ferraillage", "nomenclature", "ferraillage-tete", "mur-aile", "grille-tete"]],
+  ["r3x400x400", "paia", ["titre", "coffrage", "corps", "nomenclature-corps", "garde-corps", "nomenclature-gc", "tetes", "nomenclature-tetes"]],
+] as const) {
+  const res = runStudy(specFromPreset(id));
+  if (!res.ok) { failed++; console.log(`ÉCHEC  ${id} : calcul impossible`); continue; }
+  const sheets = buildSheets(res.study);
+  const okIds = sheets.length === ids.length && ids.every((x, i) => sheets[i].id.startsWith(x));
+  const txt = sheets[1].prims.filter((p) => p.t === "text").map((p) => (p.t === "text" ? p.s : ""));
+  const cotes = id === "r200x200" ? ["340", "650", "381"] : ["660", "850", "741"];
+  const okCotes = cotes.every((c) => txt.includes(c));
+  if (!okIds || !okCotes) { failed++; console.log(`ÉCHEC  modèle ${model} (${id}) : ${sheets.map((s) => s.id).join(", ")}`); }
+  else console.log(`OK   modèle ${model} (${id}) : ${sheets.length} planches, cotes ${cotes.join(" / ")} présentes`);
+}
 
 if (failed) { console.log(`\n${failed} contrôle(s) en échec`); process.exit(1); }
 console.log("\nTous les contrôles sont satisfaits.");

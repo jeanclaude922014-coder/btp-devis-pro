@@ -14,13 +14,14 @@ import {
   bodyBars, cellOutline, cmTxt, fmt, geometry, Pen, repMap, type BarKind, type Pt, type Sheet,
 } from "./drawings";
 import type { Study } from "./engine";
-import { steelSummary, type BarMark } from "./quantities";
+import { BAR_PARTS, steelSummary, type BarMark } from "./quantities";
+import { buildModelSheets } from "./plans-modeles";
 
-const A3: Pt = [0.42, 0.297];
+export const A3: Pt = [0.42, 0.297];
 const A4: Pt = [0.21, 0.297];
-const SCALES = [20, 25, 30, 40, 50, 75, 100, 125, 150, 200, 250];
+export const SCALES = [20, 25, 30, 40, 50, 75, 100, 125, 150, 200, 250];
 
-function headGeom(study: Study) {
+export function headGeom(study: Study) {
   const inp = study.input;
   const t = inp.tetes;
   const a = (t.angle * Math.PI) / 180;
@@ -242,16 +243,16 @@ function sheetCoffrage(study: Study, origin: Pt, num: string): Sheet {
     p.chainV([0, inp.er, inp.er + inp.hInt, yTop], B + hg.across, B + hg.across + p.th(8));
     title(pen, qx(3) + qW / 2, qy(3) + qH - pen.th(3), "VUE DE FACE");
   }
-  return { id: "coffrage", title: "Plan de coffrage", scale, origin, width: W, height: H, prims: [...pen.prims, ...subs.flatMap((s) => s.prims)] };
+  return { id: "coffrage", title: "Plan de coffrage", role: "coffrage", scale, origin, width: W, height: H, prims: [...pen.prims, ...subs.flatMap((s) => s.prims)] };
 }
 
 // ── 2. Plan de ferraillage ─────────────────────────────────
 
-type Region = { x: number; y: number; w: number; h: number }; // mm papier, origine en bas à gauche
-type Pad = { l: number; r: number; b: number; t: number };
+export type Region = { x: number; y: number; w: number; h: number }; // mm papier, origine en bas à gauche
+export type Pad = { l: number; r: number; b: number; t: number };
 
 /** Place une vue dans une zone de la planche, à la plus grande échelle normalisée qui tient. */
-function fitView(origin: Pt, sheetScale: number, r: Region, ext: { x0: number; y0: number; w: number; h: number }, pad: Pad) {
+export function fitView(origin: Pt, sheetScale: number, r: Region, ext: { x0: number; y0: number; w: number; h: number }, pad: Pad) {
   let s = SCALES[SCALES.length - 1];
   for (const c of SCALES) {
     if ((ext.w * 1000) / c + pad.l + pad.r <= r.w && (ext.h * 1000) / c + pad.b + pad.t <= r.h) { s = c; break; }
@@ -426,14 +427,14 @@ function sheetFerraillage(study: Study, origin: Pt, num: string): Sheet {
     row("Cure humide 7 jours au moins (climat tropical). Badigeon bitumineux sur les parements enterrés.");
   }
 
-  return { id: "ferraillage", title: "Plan de ferraillage", scale, origin, width: W, height: H, prims: [...pen.prims, ...subs.flatMap((x) => x.prims)] };
+  return { id: "ferraillage", title: "Plan de ferraillage", role: "ferraillage", scaleLabel: "VAR", scale, origin, width: W, height: H, prims: [...pen.prims, ...subs.flatMap((x) => x.prims)] };
 }
 
 // ── 3. Nomenclature des armatures (A4) ─────────────────────
 
 type Row = { kind: "bar"; bar: BarMark } | { kind: "total"; label: string; mass: number; big?: boolean };
 
-function sketch(p: Pen, b: BarMark, cx: number, cy: number, w: number, h: number) {
+export function sketch(p: Pen, b: BarMark, cx: number, cy: number, w: number, h: number) {
   const cm = (x: number) => String(Math.round(x * 100));
   const d = b.dims;
   const txt = (x: number, y: number, s: string, align: "left" | "center" | "right" = "center") => p.text([x, y], 1.7, s, "TEXTE", align);
@@ -491,6 +492,13 @@ function sketch(p: Pen, b: BarMark, cx: number, cy: number, w: number, h: number
       txt(x1 + p.th(0.5), cy + k * 0.4, cm(d[2]), "left");
       break;
     }
+    case "cadre": {
+      const k = h * 0.7, ww = Math.min(w * 0.4, k * 1.6);
+      p.poly([[cx - ww / 2 + k * 0.25, cy + k / 2 - k * 0.25], [cx - ww / 2, cy + k / 2], [cx - ww / 2, cy - k / 2], [cx + ww / 2, cy - k / 2], [cx + ww / 2, cy + k / 2], [cx - ww / 2 + k * 0.3, cy + k / 2]], "ACIERS");
+      txt(cx - ww / 2 - p.th(0.6), cy, cm(d[1]), "right");
+      txt(cx, cy - k / 2 - p.th(2.2), cm(d[0]));
+      break;
+    }
     case "gousset": {
       const k = h * 0.6;
       p.poly([[x0, cy - k / 2], [cx - w * 0.15, cy - k / 2], [cx + w * 0.15, cy + k / 2], [x1, cy + k / 2]], "ACIERS");
@@ -505,7 +513,7 @@ function sheetsNomenclature(study: Study, origin: Pt, num: string): Sheet[] {
   const scale = 10; // A4 au 1/10 : simple support de mise en page
   const W = A4[0] * scale, H = A4[1] * scale;
   const rows: { part: string; element: string; row: Row }[] = [];
-  for (const part of ["CORPS DU DALOT", "OUVRAGE DE TÊTE"] as const) {
+  for (const part of BAR_PARTS) {
     const pb = bars.filter((b) => b.part === part);
     if (!pb.length) continue;
     const elements = Array.from(new Set(pb.map((b) => b.element)));
@@ -586,7 +594,7 @@ function sheetsNomenclature(study: Study, origin: Pt, num: string): Sheet[] {
     pen.rect(0, 0, W, H, "CADRE");
     pen.text([W / 2, H - pen.th(14)], 3.4, "RÉCAPITULATIF DES ACIERS", "TEXTE", "center", 0, true);
     pen.text([pen.th(12), H - pen.th(22)], 2.8, `DALOT : ${study.input.ident.projet}`, "TEXTE", "left", 0, true);
-    const parts = ["CORPS DU DALOT", "OUVRAGE DE TÊTE"].map((pt) => ({ pt, m: bars.filter((b) => b.part === pt).reduce((s, b) => s + b.mass, 0) }));
+    const parts = BAR_PARTS.filter((pt) => bars.some((b) => b.part === pt)).map((pt) => ({ pt, m: bars.filter((b) => b.part === pt).reduce((s, b) => s + b.mass, 0) }));
     const cols = [30, 35, 35, 40];
     const x0 = (W - pen.th(cols.reduce((s, v) => s + v, 0))) / 2;
     const xs = [x0];
@@ -613,6 +621,8 @@ function sheetsNomenclature(study: Study, origin: Pt, num: string): Sheet[] {
 }
 
 export function buildSheets(study: Study): Sheet[] {
+  const model = study.input.ident.modelePlans;
+  if (model === "cafe" || model === "paia") return buildModelSheets(study, model);
   const num = study.input.ident.numPlan || "D01";
   const out: Sheet[] = [];
   let x = 0;
