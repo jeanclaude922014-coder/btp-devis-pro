@@ -464,14 +464,14 @@ export function PlansPanel({ study }: { study: Study }) {
 // ── Nomenclature et métré ──────────────────────────────────
 
 export function QuantitiesPanel({ study, projects, onQuote, quoting }: {
-  study: Study; projects: { id: string; name: string }[]; onQuote: (projectId: string) => void; quoting: boolean;
+  study: Study; projects: { id: string; name: string }[]; onQuote?: (projectId: string) => void; quoting: boolean;
 }) {
   const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
   const q = study.quantities;
   return (
     <div className="space-y-4">
       <Card title="Métré" actions={
-        projects.length > 0 ? (
+        !onQuote ? undefined : projects.length > 0 ? (
           <div className="flex items-center gap-2">
             <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="rounded-md border border-slate-300 px-2 py-1 text-sm">
               {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}

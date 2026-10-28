@@ -1,6 +1,15 @@
 "use client";
 
+type Saver = (blob: Blob, filename: string) => void | Promise<void>;
+let saver: Saver | null = null;
+
+/** Remplace l'enregistrement par défaut (lien de téléchargement), p. ex. dans une page hébergée. */
+export function setSaver(fn: Saver | null) {
+  saver = fn;
+}
+
 export function downloadBlob(blob: Blob, filename: string) {
+  if (saver) return saver(blob, filename);
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

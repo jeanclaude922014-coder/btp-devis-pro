@@ -43,3 +43,9 @@ Chaque vérification porte un statut **Conforme**, **Non conforme**, **Non véri
 - Biais de l'ouvrage non traité (dalots droits uniquement) ; contact radier-sol linéaire (bilatéral), vérifié a posteriori.
 - Les terrassements du métré sont des estimations forfaitaires.
 - Outil d'aide au calcul : les notes et plans doivent être vérifiés et visés par un ingénieur qualifié.
+
+## Version autonome (sans compte ChantierPilot)
+
+`npm run build:dalotpro` produit `standalone/dist/dalotpro.html`, une page unique qui embarque tout le logiciel
+(calcul, 3D, note Word, DXF). Hébergée comme Artifact claude.ai, elle garde les études dans l'espace privé du compte
+(ou, à défaut, dans le navigateur) et livre les fichiers par l'enregistreur de la plateforme ; le DXF y est livré dans un `.zip`.

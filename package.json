@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
-    "verif:dalot": "tsx scripts/verif-dalot.ts"
+    "verif:dalot": "tsx scripts/verif-dalot.ts",
+    "build:dalotpro": "node standalone/build.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",

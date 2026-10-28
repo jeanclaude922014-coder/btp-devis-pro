@@ -7,7 +7,7 @@ import { stripBlocks } from "@/lib/dalot/convoys";
 import { transverseSpread } from "@/lib/dalot/analysis";
 import { bodyBars, repMap } from "@/lib/dalot/drawings";
 import type { Study } from "@/lib/dalot/engine";
-import { slug } from "./download";
+import { downloadBlob, slug } from "./download";
 
 type Opts = { concrete: "opaque" | "transparent" | "masque"; fill: boolean; convoy: string; rebar: boolean; cut: boolean };
 
@@ -204,12 +204,9 @@ export function Viewer3D({ study }: { study: Study }) {
   }, [study, o, gov]);
 
   const savePng = () => {
-    const url = rendererRef.current?.domElement.toDataURL("image/png");
-    if (!url) return;
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `vue3d_${slug(study.input.ident.projet)}.png`;
-    a.click();
+    rendererRef.current?.domElement.toBlob((blob) => {
+      if (blob) void downloadBlob(blob, `vue3d_${slug(study.input.ident.projet)}.png`);
+    }, "image/png");
   };
 
   const chip = (on: boolean) => `rounded px-2 py-1 text-xs font-medium ${on ? "bg-blue-800 text-white" : "bg-slate-100 text-slate-600"}`;
