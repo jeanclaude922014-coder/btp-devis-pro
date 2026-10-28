@@ -5,11 +5,47 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { stripBlocks } from "@/lib/dalot/convoys";
 import { transverseSpread } from "@/lib/dalot/analysis";
-import { bodyBars, repMap } from "@/lib/dalot/drawings";
+import { bodyBars } from "@/lib/dalot/drawings";
 import type { Study } from "@/lib/dalot/engine";
 import { downloadBlob, slug } from "./download";
 
-type Opts = { concrete: "opaque" | "transparent" | "masque"; fill: boolean; convoy: string; rebar: boolean; cut: boolean };
+type Opts = { concrete: "opaque" | "transparent" | "masque"; fill: boolean; convoy: string; rebar: boolean; cut: boolean; efforts: boolean };
+
+/** Maquette 3D au format DXF (R12) : faces 3DFACE et lignes 3D, un calque par élément. */
+function sceneToDxf(scene: THREE.Scene): string {
+  const out: string[] = ["0", "SECTION", "2", "ENTITIES"];
+  const n = (x: number) => x.toFixed(4);
+  const v = new THREE.Vector3();
+  // Repère DXF : x en travers, y le long de l'ouvrage, z vertical.
+  const P = (p: THREE.Vector3) => [n(p.x), n(p.z), n(p.y)];
+  scene.updateMatrixWorld(true);
+  scene.traverse((obj) => {
+    const layer = obj.userData.layer as string | undefined;
+    if (!layer) return;
+    const geo = (obj as THREE.Mesh).geometry as THREE.BufferGeometry | undefined;
+    const pos = geo?.getAttribute("position");
+    if (!geo || !pos) return;
+    const get = (i: number) => P(v.fromBufferAttribute(pos, i).applyMatrix4(obj.matrixWorld));
+    if ((obj as THREE.LineSegments).isLineSegments) {
+      for (let i = 0; i + 1 < pos.count; i += 2) {
+        const a = get(i), b = get(i + 1);
+        out.push("0", "LINE", "8", layer, "10", a[0], "20", a[1], "30", a[2], "11", b[0], "21", b[1], "31", b[2]);
+      }
+      return;
+    }
+    const idx = geo.getIndex();
+    const tri = idx ? idx.count / 3 : pos.count / 3;
+    for (let k = 0; k < tri; k++) {
+      const ids = [0, 1, 2].map((j) => (idx ? idx.getX(3 * k + j) : 3 * k + j));
+      const [a, b, c] = ids.map(get);
+      out.push("0", "3DFACE", "8", layer,
+        "10", a[0], "20", a[1], "30", a[2], "11", b[0], "21", b[1], "31", b[2],
+        "12", c[0], "22", c[1], "32", c[2], "13", c[0], "23", c[1], "33", c[2]);
+    }
+  });
+  out.push("0", "ENDSEC", "0", "EOF");
+  return out.join("\r\n") + "\r\n";
+}
 
 /** Position défavorable d'un convoi pour le moment maximal en travée de dalle. */
 function governing(study: Study, convoyId: string) {
@@ -31,7 +67,8 @@ export function Viewer3D({ study }: { study: Study }) {
   const camState = useRef<{ p: THREE.Vector3; t: THREE.Vector3 } | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const convoys = study.analysis.traffic.filter((t) => t.positions.length);
-  const [o, setO] = useState<Opts>({ concrete: "opaque", fill: true, convoy: convoys[0]?.def.id ?? "", rebar: false, cut: false });
+  const [o, setO] = useState<Opts>({ concrete: "opaque", fill: true, convoy: convoys[0]?.def.id ?? "", rebar: false, cut: false, efforts: false });
+  const sceneRef = useRef<THREE.Scene | null>(null);
   const gov = useMemo(() => governing(study, o.convoy), [study, o.convoy]);
 
   useEffect(() => {
@@ -45,6 +82,7 @@ export function Viewer3D({ study }: { study: Study }) {
     const t = inp.tetes;
     const W = el.clientWidth || 800, Hh = el.clientHeight || 520;
     const scene = new THREE.Scene();
+    sceneRef.current = scene;
     scene.background = new THREE.Color(0xeef2f7);
     const camera = new THREE.PerspectiveCamera(40, W / Hh, 0.05, 500);
     const R = Math.max(B, L, H) * 1.9;
@@ -68,9 +106,10 @@ export function Viewer3D({ study }: { study: Study }) {
       color: 0xb8c0cc, roughness: 0.85, side: THREE.DoubleSide, clippingPlanes: clip,
       transparent: o.concrete !== "opaque", opacity: o.concrete === "transparent" ? 0.28 : 1, depthWrite: o.concrete === "opaque",
     });
-    const addConcrete = (geo: THREE.BufferGeometry, pos?: THREE.Vector3, rotY = 0) => {
+    const addConcrete = (geo: THREE.BufferGeometry, pos?: THREE.Vector3, rotY = 0, layer = "CORPS") => {
       if (o.concrete === "masque") return;
       const mesh = new THREE.Mesh(geo, concreteMat);
+      mesh.userData.layer = layer;
       if (pos) mesh.position.copy(pos);
       mesh.rotation.y = rotY;
       scene.add(mesh);
@@ -96,11 +135,11 @@ export function Viewer3D({ study }: { study: Study }) {
 
     // Murs de tête, radiers de tête, murs en aile.
     const hHead = study.heads.headWall.H;
-    for (const z of [-t.murTeteEp / 2, L + t.murTeteEp / 2]) addConcrete(new THREE.BoxGeometry(B, hHead, t.murTeteEp), new THREE.Vector3(B / 2, H + hHead / 2, z));
+    for (const z of [-t.murTeteEp / 2, L + t.murTeteEp / 2]) addConcrete(new THREE.BoxGeometry(B, hHead, t.murTeteEp), new THREE.Vector3(B / 2, H + hHead / 2, z), 0, "MUR_TETE");
     const a = (t.angle * Math.PI) / 180;
     if (t.radierLong > 0) {
       const w = B + 2 * t.radierLong * Math.tan(a) * (t.murs ? 1 : 0);
-      for (const z of [-t.radierLong / 2, L + t.radierLong / 2]) addConcrete(new THREE.BoxGeometry(w, inp.er, t.radierLong), new THREE.Vector3(B / 2, inp.er / 2, z));
+      for (const z of [-t.radierLong / 2, L + t.radierLong / 2]) addConcrete(new THREE.BoxGeometry(w, inp.er, t.radierLong), new THREE.Vector3(B / 2, inp.er / 2, z), 0, "RADIER_TETE");
     }
     if (study.heads.wing) {
       const w = study.heads.wing;
@@ -108,7 +147,7 @@ export function Viewer3D({ study }: { study: Study }) {
       const geo = new THREE.ExtrudeGeometry(ws, { depth: t.ep, bevelEnabled: false });
       for (const [sx, xr] of [[-1, 0], [1, B]] as const) for (const [sz, zr] of [[-1, 0], [1, L]] as const) {
         const dx = sx * Math.sin(a), dz = sz * Math.cos(a);
-        addConcrete(geo, new THREE.Vector3(xr, 0, zr), Math.atan2(-dz, dx));
+        addConcrete(geo, new THREE.Vector3(xr, 0, zr), Math.atan2(-dz, dx), "MURS_AILE");
       }
     }
 
@@ -150,9 +189,46 @@ export function Viewer3D({ study }: { study: Study }) {
       }
     }
 
+    // Enveloppe des moments ELU tracée dans la bande de calcul (côté fibre tendue).
+    if (o.efforts) {
+      const an = study.analysis;
+      const env = an.elu;
+      let vmax = 1e-9;
+      for (let k = 0; k < an.quantities.ns; k++) vmax = Math.max(vmax, Math.abs(env.max[k]), Math.abs(env.min[k]));
+      const amp = (Math.min(B, H) * 0.3) / vmax;
+      const zP = o.cut ? L / 2 + 0.02 : -0.06;
+      const yOff = inp.er / 2;
+      for (const [vals, color] of [[env.max, 0xdc2626], [env.min, 0x2563eb]] as const) {
+        const tris: number[] = [], lines: number[] = [];
+        for (const m of model.members) {
+          const a0 = model.nodes[m.nodes[0]], a1 = model.nodes[m.nodes[m.nodes.length - 1]];
+          const ux = (a1.x - a0.x) / m.length, uy = (a1.y - a0.y) / m.length;
+          const nx = -uy, ny = ux;
+          const pt = (k: number) => {
+            const nd = model.nodes[m.nodes[k]];
+            const v = -vals[m.station0 + k] * amp;
+            return { ax: nd.x - model.xLeft, ay: nd.y + yOff, cx: nd.x - model.xLeft + nx * v, cy: nd.y + yOff + ny * v };
+          };
+          for (let k = 0; k < m.nodes.length - 1; k++) {
+            const p0 = pt(k), p1 = pt(k + 1);
+            tris.push(p0.ax, p0.ay, zP, p0.cx, p0.cy, zP, p1.cx, p1.cy, zP, p0.ax, p0.ay, zP, p1.cx, p1.cy, zP, p1.ax, p1.ay, zP);
+            lines.push(p0.cx, p0.cy, zP, p1.cx, p1.cy, zP);
+          }
+        }
+        const g1 = new THREE.BufferGeometry();
+        g1.setAttribute("position", new THREE.Float32BufferAttribute(tris, 3));
+        scene.add(new THREE.Mesh(g1, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false })));
+        const g2 = new THREE.BufferGeometry();
+        g2.setAttribute("position", new THREE.Float32BufferAttribute(lines, 3));
+        const ls = new THREE.LineSegments(g2, new THREE.LineBasicMaterial({ color }));
+        ls.userData.layer = color === 0xdc2626 ? "MOMENTS_MAX" : "MOMENTS_MIN";
+        scene.add(ls);
+      }
+    }
+
     // Ferraillage du corps.
     if (o.rebar) {
-      const bars = bodyBars(study, repMap(study));
+      const bars = bodyBars(study);
       const mainPts: number[] = [], repPts: number[] = [];
       const c = inp.cover;
       for (const b of bars) {
@@ -174,7 +250,9 @@ export function Viewer3D({ study }: { study: Study }) {
       const mk = (pts: number[], color: number) => {
         const geo = new THREE.BufferGeometry();
         geo.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
-        scene.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color })));
+        const seg = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color }));
+        seg.userData.layer = color === 0xdc2626 ? "ACIERS" : "REPARTITION";
+        scene.add(seg);
       };
       mk(mainPts, 0xdc2626);
       mk(repPts, 0x2563eb);
@@ -224,6 +302,9 @@ export function Viewer3D({ study }: { study: Study }) {
           <option value="">aucun</option>
           {convoys.map((c) => <option key={c.def.id} value={c.def.id}>{c.def.label}</option>)}
         </select>
+        <button onClick={() => setO({ ...o, efforts: !o.efforts })} className={chip(o.efforts)}>Diagrammes M</button>
+        <button onClick={() => { if (sceneRef.current) void downloadBlob(new Blob([sceneToDxf(sceneRef.current)], { type: "application/dxf" }), `maquette3d_${slug(study.input.ident.projet)}.dxf`); }}
+          className="rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">Maquette DXF 3D</button>
         <button onClick={savePng} className="ml-auto rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">Enregistrer l&apos;image</button>
       </div>
       <div ref={ref} className="h-[560px] w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100" />

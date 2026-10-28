@@ -2,23 +2,31 @@
  * Nomenclature des aciers (repères, façonnage, longueurs, poids) et métré de l'ouvrage.
  */
 
-import { barMass, type BarChoice, type Materials } from "./ba";
+import { barMass, type Materials } from "./ba";
 import type { GroupDesign, GroupId } from "./design";
 import type { DalotInput } from "./fields";
 import type { HeadsResult } from "./heads";
 
-export type BarShape = "droite" | "U" | "L" | "gousset";
+export type BarShape = "droite" | "crochets" | "U" | "L" | "equerre" | "chaise" | "epingle" | "gousset";
+
+export type BarPart = "CORPS DU DALOT" | "OUVRAGE DE TÊTE";
 
 export type BarMark = {
   rep: number;
+  /** Élément de la nomenclature (RADIER, DALLE, PIÉDROITS, GUIDE-ROUES, MUR EN L…). */
   element: string;
+  part: BarPart;
   designation: string;
   phi: number;
   s: number;
+  /** Espacement tel qu'écrit sur la nomenclature (« 14 », « 3/m² »). */
+  spacingLabel: string;
   shape: BarShape;
-  /** Cotes de façonnage (m) : droite [a], U [jambe, base, jambe], L [a, b]. */
+  /** Cotes de façonnage (m), dans l'ordre du croquis. */
   dims: number[];
-  length: number; // longueur développée d'une barre (m), recouvrements compris
+  /** Cote variable (barres des ouvrages de tête), ex. « var (619/989) ». */
+  varLabel?: string;
+  length: number; // longueur développée moyenne d'une barre (m), recouvrements compris
   count: number;
   totalLength: number;
   mass: number; // kg
@@ -46,69 +54,112 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
   const anchor = (phi: number) => (mat.ls * phi) / 1000;
 
   const bars: BarMark[] = [];
-  const add = (element: string, designation: string, b: BarChoice | { phi: number; s: number }, shape: BarShape, dims: number[], count: number) => {
-    if (count <= 0) return;
-    const raw = dims.reduce((s, x) => s + x, 0);
+  const add = (
+    part: BarPart, element: string, designation: string, b: { phi: number; s: number }, shape: BarShape, dims: number[], count: number,
+    opts: { spacingLabel?: string; varLabel?: string; length?: number } = {}
+  ) => {
+    if (count <= 0 || dims.some((d) => !(d > 0))) return;
+    const raw = opts.length ?? dims.reduce((acc, x) => acc + x, 0);
     const length = lap(raw, b.phi);
     bars.push({
-      rep: bars.length + 1, element, designation, phi: b.phi, s: b.s, shape, dims, length, count,
-      totalLength: length * count, mass: length * count * barMass(b.phi),
+      rep: bars.length + 1, element, part, designation, phi: b.phi, s: b.s,
+      spacingLabel: opts.spacingLabel ?? String(Math.round(b.s * 1000) / 10).replace(".", ","),
+      shape, dims, varLabel: opts.varLabel, length, count, totalLength: length * count, mass: length * count * barMass(b.phi),
     });
   };
+  const CORPS: BarPart = "CORPS DU DALOT", TETE: BarPart = "OUVRAGE DE TÊTE";
+  const hook = 0.15; // crochets des barres transversales (cm 15, comme sur les plans types)
+  const retour = Math.max(0.12, Math.min(inp.es, inp.er) - 2 * c); // retours des barres de piédroits dans dalle et radier
+  const chaise = { phi: 12, s: 0 };
+  const perM2 = (area: number, k: number) => Math.ceil(area * k);
+  const legEq = (phi: number) => Math.min(0.9, Math.max(0.5, Math.round((40 * phi) / 1000 / 0.05) * 0.05));
 
   const de = g("dalle_ext"), di = g("dalle_int"), re = g("radier_ext"), ri = g("radier_int");
   const pe = g("pext_ext"), pi = g("pext_int"), pn = g("pint");
-  if (de) {
-    const leg = Math.min(anchor(de.bars.phi), Hout - 2 * c);
-    add("Dalle", "Nappe supérieure — cadre extérieur retourné dans les piédroits", de.bars, "U", [leg, B - 2 * c, leg], nAlong(de.bars.s));
-  }
-  if (di) add("Dalle", "Nappe inférieure — barres filantes", di.bars, "droite", [B - 2 * c], nAlong(di.bars.s));
-  if (re) {
-    const leg = Math.min(anchor(re.bars.phi), Hout - 2 * c);
-    add("Radier", "Nappe inférieure — cadre extérieur retourné dans les piédroits", re.bars, "U", [leg, B - 2 * c, leg], nAlong(re.bars.s));
-  }
-  if (ri) add("Radier", "Nappe supérieure — barres filantes", ri.bars, "droite", [B - 2 * c], nAlong(ri.bars.s));
-  if (pe) add("Piédroits extérieurs", "Face extérieure — barres verticales", pe.bars, "droite", [Hout - 2 * c], 2 * nAlong(pe.bars.s));
-  if (pi) add("Piédroits extérieurs", "Face intérieure — barres verticales", pi.bars, "droite", [Hout - 2 * c], 2 * nAlong(pi.bars.s));
-  if (pn && n > 1) add("Piédroits intermédiaires", "Deux faces — barres verticales", pn.bars, "droite", [Hout - 2 * c], 2 * (n - 1) * nAlong(pn.bars.s));
-  if (inp.gousset > 0 && di) {
-    const gb = { phi: 10, s: di.bars.s };
-    add("Goussets", "Barres de gousset à 45°", gb, "gousset", [0.3, inp.gousset * Math.SQRT2, 0.3], 4 * n * nAlong(gb.s));
-  }
-  // Répartitions longitudinales.
-  const repLen = L - 2 * c;
-  if (de) add("Dalle", "Répartition nappe supérieure", de.rep, "droite", [repLen], nAcross(B - 2 * c, de.rep.s));
-  if (di) add("Dalle", "Répartition nappe inférieure", di.rep, "droite", [repLen], nAcross(B - 2 * c, di.rep.s));
-  if (re) add("Radier", "Répartition nappe inférieure", re.rep, "droite", [repLen], nAcross(B - 2 * c, re.rep.s));
-  if (ri) add("Radier", "Répartition nappe supérieure", ri.rep, "droite", [repLen], nAcross(B - 2 * c, ri.rep.s));
-  if (pe) add("Piédroits extérieurs", "Répartition face extérieure", pe.rep, "droite", [repLen], 2 * nAcross(Hout - 2 * c, pe.rep.s));
-  if (pi) add("Piédroits extérieurs", "Répartition face intérieure", pi.rep, "droite", [repLen], 2 * nAcross(inp.hInt, pi.rep.s));
-  if (pn && n > 1) add("Piédroits intermédiaires", "Répartition deux faces", pn.rep, "droite", [repLen], 2 * (n - 1) * nAcross(inp.hInt, pn.rep.s));
+  const wallsRep = Math.max(pe?.rep.phi ?? 8, pi?.rep.phi ?? 8);
 
-  // Ouvrages de tête (deux extrémités).
+  // ── RADIER ──
+  if (re) add(CORPS, "RADIER", "Nappe inférieure — barres transversales à crochets", re.bars, "crochets", [hook, B - 2 * c, hook], nAlong(re.bars.s));
+  if (ri) add(CORPS, "RADIER", "Nappe supérieure — barres transversales à crochets", ri.bars, "crochets", [hook, B - 2 * c, hook], nAlong(ri.bars.s));
+  if (re && ri) {
+    const rp = re.rep.phi >= ri.rep.phi ? re.rep : ri.rep;
+    add(CORPS, "RADIER", "Répartition longitudinale deux nappes", rp, "droite", [L - 2 * c], 2 * nAcross(B - 2 * c, rp.s));
+  }
+  add(CORPS, "RADIER", "Chaises de maintien des nappes", chaise, "chaise", [0.24, 0.25, 0.2], perM2(B * L, 3), { spacingLabel: "3/m²" });
+  if (pe) {
+    const lg = legEq(pe.bars.phi);
+    add(CORPS, "RADIER", "Équerres d'angle radier / piédroits", pe.bars, "equerre", [0.1, lg, lg, 0.1], 2 * nAlong(pe.bars.s));
+  }
+  // ── DALLE ──
+  if (de) add(CORPS, "DALLE", "Nappe supérieure — barres transversales à crochets", de.bars, "crochets", [hook, B - 2 * c, hook], nAlong(de.bars.s));
+  if (di) add(CORPS, "DALLE", "Nappe inférieure — barres transversales à crochets", di.bars, "crochets", [hook, B - 2 * c, hook], nAlong(di.bars.s));
+  if (de && di) {
+    const rp = de.rep.phi >= di.rep.phi ? de.rep : di.rep;
+    add(CORPS, "DALLE", "Répartition longitudinale deux nappes", rp, "droite", [L - 2 * c], 2 * nAcross(B - 2 * c, rp.s));
+  }
+  add(CORPS, "DALLE", "Chaises de maintien des nappes", chaise, "chaise", [0.24, 0.25, 0.2], perM2(B * L, 3), { spacingLabel: "3/m²" });
+  if (pe) {
+    const lg = legEq(pe.bars.phi);
+    add(CORPS, "DALLE", "Équerres d'angle dalle / piédroits", pe.bars, "equerre", [0.1, lg, lg, 0.1], 2 * nAlong(pe.bars.s));
+  }
+  if (inp.gousset > 0 && di) {
+    add(CORPS, "DALLE", "Barres de goussets à 45° (dalle et radier)", { phi: 10, s: di.bars.s }, "gousset", [0.3, inp.gousset * Math.SQRT2, 0.3], 4 * n * nAlong(di.bars.s));
+  }
+  // ── PIÉDROITS ──
+  const hv = Hout - 2 * c;
+  add(CORPS, "PIÉDROITS", "Répartition horizontale (toutes faces)", { phi: wallsRep, s: pe?.rep.s ?? 0.2 }, "droite", [L - 2 * c],
+    (2 * 2 + 2 * (n - 1)) * nAcross(inp.hInt, pe?.rep.s ?? 0.2));
+  if (pe) add(CORPS, "PIÉDROITS", "Piédroits extérieurs — face extérieure, barres verticales", pe.bars, "U", [retour, hv, retour], 2 * nAlong(pe.bars.s));
+  if (pi) add(CORPS, "PIÉDROITS", "Piédroits extérieurs — face intérieure, barres verticales", pi.bars, "U", [retour, hv, retour], 2 * nAlong(pi.bars.s));
+  if (pn && n > 1) add(CORPS, "PIÉDROITS", "Piédroits intermédiaires — deux faces, barres verticales", pn.bars, "U", [retour, hv, retour], 2 * (n - 1) * nAlong(pn.bars.s));
+  const tWall = Math.min(inp.eExt, n > 1 ? inp.eInt : inp.eExt) - 2 * c;
+  add(CORPS, "PIÉDROITS", "Épingles", { phi: 8, s: 0 }, "epingle", [0.05, tWall, 0.05], perM2((n + 1) * inp.hInt * L, 3), { spacingLabel: "3/m²" });
+
+  // ── GUIDE-ROUES ── (deux, sur les bords libres de la dalle)
   const t = inp.tetes;
+  if (t.guideRoues) {
+    const gw = 0.25, gh = 0.4;
+    add(CORPS, "GUIDE-ROUES", "Cadres ouverts ancrés dans la dalle", { phi: 8, s: 0.2 }, "U", [gh - c + 0.19, gw - 2 * c, gh - c + 0.19], 2 * nAcross(B - 2 * c, 0.2));
+    add(CORPS, "GUIDE-ROUES", "Filants", { phi: 10, s: 0.2 }, "droite", [B - 2 * c], 2 * 4);
+  }
+
+  // ── OUVRAGE DE TÊTE (deux extrémités) ──
   const hw = heads.headWall;
-  add("Murs de tête", "Face côté remblai — barres en attente dans la dalle", hw.bars, "L", [hw.H - c, anchor(hw.bars.phi)], 2 * nAcross(B - 2 * c, hw.bars.s));
-  add("Murs de tête", "Face vue — barres verticales", { phi: 10, s: 0.2 }, "L", [hw.H - c, anchor(10)], 2 * nAcross(B - 2 * c, 0.2));
-  add("Murs de tête", "Répartition horizontale deux faces", hw.rep, "droite", [B - 2 * c], 2 * 2 * nAcross(hw.H - c, hw.rep.s));
   const tanA = Math.tan((t.angle * Math.PI) / 180);
   const Wrt = t.murs ? B + t.radierLong * tanA : B;
+  const cm = (x: number) => Math.round(x * 100);
+  if (hw.H > 0.3) {
+    add(TETE, "MUR DE TÊTE", "Face côté remblai — barres en attente dans la dalle", hw.bars, "L", [hw.H - c, anchor(hw.bars.phi)], 2 * nAcross(B - 2 * c, hw.bars.s));
+    add(TETE, "MUR DE TÊTE", "Face vue — barres verticales", { phi: 10, s: 0.2 }, "L", [hw.H - c, anchor(10)], 2 * nAcross(B - 2 * c, 0.2));
+    add(TETE, "MUR DE TÊTE", "Répartition horizontale deux faces", hw.rep, "droite", [B - 2 * c], 2 * 2 * nAcross(hw.H - c, hw.rep.s));
+  }
+  if (t.radierLong > 0) {
+    const wMin = B - 2 * c, wMax = B + 2 * t.radierLong * tanA * (t.murs ? 1 : 0) - 2 * c;
+    const vl = `var (${cm(wMin)}/${cm(wMax)})`;
+    const rows = nAcross(t.radierLong - 2 * c, 0.2);
+    add(TETE, "RADIER DE TÊTE", "Nappe inférieure — barres transversales", { phi: 10, s: 0.2 }, "crochets", [hook, (wMin + wMax) / 2, hook], 2 * rows, { varLabel: vl });
+    add(TETE, "RADIER DE TÊTE", "Nappe supérieure — barres transversales", { phi: 10, s: 0.2 }, "crochets", [hook, (wMin + wMax) / 2, hook], 2 * rows, { varLabel: vl });
+    add(TETE, "RADIER DE TÊTE", "Barres longitudinales deux nappes", { phi: 10, s: 0.2 }, "droite", [t.radierLong - 2 * c], 2 * 2 * nAcross(Wrt - 2 * c, 0.2));
+    add(TETE, "RADIER DE TÊTE", "Chaises", chaise, "chaise", [0.24, 0.25, 0.2], perM2(2 * Wrt * t.radierLong, 3), { spacingLabel: "3/m²" });
+  }
   if (heads.wing) {
     const w = heads.wing;
     const Havg = (w.Htot + w.Hend) / 2;
-    add("Murs en aile", "Voile — face côté remblai, barres verticales", w.bars, "L", [Havg - c, anchor(w.bars.phi)], 4 * nAcross(t.long - 2 * c, w.bars.s));
-    add("Murs en aile", "Voile — face vue, barres verticales", { phi: 10, s: 0.2 }, "L", [Havg - c, anchor(10)], 4 * nAcross(t.long - 2 * c, 0.2));
-    add("Murs en aile", "Voile — répartition horizontale deux faces", w.rep, "droite", [t.long - 2 * c], 4 * 2 * nAcross(Havg, w.rep.s));
-    add("Murs en aile", "Semelle — barres transversales deux nappes", w.footBars, "droite", [t.semelle - 2 * c], 4 * 2 * nAcross(t.long - 2 * c, w.footBars.s));
-    add("Murs en aile", "Semelle — barres longitudinales deux nappes", { phi: 10, s: 0.2 }, "droite", [t.long - 2 * c], 4 * 2 * nAcross(t.semelle - 2 * c, 0.2));
-  }
-  if (t.radierLong > 0) {
-    add("Radiers de tête", "Barres transversales deux nappes", { phi: 10, s: 0.2 }, "droite", [Wrt - 2 * c], 2 * 2 * nAcross(t.radierLong - 2 * c, 0.2));
-    add("Radiers de tête", "Barres longitudinales deux nappes", { phi: 10, s: 0.2 }, "droite", [t.radierLong - 2 * c], 2 * 2 * nAcross(Wrt - 2 * c, 0.2));
+    const vl = `var (${cm(w.Hend - c)}/${cm(w.Htot - c)})`;
+    const nv = nAcross(t.long - 2 * c, w.bars.s);
+    add(TETE, "MUR EN L", "Voile — barres verticales côté remblai, ancrées dans la semelle", w.bars, "L", [Havg - c, anchor(w.bars.phi)], 4 * nv, { varLabel: vl });
+    add(TETE, "MUR EN L", "Voile — barres verticales face vue", { phi: 10, s: 0.2 }, "L", [Havg - c, anchor(10)], 4 * nAcross(t.long - 2 * c, 0.2), { varLabel: vl });
+    add(TETE, "MUR EN L", "Voile — barres horizontales deux faces", w.rep, "droite", [t.long - 2 * c], 4 * 2 * nAcross(Havg, w.rep.s));
+    add(TETE, "MUR EN L", "Barres en ciseau au raccord avec le piédroit", { phi: 12, s: 0.2 }, "crochets", [0.05, 0.5 + 1.0, 0.05], 4 * nAcross(w.Htot, 0.25), { varLabel: "50 / 100" });
+    add(TETE, "MUR EN L", "Couronnement", { phi: 10, s: 0.2 }, "droite", [Math.hypot(t.long, w.Htot - w.Hend)], 4 * 2);
+    add(TETE, "MUR EN L", "Semelle — cadres transversaux (deux nappes liées)", w.footBars, "U", [t.semEp - 2 * c, t.semelle - 2 * c, t.semEp - 2 * c], 4 * nAcross(t.long - 2 * c, w.footBars.s));
+    add(TETE, "MUR EN L", "Semelle — filants deux nappes", { phi: 10, s: 0.2 }, "droite", [t.long - 2 * c], 4 * 2 * nAcross(t.semelle - 2 * c, 0.2));
   }
   if (t.becheProf > 0) {
-    add("Bêches", "Cadres verticaux", { phi: 10, s: 0.2 }, "U", [t.becheProf + inp.er - c, t.becheEp - 2 * c, t.becheProf + inp.er - c], 2 * nAcross(Wrt - 2 * c, 0.2));
-    add("Bêches", "Filants horizontaux", { phi: 10, s: 0.2 }, "droite", [Wrt - 2 * c], 2 * 2 * nAcross(t.becheProf, 0.2));
+    const nb = nAcross(Wrt - 2 * c, 0.2);
+    add(TETE, "BÊCHE", "Cadres verticaux", { phi: 8, s: 0.2 }, "U", [t.becheEp - 2 * c, t.becheProf + inp.er - 2 * c, t.becheEp - 2 * c], 2 * nb);
+    add(TETE, "BÊCHE", "Filants horizontaux", { phi: 10, s: 0.2 }, "droite", [Wrt - 2 * c], 2 * 2 * nAcross(t.becheProf, 0.25));
+    add(TETE, "BÊCHE", "Épingles", { phi: 8, s: 0.2 }, "epingle", [0.05, t.becheEp - 2 * c, 0.05], 2 * nb);
   }
 
   const steelMass = bars.reduce((s, b) => s + b.mass, 0);
@@ -147,13 +198,27 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
   return { bars, lines, steelMass, concrete, ratio: steelMass / concrete };
 }
 
+/** Récapitulatif par diamètre (barres commerciales de 12 m). */
+export function steelSummary(bars: BarMark[]) {
+  const by = new Map<number, { length: number; mass: number }>();
+  for (const b of bars) {
+    const r = by.get(b.phi) ?? { length: 0, mass: 0 };
+    r.length += b.totalLength;
+    r.mass += b.mass;
+    by.set(b.phi, r);
+  }
+  return Array.from(by.entries()).sort((a, b) => a[0] - b[0])
+    .map(([phi, r]) => ({ phi, unitMass: barMass(phi), length: r.length, bars12: r.length / COMMERCIAL, mass: r.mass }));
+}
+
 export function barsToCsv(bars: BarMark[]) {
-  const head = ["Repère", "Élément", "Désignation", "Ø (mm)", "Espacement (cm)", "Forme", "Cotes (m)", "Longueur unitaire (m)", "Nombre", "Longueur totale (m)", "Masse (kg)"];
+  const head = ["Partie", "Élément", "N°", "Désignation", "Diamètre", "Espacement (cm)", "Forme", "Cotes (cm)", "Longueur (m)", "Nombre", "Longueur totale (m)", "Poids unitaire (kg/m)", "Poids total (kg)"];
   const f = (x: number, d = 2) => x.toFixed(d).replace(".", ",");
   const rows = bars.map((b) => [
-    b.rep, b.element, b.designation, b.phi, f(b.s * 100, 1), b.shape, b.dims.map((x) => f(x)).join(" + "),
-    f(b.length), b.count, f(b.totalLength), f(b.mass, 1),
+    b.part, b.element, b.rep, b.designation, `HA ${b.phi}`, b.spacingLabel, b.shape, b.varLabel ?? b.dims.map((x) => Math.round(x * 100)).join(" + "),
+    f(b.length), b.count, f(b.totalLength), f(barMass(b.phi), 3), f(b.mass, 2),
   ].map((x) => `"${String(x).replace(/"/g, '""')}"`).join(";"));
   const total = bars.reduce((s, b) => s + b.mass, 0);
-  return "﻿" + [head.join(";"), ...rows, `;;;;;;;;;Total;${f(total, 1)}`].join("\r\n");
+  const recap = steelSummary(bars).map((r) => `;;;;HA ${r.phi};;;;;;${f(r.length)};${f(r.unitMass, 3)};${f(r.mass)}`);
+  return "\uFEFF" + [head.join(";"), ...rows, "", ...recap, `;;;;;;;;;;;POIDS TOTAL (kg);${f(total, 2)}`].join("\r\n");
 }

@@ -72,6 +72,9 @@ export const FIELDS: FieldDef[] = [
   { key: "maitreOeuvre", section: "general", group: "Identification", label: "Maître d'œuvre / Contrôle", kind: "text", default: "BNETD" },
   { key: "auteur", section: "general", group: "Identification", label: "Auteur de la note", kind: "text", default: "Moulo Jean Claude" },
   { key: "indice", section: "general", group: "Identification", label: "Indice de révision", kind: "text", default: "A" },
+  { key: "entreprise", section: "general", group: "Cartouche des plans", label: "Entreprise", kind: "text", default: "" },
+  { key: "pk", section: "general", group: "Cartouche des plans", label: "PK de l'ouvrage", kind: "text", default: "" },
+  { key: "numPlan", section: "general", group: "Cartouche des plans", label: "Numéro de plan (préfixe)", kind: "text", default: "D01", help: "Les planches sont numérotées D01.1, D01.2, D01.3…" },
 
   // ── Hydrologie et hydraulique ─────────────────────────────
   { key: "hyActif", section: "hydro", group: "Étude hydraulique", label: "Justifier la capacité hydraulique de l'ouvrage", kind: "bool", default: true },
@@ -110,8 +113,15 @@ export const FIELDS: FieldDef[] = [
   { key: "ech", section: "remblai", group: "Couverture", label: "Épaisseur de chaussée", unit: "m", kind: "number", default: 0.1, min: 0, max: 0.6, step: 0.01 },
   { key: "gammaR", section: "remblai", group: "Couverture", label: "Poids volumique du remblai", unit: "kN/m³", kind: "number", default: 20, required: true, min: 14, max: 23 },
   { key: "gammaCh", section: "remblai", group: "Couverture", label: "Poids volumique de la chaussée", unit: "kN/m³", kind: "number", default: 24, min: 18, max: 26 },
-  { key: "Kmax", section: "remblai", group: "Poussée des terres", label: "Coefficient de poussée maximal Kmax", kind: "number", default: 0.5, required: true, min: 0.1, max: 1, step: 0.01, help: "Guide SETRA PICF : poussée des terres encadrée entre 0,25 et 0,50." },
-  { key: "Kmin", section: "remblai", group: "Poussée des terres", label: "Coefficient de poussée minimal Kmin", kind: "number", default: 0.25, required: true, min: 0.05, max: 1, step: 0.01 },
+  { key: "pousseeMode", section: "remblai", group: "Poussée des terres", label: "Hypothèse de poussée", kind: "select", default: "encadrement", options: [
+    { value: "encadrement", label: "Encadrement Kmin / Kmax (guide SETRA PICF)" },
+    { value: "repos", label: "Terres au repos K0 = 1 − sin φ'" },
+    { value: "active", label: "Poussée active Ka (Rankine, sur justification)" },
+  ] },
+  { key: "Kmax", section: "remblai", group: "Poussée des terres", label: "Coefficient de poussée maximal Kmax", kind: "number", default: 0.5, required: true, min: 0.1, max: 1, step: 0.01, help: "Guide SETRA PICF : poussée des terres encadrée entre 0,25 et 0,50.", visibleIf: (v) => (v.pousseeMode ?? "encadrement") === "encadrement" },
+  { key: "Kmin", section: "remblai", group: "Poussée des terres", label: "Coefficient de poussée minimal Kmin", kind: "number", default: 0.25, required: true, min: 0.05, max: 1, step: 0.01, visibleIf: (v) => (v.pousseeMode ?? "encadrement") === "encadrement" },
+  { key: "phiRemblai", section: "remblai", group: "Poussée des terres", label: "Angle de frottement du remblai φ'", unit: "°", kind: "number", default: 30, min: 15, max: 45, visibleIf: (v) => v.pousseeMode === "repos" || v.pousseeMode === "active" },
+  { key: "pousseeMin", section: "remblai", group: "Poussée des terres", label: "Poussée minimale (fraction de la poussée retenue)", kind: "number", default: 0.5, min: 0.2, max: 1, step: 0.05, visibleIf: (v) => v.pousseeMode === "repos" || v.pousseeMode === "active", help: "Cas de poussée réduite, défavorable à la dalle et au radier en travée." },
   { key: "qRemblai", section: "remblai", group: "Poussée des terres", label: "Surcharge sur remblai (trafic)", unit: "kN/m²", kind: "number", default: 10, min: 0, max: 30 },
   { key: "Lr", section: "remblai", group: "Chaussée portée", label: "Largeur roulable", unit: "m", kind: "number", default: 7, required: true, min: 3, max: 30, step: 0.1 },
   { key: "Lc", section: "remblai", group: "Chaussée portée", label: "Largeur chargeable", unit: "m", kind: "number", default: 7, required: true, min: 3, max: 30, step: 0.1, help: "Largeur roulable diminuée de 0,50 m par dispositif de retenue." },
@@ -145,6 +155,12 @@ export const FIELDS: FieldDef[] = [
   { key: "qadm", section: "sol", group: "Sol de fondation", label: "Contrainte admissible ELS (étude géotechnique)", unit: "MPa", kind: "number", default: 0.25, min: 0, max: 2, step: 0.01, help: "Laisser vide pour n'utiliser que la portance calculée (Terzaghi)." },
   { key: "Df", section: "sol", group: "Sol de fondation", label: "Ancrage du radier sous le terrain naturel", unit: "m", kind: "number", default: 0.3, min: 0, max: 5, step: 0.05 },
   { key: "tassementMax", section: "sol", group: "Sol de fondation", label: "Tassement admissible", unit: "cm", kind: "number", default: 2.5, min: 0.5, max: 10, step: 0.5 },
+  { key: "tassMethode", section: "sol", group: "Tassement", label: "Méthode de calcul du tassement", kind: "select", default: "elastique", options: [
+    { value: "elastique", label: "Élastique (module E du sol)" }, { value: "oedometrique", label: "Œdométrique (couche compressible)" },
+  ] },
+  { key: "oedCc", section: "sol", group: "Tassement", label: "Indice de compression Cc", kind: "number", default: 0.25, min: 0.01, max: 2, step: 0.01, visibleIf: (v) => v.tassMethode === "oedometrique" },
+  { key: "oedE0", section: "sol", group: "Tassement", label: "Indice des vides initial e0", kind: "number", default: 0.8, min: 0.2, max: 4, step: 0.05, visibleIf: (v) => v.tassMethode === "oedometrique" },
+  { key: "oedH", section: "sol", group: "Tassement", label: "Épaisseur de la couche compressible", unit: "m", kind: "number", default: 3, min: 0.5, max: 30, step: 0.5, visibleIf: (v) => v.tassMethode === "oedometrique" },
   { key: "nappe", section: "sol", group: "Eau", label: "Nappe phréatique ou crue au-dessus du radier", kind: "bool", default: false },
   { key: "hw", section: "sol", group: "Eau", label: "Hauteur d'eau au-dessus de la sous-face du radier", unit: "m", kind: "number", default: 1, min: 0, max: 20, step: 0.05, visibleIf: yes("nappe") },
 
@@ -158,6 +174,8 @@ export const FIELDS: FieldDef[] = [
   { key: "cv_Me80", section: "convois", group: "Charges militaires", label: "Me80 (essieux 2 × 22 t)", kind: "bool", default: false },
   { key: "cv_Me120", section: "convois", group: "Charges militaires", label: "Me120 (essieux 2 × 33 t)", kind: "bool", default: false },
   { key: "cv_D240", section: "convois", group: "Convois exceptionnels", label: "D240 (240 t)", kind: "bool", default: false },
+  { key: "cv_LM1", section: "convois", group: "Eurocodes (NF EN 1991-2)", label: "LM1 : tandems TS + charge répartie UDL", kind: "bool", default: false },
+  { key: "cv_LM2", section: "convois", group: "Eurocodes (NF EN 1991-2)", label: "LM2 : essieu isolé de 400 kN", kind: "bool", default: false },
   { key: "cv_custom", section: "convois", group: "Convoi personnalisé", label: "Convoi régional / personnalisé", kind: "bool", default: false },
   { key: "customName", section: "convois", group: "Convoi personnalisé", label: "Nom du convoi", kind: "text", default: "Convoi régional", visibleIf: yes("cv_custom") },
   { key: "customAxles", section: "convois", group: "Convoi personnalisé", label: "Essieux : charge (kN) ; distance à l'essieu précédent (m)", kind: "text", default: "60;0 / 120;4,5 / 120;1,5", visibleIf: yes("cv_custom"), help: "Essieux séparés par « / ». Chaque essieu : charge totale ; distance à l'essieu précédent." },
@@ -252,25 +270,27 @@ export function parseList(text: string): number[] {
 
 // ── Entrée typée du moteur de calcul ───────────────────────────
 
-export type ConvoyId = "A" | "Bc" | "Bt" | "Br" | "Mc80" | "Mc120" | "Me80" | "Me120" | "D240" | "custom";
+export type ConvoyId = "A" | "Bc" | "Bt" | "Br" | "Mc80" | "Mc120" | "Me80" | "Me120" | "D240" | "LM1" | "LM2" | "custom";
 
 export type DalotInput = {
   ident: {
     projet: string; dossier: string; ouvrage: string; localisation: string;
     maitreOuvrage: string; maitreOeuvre: string; auteur: string; indice: string;
+    entreprise: string; pk: string; numPlan: string;
   };
   openings: number[];
   hInt: number;
   es: number; er: number; eExt: number; eInt: number; gousset: number;
   L: number;
   hr: number; ech: number; gammaR: number; gammaCh: number;
-  Kmax: number; Kmin: number; qRemblai: number;
+  Kmax: number; Kmin: number; qRemblai: number; pousseeMode: "encadrement" | "repos" | "active";
   Lr: number; Lc: number; classe: 1 | 2 | 3;
   fc28: number; gammaBA: number; fe: number; cover: number;
   fissuration: "prejudiciable" | "tres_prejudiciable"; wkMax: number;
   modeleSol: "winkler" | "lineaire"; ks: number;
   gammaSol: number; phiSol: number; cSol: number; EsSol: number; nuSol: number;
   qadm: number | null; Df: number; tassementMax: number;
+  oedo: { actif: boolean; Cc: number; e0: number; H: number };
   nappe: boolean; hw: number;
   convoys: ConvoyId[];
   custom: { name: string; axles: { P: number; d: number }[]; voie: number; roue: number; gU: number; gS: number };
@@ -294,6 +314,15 @@ const num = (v: FieldValue, d = 0) => {
 };
 const str = (v: FieldValue) => (v === null || v === undefined ? "" : String(v));
 
+/** Coefficients de poussée selon l'hypothèse retenue. */
+function thrust(v: Record<string, FieldValue>): { Kmax: number; Kmin: number; pousseeMode: DalotInput["pousseeMode"] } {
+  const mode = v.pousseeMode === "repos" || v.pousseeMode === "active" ? v.pousseeMode : "encadrement";
+  if (mode === "encadrement") return { Kmax: num(v.Kmax, 0.5), Kmin: num(v.Kmin, 0.25), pousseeMode: mode };
+  const phi = (num(v.phiRemblai, 30) * Math.PI) / 180;
+  const K = mode === "repos" ? 1 - Math.sin(phi) : Math.tan(Math.PI / 4 - phi / 2) ** 2;
+  return { Kmax: K, Kmin: K * num(v.pousseeMin, 0.5), pousseeMode: mode };
+}
+
 export function autoClasse(Lr: number): 1 | 2 | 3 {
   if (Lr >= 7) return 1;
   if (Lr > 5.5) return 2;
@@ -309,7 +338,7 @@ export function toInput(spec: DalotSpec): DalotInput {
   const classe = v.classePont === "1" || v.classePont === "2" || v.classePont === "3"
     ? (Number(v.classePont) as 1 | 2 | 3)
     : autoClasse(Lr);
-  const convoys = (["A", "Bc", "Bt", "Br", "Mc80", "Mc120", "Me80", "Me120", "D240", "custom"] as ConvoyId[])
+  const convoys = (["A", "Bc", "Bt", "Br", "Mc80", "Mc120", "Me80", "Me120", "D240", "LM1", "LM2", "custom"] as ConvoyId[])
     .filter((c) => v[`cv_${c}`] === true);
   const axles = str(v.customAxles)
     .split("/")
@@ -321,7 +350,7 @@ export function toInput(spec: DalotSpec): DalotInput {
     ident: {
       projet: str(v.projet), dossier: str(v.dossier), ouvrage: str(v.ouvrage), localisation: str(v.localisation),
       maitreOuvrage: str(v.maitreOuvrage), maitreOeuvre: str(v.maitreOeuvre), auteur: str(v.auteur) || "Moulo Jean Claude",
-      indice: str(v.indice),
+      indice: str(v.indice), entreprise: str(v.entreprise), pk: str(v.pk), numPlan: str(v.numPlan) || "D01",
     },
     openings,
     hInt: num(v.hInt, 1.5),
@@ -329,7 +358,7 @@ export function toInput(spec: DalotSpec): DalotInput {
     gousset: num(v.gousset, 0),
     L: num(v.L, 8),
     hr: num(v.hr, 1), ech: num(v.ech, 0), gammaR: num(v.gammaR, 20), gammaCh: num(v.gammaCh, 24),
-    Kmax: num(v.Kmax, 0.5), Kmin: num(v.Kmin, 0.25), qRemblai: num(v.qRemblai, 10),
+    ...thrust(v), qRemblai: num(v.qRemblai, 10),
     Lr, Lc: num(v.Lc, Lr), classe,
     fc28: num(v.fc28, 25), gammaBA: num(v.gammaBA, 25), fe: num(v.fe, 400), cover: num(v.cover, 0.04),
     fissuration: v.fissuration === "tres_prejudiciable" ? "tres_prejudiciable" : "prejudiciable",
@@ -340,6 +369,7 @@ export function toInput(spec: DalotSpec): DalotInput {
     EsSol: num(v.EsSol, 30), nuSol: num(v.nuSol, 0.3),
     qadm: qadmRaw === null || qadmRaw === "" || num(qadmRaw, 0) <= 0 ? null : num(qadmRaw),
     Df: num(v.Df, 0), tassementMax: num(v.tassementMax, 2.5),
+    oedo: { actif: v.tassMethode === "oedometrique", Cc: num(v.oedCc, 0.25), e0: num(v.oedE0, 0.8), H: num(v.oedH, 3) },
     nappe: v.nappe === true, hw: num(v.hw, 0),
     convoys,
     custom: {
@@ -411,6 +441,20 @@ export const DALOT_PRESETS: DalotPreset[] = [
     description: "Note et plan types (Intercoton) : voiles 25 cm, dalle et radier 30 cm, L = 7,00 m. BV 5,00 km² → Qp ≈ 31,8 m³/s.",
     values: { ...RURAL, projet: "Dalot 2 × 3,00 × 2,00", nCells: 2, opening: 3, hInt: 2, es: 0.3, er: 0.3, eExt: 0.25, eInt: 0.25, aileLong: 3.45, aileEp: 0.2, hyA: 5, hyL: 4.6, hyDH: 55, hyC: 0.33, hyI: 0.4, maitreOuvrage: "Intercoton" },
   },
+  {
+    id: "r2x300x300", label: "Dalot double 2 × 3,00 × 3,00 — plan type ENGC",
+    description: "D'après le plan D07 : piédroits 25 cm, dalle et radier 30 cm, L = 7,00 m, murs en aile de 4,00 m à 30°, bêches 20 × 120, guide-roues 25 × 40, chaussée sur la dalle.",
+    values: { ...RURAL, projet: "Dalot double 2 × 3,00 × 3,00", nCells: 2, opening: 3, hInt: 3, es: 0.3, er: 0.3, eExt: 0.25, eInt: 0.25, L: 7,
+      hr: 0, ech: 0, aileLong: 4, aileEp: 0.2, becheProf: 1.2, becheEp: 0.2, radierTeteLong: 2, guideRoues: true, hyActif: false,
+      maitreOuvrage: "", localisation: "Côte d'Ivoire", numPlan: "D07" },
+  },
+  {
+    id: "r3x400x400", label: "Dalot triple 3 × 4,00 × 4,00, L = 8,50 m — Damé – Massakro",
+    description: "D'après le plan PAIA : piédroits 35 cm, dalle et radier 40 cm, L = 8,50 m, murs en aile de 6,60 m, garde-corps ; chaussée sur la dalle.",
+    values: { ...RURAL, projet: "Dalot 3 × 4,00 × 4,00", nCells: 3, opening: 4, hInt: 4, es: 0.4, er: 0.4, eExt: 0.35, eInt: 0.35, L: 8.5,
+      hr: 0, ech: 0, aileLong: 6.6, aileEp: 0.3, becheProf: 1.3, becheEp: 0.25, radierTeteLong: 2.5, guideRoues: true, hyActif: false,
+      maitreOuvrage: "Ministère de l'Agriculture", localisation: "Damé – Massakro (Agnibilékro), PK 6+400", pk: "PK 6+400", numPlan: "D01" },
+  },
 ];
 
 /** Gabarits types par ouverture (épaisseurs des notes de calcul de référence). */
@@ -421,6 +465,8 @@ export const SERIES_TYPES: { id: string; label: string; opening: number; hInt: n
   { id: "250x200", label: "2,50 × 2,00", opening: 2.5, hInt: 2, es: 0.3, er: 0.3, eExt: 0.25, eInt: 0.25, aileEp: 0.2 },
   { id: "300x200", label: "3,00 × 2,00", opening: 3, hInt: 2, es: 0.3, er: 0.3, eExt: 0.25, eInt: 0.25, aileEp: 0.2 },
   { id: "300x250", label: "3,00 × 2,50", opening: 3, hInt: 2.5, es: 0.3, er: 0.3, eExt: 0.25, eInt: 0.25, aileEp: 0.25 },
+  { id: "300x300", label: "3,00 × 3,00", opening: 3, hInt: 3, es: 0.3, er: 0.3, eExt: 0.25, eInt: 0.25, aileEp: 0.2 },
+  { id: "400x400", label: "4,00 × 4,00", opening: 4, hInt: 4, es: 0.4, er: 0.4, eExt: 0.35, eInt: 0.35, aileEp: 0.3 },
 ];
 
 const fr = (x: number) => x.toFixed(2).replace(".", ",");

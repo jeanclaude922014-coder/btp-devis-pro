@@ -49,3 +49,18 @@ Chaque vérification porte un statut **Conforme**, **Non conforme**, **Non véri
 `npm run build:dalotpro` produit `standalone/dist/dalotpro.html`, une page unique qui embarque tout le logiciel
 (calcul, 3D, note Word, DXF). Hébergée comme Artifact claude.ai, elle garde les études dans l'espace privé du compte
 (ou, à défaut, dans le navigateur) et livre les fichiers par l'enregistreur de la plateforme ; le DXF y est livré dans un `.zip`.
+
+## Version 2 — corrections, plans types et compléments
+
+- **Corriger** : sur chaque vérification non conforme, DalotPro cherche la plus petite modification de donnée qui la rend
+  conforme (épaisseur, classe de béton, semelle ou bêche des murs en aile, hauteur libre, nombre de cellules…) et affiche
+  le statut global obtenu. « Corriger automatiquement » enchaîne ces corrections ; rien n'est appliqué sans validation.
+- **Plans types** (modèle D07.1 / D07.2) : plan de coffrage (vue en plan, coupes A-A et B-B, vue de face, cotes en cm,
+  épaisseurs cerclées, TN hachuré), plan de ferraillage (coupes repérées, mur en L, radier en plan, tableaux Aciers et
+  Indications générales), nomenclature A4 par élément avec croquis de façonnage, totaux et récapitulatif par diamètre.
+  Cartouche PROJET / ENTREPRISE – CONCEPTEUR / PK, TITRE, N°, ÉCH, DATE.
+- Façonnage : barres transversales à crochets, piédroits en U à retours, équerres d'angle, chaises 3/m², épingles,
+  guide-roues, radier de tête, mur en L, bêches.
+- Convois Eurocodes LM1 (TS + UDL) et LM2 ; poussée au repos K0, active Ka ou encadrement Kmin/Kmax ; tassement
+  œdométrique ; schémas cotés des convois (écran et note) ; diagrammes de moments et maquette DXF 3D dans la vue 3D.
+- Contrôle sur le plan ENGC du dalot 2 × 3,00 × 3,00 : 3 664 kg d'acier pour le corps contre 3 689 kg sur la nomenclature.

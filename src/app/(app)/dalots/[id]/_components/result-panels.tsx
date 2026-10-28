@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { DIAMETERS, SPACINGS } from "@/lib/dalot/ba";
 import { checksToCsv, countByStatus, DOMAINS, ratio, STATUS_LABELS, type CheckStatus } from "@/lib/dalot/checks";
 import type { GroupId } from "@/lib/dalot/design";
-import { envelopeSvg, type Quantity } from "@/lib/dalot/diagrams";
+import { convoyFigure, envelopeSvg, type Quantity } from "@/lib/dalot/diagrams";
 import { buildSheets } from "@/lib/dalot/drawings";
 import { sheetsToDxf } from "@/lib/dalot/dxf";
 import type { Study } from "@/lib/dalot/engine";
@@ -12,6 +12,7 @@ import { buildNoteDocx, type NoteImages } from "@/lib/dalot/note-docx";
 import { barsToCsv } from "@/lib/dalot/quantities";
 import { sheetToSvg } from "@/lib/dalot/svg";
 import { downloadBlob, downloadText, slug, svgToPng } from "./download";
+import { FixOptions, FixToolbar, type FixApi } from "./fix-panel";
 
 const fr = (x: number | undefined, d = 2) =>
   x === undefined || !Number.isFinite(x) ? "—" : x.toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -73,7 +74,10 @@ export function SynthesePanel({ study, onNav }: { study: Study; onNav: (id: stri
               <li key={c.id} className="text-red-700">✗ <span className="font-medium">{c.element}</span> — {c.label} : {fr(c.value, 3)} pour {fr(c.limit, 3)} {c.unit}{c.detail ? ` (${c.detail})` : ""}</li>
             ))}
           </ul>
-          <p className="mt-2 text-xs text-slate-500">Le bouton « Optimiser » de l&apos;écran Dimensionnement propose les épaisseurs qui rendent le corps conforme.</p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button onClick={() => onNav("verifications")} className="rounded-md bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-700">Corriger les non-conformités</button>
+            <span className="text-xs text-slate-500">ou « Optimiser » dans l&apos;écran Dimensionnement pour les épaisseurs du corps.</span>
+          </div>
         </Card>
       )}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -124,8 +128,20 @@ export function SynthesePanel({ study, onNav }: { study: Study; onNav: (id: stri
 export function CombosPanel({ study }: { study: Study }) {
   const [state, setState] = useState<"ELU" | "ELS" | "EC2">("ELU");
   const t = study.analysis.traffic;
+  const swept = t.filter((x) => x.positions.length);
+  const [cv, setCv] = useState<string>(swept[0]?.def.id ?? "");
+  const fig = useMemo(() => (cv ? convoyFigure(study, cv) : null), [study, cv]);
   return (
     <div className="space-y-4">
+      {swept.length > 0 && (
+        <Card title="Schéma coté du convoi à sa position défavorable" actions={
+          <select value={cv} onChange={(e) => setCv(e.target.value)} className="rounded-md border border-slate-300 px-2 py-1 text-sm">
+            {swept.map((x) => <option key={x.def.id} value={x.def.id}>{x.def.label}</option>)}
+          </select>
+        }>
+          {fig ? <div className="mx-auto max-w-4xl" dangerouslySetInnerHTML={{ __html: fig }} /> : <p className="text-sm text-slate-500">Pas de position calculée pour ce convoi.</p>}
+        </Card>
+      )}
       <Card title="Convois et majoration dynamique">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -310,7 +326,7 @@ export function DesignPanel({
 
 // ── Vérifications ──────────────────────────────────────────
 
-export function ChecksPanel({ study }: { study: Study }) {
+export function ChecksPanel({ study, fix }: { study: Study; fix?: FixApi }) {
   const [status, setStatus] = useState<CheckStatus | "all">("all");
   const [domain, setDomain] = useState<string>("all");
   const [q, setQ] = useState("");
@@ -319,6 +335,7 @@ export function ChecksPanel({ study }: { study: Study }) {
     && (!q || `${c.element} ${c.label} ${c.ref}`.toLowerCase().includes(q.toLowerCase())));
   return (
     <div className="space-y-4">
+      {fix && <FixToolbar fix={fix} nonConformes={counts.non_conforme} />}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <div className="col-span-2 rounded-xl border border-slate-200 bg-white p-4 lg:col-span-1">
           <div className="text-xs text-slate-500">Résultat global</div>
@@ -368,7 +385,10 @@ export function ChecksPanel({ study }: { study: Study }) {
                   <tr key={c.id} className="align-top">
                     <td className="px-2 py-1.5"><StatusBadge status={c.status} /></td>
                     <td className="px-2 py-1.5 text-xs">{c.element}</td>
-                    <td className="px-2 py-1.5">{c.label}{c.combo && <span className="ml-1 font-mono text-[11px] text-slate-400">[{c.combo}]</span>}{c.detail && <div className="text-xs text-slate-500">{c.detail}</div>}</td>
+                    <td className="px-2 py-1.5">
+                      {c.label}{c.combo && <span className="ml-1 font-mono text-[11px] text-slate-400">[{c.combo}]</span>}{c.detail && <div className="text-xs text-slate-500">{c.detail}</div>}
+                      {fix && (c.status === "non_conforme" || c.status === "non_verifie") && <FixOptions key={`${c.id}-${study.fingerprint}`} fix={fix} check={c} />}
+                    </td>
                     <td className="px-2 py-1.5 text-right">{c.value !== undefined ? `${fr(c.value, 3)}` : "—"}</td>
                     <td className="px-2 py-1.5 text-right">{c.limit !== undefined ? `${fr(c.limit, 3)} ${c.unit ?? ""}` : "—"}</td>
                     <td className="px-2 py-1.5 text-right">
@@ -526,7 +546,12 @@ export function NotePanel({ study }: { study: Study }) {
         ferraillage: await svgToPng(sheetToSvg(sheets[1], { background: "#ffffff" }), 1600),
         moments: await svgToPng(envelopeSvg(study.analysis, study.analysis.elu, "M"), 1400),
         tranchant: await svgToPng(envelopeSvg(study.analysis, study.analysis.elu, "V"), 1400),
+        convois: [],
       };
+      for (const t of study.analysis.traffic.filter((x) => x.positions.length)) {
+        const svg = convoyFigure(study, t.def.id);
+        if (svg) images.convois!.push({ label: t.def.label, img: await svgToPng(svg, 1400) });
+      }
       const blob = await buildNoteDocx(study, images);
       downloadBlob(blob, `Note_de_calcul_${slug(study.input.ident.projet)}_${study.fingerprint}.docx`);
     } catch (e) {

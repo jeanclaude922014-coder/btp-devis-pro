@@ -18,13 +18,15 @@ export function sheetToSvg(sheet: Sheet, opts: { background?: string } = {}): st
       parts.push(`<line x1="${X(p.a[0])}" y1="${Y(p.a[1])}" x2="${X(p.b[0])}" y2="${Y(p.b[1])}" stroke="${col}" stroke-width="${w.toFixed(4)}"${dash}/>`);
     } else if (p.t === "poly") {
       const pts = p.pts.map((q) => `${X(q[0])},${Y(q[1])}`).join(" ");
-      parts.push(`<${p.closed ? "polygon" : "polyline"} points="${pts}" fill="none" stroke="${col}" stroke-width="${w.toFixed(4)}" stroke-linejoin="round"${dash}/>`);
+      parts.push(`<${p.closed ? "polygon" : "polyline"} points="${pts}" fill="${p.fill ? col : "none"}" stroke="${col}" stroke-width="${w.toFixed(4)}" stroke-linejoin="round"${dash}/>`);
     } else if (p.t === "circle") {
-      parts.push(`<circle cx="${X(p.c[0])}" cy="${Y(p.c[1])}" r="${p.r.toFixed(4)}" fill="${col}"/>`);
+      parts.push(p.hollow
+        ? `<circle cx="${X(p.c[0])}" cy="${Y(p.c[1])}" r="${p.r.toFixed(4)}" fill="none" stroke="${col}" stroke-width="${lw.toFixed(4)}"/>`
+        : `<circle cx="${X(p.c[0])}" cy="${Y(p.c[1])}" r="${p.r.toFixed(4)}" fill="${col}"/>`);
     } else {
       const anchor = p.align === "center" ? "middle" : p.align === "right" ? "end" : "start";
       const tr = p.rot ? ` transform="rotate(${-p.rot} ${X(p.p[0])} ${Y(p.p[1])})"` : "";
-      parts.push(`<text x="${X(p.p[0])}" y="${Y(p.p[1])}" font-size="${p.h.toFixed(4)}" font-family="Arial, Helvetica, sans-serif" fill="${col}" text-anchor="${anchor}"${tr}>${esc(p.s)}</text>`);
+      parts.push(`<text x="${X(p.p[0])}" y="${Y(p.p[1])}" font-size="${p.h.toFixed(4)}" font-family="Arial, Helvetica, sans-serif" fill="${col}" text-anchor="${anchor}"${p.bold ? ' font-weight="bold"' : ""}${tr}>${esc(p.s)}</text>`);
     }
   }
   const bg = opts.background ? `<rect x="0" y="0" width="${W}" height="${H}" fill="${opts.background}"/>` : "";

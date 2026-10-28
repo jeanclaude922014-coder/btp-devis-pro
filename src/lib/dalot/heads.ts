@@ -85,7 +85,11 @@ export function designHeads(inp: DalotInput, mat: Materials): HeadsResult {
   if (t.murs) {
     const Htot = Hext + inp.hr + inp.ech; // hauteur à l'enracinement, sous la semelle exclue
     const Hend = Math.max(0.6, Htot - (t.long * Math.cos(rad(t.angle))) / inp.talus.pente);
-    const base = cantilever("Mur en aile (enracinement)", Htot, t.ep, Ka, inp.gammaR, inp.qRemblai, mat);
+    // Ferraillage du voile au tiers de sa longueur : près de l'enracinement, le voile est tenu par
+    // le mur de tête et le corps (fonctionnement en dalle sur deux côtés). La stabilité, elle,
+    // reste vérifiée à l'enracinement, à la hauteur maximale.
+    const Hd = Htot - (Htot - Hend) / 3;
+    const base = { ...cantilever("Mur en aile (tiers de la longueur)", Hd, t.ep, Ka, inp.gammaR, inp.qRemblai, mat), H: Htot };
     // Stabilité du mur en aile au droit de l'enracinement (sécuritaire), par mètre.
     const Bf = t.semelle, hs = t.semEp, toe = t.patin;
     const heel = Math.max(0, Bf - toe - t.ep);
@@ -135,7 +139,7 @@ export function designHeads(inp: DalotInput, mat: Materials): HeadsResult {
     });
     checks.push({
       id: "T-MA-F", domain: dom, element: "Voile du mur en aile",
-      label: `Flexion à l'encastrement (H = ${Htot.toFixed(2)} m) : As fournie ≥ As requise`, value: base.bars.As * 1e4, limit: base.AsReq, unit: "cm²/m",
+      label: `Flexion à la base du voile, au tiers de la longueur (H = ${Hd.toFixed(2)} m) : As fournie ≥ As requise`, value: base.bars.As * 1e4, limit: base.AsReq, unit: "cm²/m",
       status: st(base.bars.As * 1e4 >= base.AsReq - 1e-6), ref: "BAEL 91 A.4.3 / A.4.5",
     });
     checks.push({

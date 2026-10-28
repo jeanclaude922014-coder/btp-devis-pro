@@ -198,6 +198,19 @@ export function runAnalysis(inp: DalotInput): Analysis {
     const delta = def.dynamic ? dynamicCoef(B, Gcover, S) : 1;
     const env = convoyEnvelope(def, D, transverseSpread(inp), IM, nq, nTop, xTop, model.xLeft, model.xRight, inp.pas, delta);
     env.S = S;
+    if (def.udl) {
+      // Charge répartie simultanée : sur les zones de même signe des lignes d'influence.
+      for (let q = 0; q < nq; q++) {
+        let sp = 0, sn = 0;
+        for (let j = 0; j < nTop; j++) {
+          const v = IM[q * nTop + j] * model.topTrib[j];
+          if (v > 0) sp += v; else sn += v;
+        }
+        env.max[q] += def.udl * sp;
+        env.min[q] += def.udl * sn;
+      }
+      env.info = `TS balayé pas à pas + UDL ${def.udl} kN/m² sur les zones défavorables.`;
+    }
     traffic.push(env);
   }
 

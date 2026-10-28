@@ -14,7 +14,9 @@ import { FIELD_BY_KEY } from "./fields";
 import { convoyLibrary, diffusionDepth } from "./convoys";
 
 export type NoteImage = { data: Uint8Array; width: number; height: number };
-export type NoteImages = Partial<Record<"section" | "coffrage" | "ferraillage" | "moments" | "tranchant" | "normal", NoteImage>>;
+export type NoteImages = Partial<Record<"section" | "coffrage" | "ferraillage" | "moments" | "tranchant" | "normal", NoteImage>> & {
+  convois?: { label: string; img: NoteImage }[];
+};
 
 const FONT = "Arial";
 const f = (x: number | undefined, d = 2) => (x === undefined || !Number.isFinite(x) ? "—" : x.toFixed(d).replace(".", ","));
@@ -230,6 +232,9 @@ export async function buildNoteDocx(study: Study, images: NoteImages): Promise<B
   body.push(H1("9. Poussée des terres"),
     FORMULA(`σv(z) = g2 + γr·z ; σh = K·σv' + u — en tête : σv = ${f(sigTop)} kPa ; en pied : σv = ${f(sigBot)} kPa`),
     FORMULA(`Pmax : K = ${f(inp.Kmax)} → σh de ${f(inp.Kmax * sigTop)} à ${f(inp.Kmax * sigBot)} kPa ; Pmin : K = ${f(inp.Kmin)} → σh de ${f(inp.Kmin * sigTop)} à ${f(inp.Kmin * sigBot)} kPa`, "Guide SETRA PICF"),
+    P(inp.pousseeMode === "repos" ? "Hypothèse retenue : terres au repos K0 = 1 − sin φ' ; la poussée minimale est une fraction de K0."
+      : inp.pousseeMode === "active" ? "Hypothèse retenue : poussée active de Rankine Ka = tan²(45° − φ'/2), justifiée par un déplacement suffisant des piédroits ; la poussée minimale est une fraction de Ka."
+      : "Hypothèse retenue : encadrement de la poussée entre Kmin et Kmax (guide SETRA PICF)."),
     P("Les deux situations sont combinées séparément (poussée maximale défavorable aux piédroits, poussée minimale défavorable à la dalle et au radier en travée)."),
     ...(inp.nappe ? [P(`Nappe à ${f(inp.hw)} m au-dessus de la sous-face du radier : poussée calculée avec les contraintes effectives, plus la pression hydrostatique.`)] : []),
     H1("10. Surcharge sur remblai"),
@@ -268,7 +273,8 @@ export async function buildNoteDocx(study: Study, images: NoteImages): Promise<B
         const pos = t.positions[t.argMax[best]];
         return [t.def.label, "M max (mi-travée)", `${f(t.max[best])} kN·m/m`,
           pos ? `x = ${f(pos.X)} m${pos.reversed ? " (sens inverse)" : ""}` : "—", pos ? t.def.configs[pos.config].label : "—"];
-      }), [0.12, 0.22, 0.2, 0.26, 0.2]));
+      }), [0.12, 0.22, 0.2, 0.26, 0.2]),
+    ...(images.convois ?? []).flatMap((c, i) => image(c.img, 600, `Figure C${i + 1} — Convoi ${c.label} à la position du moment maximal en travée : vue en long avec diffusion, vue en plan avec empreintes diffusées et bande de calcul.`)));
 
   // 15. Combinaisons
   body.push(H1("13. Combinaisons d'actions"),
@@ -333,7 +339,7 @@ export async function buildNoteDocx(study: Study, images: NoteImages): Promise<B
   const gf = geo.factors;
   body.push(H1("22. Vérifications géotechniques"),
     FORMULA(`Portance : qu = c·Nc·sc + q0·Nq·sq + 0,5·γ'·B·Nγ·sγ, avec Nq = ${f(gf.Nq)}, Nc = ${f(gf.Nc)}, Nγ = ${f(gf.Ng)}, sq = ${f(gf.sq)}, sγ = ${f(gf.sg)}, sc = ${f(gf.sc)}, q0 = ${f(gf.q0, 1)} kPa → qu = ${f(geo.qu, 0)} kPa`, "EC7 annexe D"),
-    FORMULA(`Tassement : s = qnet·B·(1 − ν²)·Cf/E = ${f(geo.settlement)} cm`),
+    FORMULA(`${study.checks.find((c) => c.id === "G-TASS")?.label ?? "Tassement"} = ${f(geo.settlement)} cm`),
     ...(geo.slope ? [FORMULA(`Talus : cercle critique centre (${f(geo.slope.xc)} ; ${f(geo.slope.yc)}) m, R = ${f(geo.slope.R)} m → FS = ${f(geo.slope.FS)}`, "Fellenius")] : []),
     checksTable(by("Géotechnique et stabilité")));
 

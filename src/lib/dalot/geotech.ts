@@ -125,11 +125,23 @@ export function geotechChecks(inp: DalotInput, an: Analysis): { checks: Check[];
   const qMean = pG.reduce((s, v, k) => s + v * model.raftTrib[k], 0) / B;
   const qNet = Math.max(0, qMean - inp.gammaSol * inp.Df);
   const Cf = influenceCf(Math.max(1, inp.L / B));
-  const settlement = ((qNet * B * (1 - inp.nuSol ** 2) * Cf) / (inp.EsSol * 1000)) * 100;
+  let settlement = ((qNet * B * (1 - inp.nuSol ** 2) * Cf) / (inp.EsSol * 1000)) * 100;
+  let tassLabel = `Tassement élastique s = q·B·(1−ν²)·Cf/E (Cf = ${Cf.toFixed(2)})`;
+  let tassRef = "Méthode élastique (Giroud), charges permanentes";
+  if (inp.oedo.actif) {
+    // Couche normalement consolidée, contrainte au milieu de la couche, diffusion 2/1.
+    const z = inp.Df + inp.oedo.H / 2;
+    const gEff = inp.nappe ? inp.gammaSol - GAMMA_W : inp.gammaSol;
+    const s0 = Math.max(1, gEff * z);
+    const ds = (qNet * B * inp.L) / ((B + inp.oedo.H / 2) * (inp.L + inp.oedo.H / 2));
+    settlement = ((inp.oedo.H * inp.oedo.Cc) / (1 + inp.oedo.e0)) * Math.log10((s0 + ds) / s0) * 100;
+    tassLabel = `Tassement œdométrique s = H·Cc/(1+e0)·log((σ'0+Δσ)/σ'0), σ'0 = ${s0.toFixed(0)} kPa, Δσ = ${ds.toFixed(0)} kPa`;
+    tassRef = "Méthode œdométrique (couche compressible normalement consolidée)";
+  }
   checks.push({
     id: "G-TASS", domain: dom, element: "Sol sous radier",
-    label: `Tassement élastique s = q·B·(1−ν²)·Cf/E (Cf = ${Cf.toFixed(2)})`, value: settlement, limit: inp.tassementMax, unit: "cm",
-    status: settlement <= inp.tassementMax ? "conforme" : "non_conforme", ref: "Méthode élastique (Giroud), charges permanentes",
+    label: tassLabel, value: settlement, limit: inp.tassementMax, unit: "cm",
+    status: settlement <= inp.tassementMax ? "conforme" : "non_conforme", ref: tassRef,
   });
 
   // Flottaison (ouvrage vide, nappe haute).

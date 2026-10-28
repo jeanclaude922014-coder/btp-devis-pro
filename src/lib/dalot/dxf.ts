@@ -26,6 +26,12 @@ function entity(p: Prim, out: string[]) {
       out.push("0", "CIRCLE", "8", p.layer, "10", n(p.c[0]), "20", n(p.c[1]), "30", "0", "40", n(p.r));
       break;
     case "poly":
+      if (p.fill && p.pts.length === 4) {
+        // Surface pleine (ouvertures en vue de face) : SOLID, sommets dans l'ordre 1-2-4-3.
+        const [a, b, c2, d] = p.pts;
+        out.push("0", "SOLID", "8", p.layer, "10", n(a[0]), "20", n(a[1]), "30", "0", "11", n(b[0]), "21", n(b[1]), "31", "0",
+          "12", n(d[0]), "22", n(d[1]), "32", "0", "13", n(c2[0]), "23", n(c2[1]), "33", "0");
+      }
       out.push("0", "POLYLINE", "8", p.layer, "66", "1", "10", "0", "20", "0", "30", "0", "70", p.closed ? "1" : "0");
       for (const v of p.pts) out.push("0", "VERTEX", "8", p.layer, "10", n(v[0]), "20", n(v[1]), "30", "0");
       out.push("0", "SEQEND", "8", p.layer);

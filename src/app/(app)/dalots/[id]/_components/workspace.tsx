@@ -25,6 +25,7 @@ export function DalotWorkspace({ id, seriesName, initialSpec, projects }: {
   const [spec, setSpec] = useState<DalotSpec>(initialSpec);
   const [computed, setComputed] = useState<{ spec: DalotSpec; outcome: RunOutcome } | null>(null);
   const computedOnce = useRef(false);
+  const [verifiedAt, setVerifiedAt] = useState<number | null>(null);
   const [panel, setPanel] = useState("synthese");
   const [save, setSave] = useState<{ spec: DalotSpec; state: "saved" | "error"; at?: string; msg?: string }>({ spec: initialSpec, state: "saved" });
   const [optimizing, setOptimizing] = useState(false);
@@ -216,7 +217,13 @@ export function DalotWorkspace({ id, seriesName, initialSpec, projects }: {
               {panel === "dimensionnement" && (
                 <DesignPanel study={study} imposed={spec.imposed} onImpose={onImpose} onOptimize={onOptimize} optimizing={optimizing} proposal={proposal} onApply={applyProposal} />
               )}
-              {panel === "verifications" && <ChecksPanel study={study} />}
+              {panel === "verifications" && (
+                <ChecksPanel study={study} fix={{
+                  spec, verifiedAt: computed?.outcome === outcome ? verifiedAt : null,
+                  onApply: (next) => { setProposal(null); setSpec(next); },
+                  onVerify: () => { setComputed({ spec, outcome: runStudy(spec) }); setVerifiedAt(Date.now()); },
+                }} />
+              )}
               {panel === "res-tetes" && <HeadsPanel study={study} />}
               {panel === "vue3d" && <Viewer3D study={study} />}
               {panel === "plans" && <PlansPanel study={study} />}

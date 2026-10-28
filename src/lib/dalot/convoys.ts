@@ -20,7 +20,9 @@ export type ConvoyConfig = {
 export type ConvoyDef = {
   id: ConvoyId;
   label: string;
-  family: "A" | "B" | "M" | "D" | "custom";
+  family: "A" | "B" | "M" | "D" | "EC" | "custom";
+  /** Charge uniforme associée (UDL du LM1), en kN/m² sur la bande la plus chargée. */
+  udl?: number;
   gammaU: number;
   gammaS: number;
   /** Majoration dynamique δ applicable. */
@@ -150,6 +152,28 @@ export function convoyLibrary(inp: DalotInput, ctx: TrafficContext): ConvoyDef[]
     configs: [{ label: "Remorque", patches: [{ x: 0, y: 0, P: 2400, ax: 18.6, ay: 3.2 }], coef: 1 }],
     description: "Convoi exceptionnel de 240 t uniformément réparti sur 18,60 × 3,20 m (sans majoration dynamique).",
   });
+  if (want.has("LM1")) {
+    // NF EN 1991-2 §4.3.2 : tandems TS (300, 200, 100 kN par essieu) dans des voies de 3 m,
+    // roues 0,40 × 0,40 m à 2,00 m, essieux à 1,20 m ; UDL 9 kN/m² sur la voie 1. αQ = αq = 1.
+    const nl = Math.max(1, Math.floor(inp.Lc / 3));
+    const loads = [300, 200, 100].slice(0, Math.min(nl, 3));
+    const patches: Patch[] = loads.flatMap((Q, i) => [0, 1.2].flatMap((x) => [
+      { x, y: 3 * i + 0.5, P: Q / 2, ax: 0.4, ay: 0.4 },
+      { x, y: 3 * i + 2.5, P: Q / 2, ax: 0.4, ay: 0.4 },
+    ]));
+    defs.push({
+      id: "LM1", label: "LM1", family: "EC", gammaU: 1.35, gammaS: 1, dynamic: false, udl: 9,
+      configs: [{ label: `${loads.length} voie(s) chargée(s)`, patches, coef: 1 }],
+      description: `Modèle LM1 de l'EN 1991-2 : tandems TS de ${loads.map((q) => 2 * q).join(" + ")} kN et charge répartie de 9 kN/m² (amplification dynamique incluse dans les valeurs).`,
+    });
+  }
+  if (want.has("LM2")) {
+    defs.push({
+      id: "LM2", label: "LM2", family: "EC", gammaU: 1.35, gammaS: 1, dynamic: false,
+      configs: [{ label: "Essieu isolé", patches: [0, 2].map((y) => ({ x: 0, y, P: 200, ax: 0.35, ay: 0.6 })), coef: 1 }],
+      description: "Modèle LM2 de l'EN 1991-2 : essieu isolé de 400 kN (βQ = 1), roues de 0,35 × 0,60 m à 2,00 m.",
+    });
+  }
   if (want.has("custom") && inp.custom.axles.length > 0) {
     let x = 0;
     const patches: Patch[] = [];
