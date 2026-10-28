@@ -62,6 +62,8 @@ function App() {
     // disponible, un clic sur « Télécharger » affiche la marche à suivre au lieu d'échouer en silence.
     const runtime = (window as unknown as { claude?: { use?(n: string): Promise<unknown> } }).claude;
     let dl: Saves = null;
+    // Fichier ouvert en local (hors plateforme) : téléchargement normal du navigateur.
+    if (typeof runtime?.use !== "function") { setSaver(null); return () => { alive = false; }; }
     setSaver(async (blob, filename) => {
       if (!dl) {
         setHelp(true);
@@ -82,9 +84,7 @@ function App() {
         else setHelp(true);
       }
     });
-    if (typeof runtime?.use === "function") {
-      runtime.use("downloads").then((d) => { if (alive) dl = d as Saves; }).catch(() => undefined);
-    }
+    runtime.use("downloads").then((d) => { if (alive) dl = d as Saves; }).catch(() => undefined);
     return () => { alive = false; };
   }, []);
 
