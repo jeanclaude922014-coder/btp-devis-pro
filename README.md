@@ -1,3 +1,7 @@
+## DalotPro
+
+Module de calcul des dalots cadres (BAEL 91 mod. 99, Fascicule 61 titre II, contrôle EC2) : voir [docs/DALOTPRO.md](docs/DALOTPRO.md). Contrôle de non-régression : `npm run verif:dalot`.
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started

@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Tableau de bord", icon: "◧" },
   { href: "/projects", label: "Projets", icon: "▤" },
   { href: "/plans", label: "Générateur de plan IA", icon: "▦" },
+  { href: "/dalots", label: "DalotPro — Dalots", icon: "▣" },
   { href: "/contacts", label: "Contacts", icon: "☺" },
   { href: "/price-library", label: "Bibliothèque de prix", icon: "≡" },
   { href: "/settings", label: "Paramètres", icon: "⚙" },

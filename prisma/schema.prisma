@@ -40,6 +40,7 @@ model Organization {
   priceItems    PriceItem[]
   exchangeRates ExchangeRate[]
   floorPlans    FloorPlan[]
+  dalotStudies  DalotStudy[]
 }
 
 model User {
@@ -219,4 +220,21 @@ model FloorPlanMessage {
   role        String   // user, assistant
   content     String
   createdAt   DateTime @default(now())
+}
+
+// ── DalotPro : études de dalots cadres (module indépendant) ──
+
+model DalotStudy {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  /** Regroupe les études créées ensemble par le générateur de série. */
+  seriesName     String?
+  status         String   @default("non_verifie") // conforme, non_conforme, non_verifie
+  spec           Json     // DalotSpec : valeurs saisies, valeurs par défaut à confirmer, ferraillage imposé
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId, seriesName])
 }

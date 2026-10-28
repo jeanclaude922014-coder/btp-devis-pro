@@ -1,0 +1,45 @@
+# DalotPro — calcul des dalots cadres en béton armé
+
+Auteur : Moulo Jean Claude — module intégré à ChantierPilot (menu « DalotPro — Dalots »).
+
+## Ce que fait le logiciel
+
+| Étape | Contenu |
+|---|---|
+| Hydrologie et hydraulique | Kirpich, Montana (station de Man par défaut), méthode rationnelle, Manning-Strickler par cellule, revanche, Froude, vitesse et protections aval |
+| Saisie | Géométrie (1 à 6 cellules, ouvertures différentes possibles), remblai et chaussée, matériaux, sol (bibliothèque de sols ivoiriens), convois, ouvrages de tête, talus. Données manquantes signalées en rouge, valeurs par défaut « à confirmer » en orange |
+| Modèle | Portique fermé par bande de 1 m (méthode des déplacements), radier sur sol de Winkler ou à réaction linéaire |
+| Charges | Poids propre, remblai, chaussée, poussées Kmax / Kmin (guide SETRA PICF), eau, surcharge de remblai |
+| Convois | Fascicule 61 titre II : A(l), Bc, Bt, Br, Mc80, Mc120, Me80, Me120, D240, convoi personnalisé ; balayage pas à pas dans les deux sens, diffusion dans le remblai, largeur de répartition b' + 0,5·L, majoration dynamique δ |
+| Combinaisons | ELU et ELS (BAEL / Fascicule 61) et combinaisons EN 1990 pour le contrôle Eurocode 2, toutes identifiées |
+| Béton armé | BAEL 91 mod. 99 face par face (ELU, ELS, non-fragilité, effort tranchant, dispositions constructives) et contrôle EC2 (MRd, VRd,c, As,min, ouverture de fissures wk). Ferraillage imposable nappe par nappe |
+| Géotechnique | Portance (Terzaghi / EC7), contact du radier (Fascicule 62 titre V), tassement, flottaison, stabilité du talus (Fellenius) |
+| Ouvrages de tête | Mur de tête et murs en aile calculés (renversement, glissement avec bêche, tiers central, portance, flexion, tranchant) |
+| Optimiser | Propose les épaisseurs minimales (grille de 5 cm, ≥ 20 cm) rendant le corps conforme |
+| Livrables | Note de calcul Word (en-tête et auteur sur chaque page, sommaire, formules référencées, figures), dossier DXF de 5 planches A3, nomenclature CSV, métré, vue 3D, devis (DQE) dans un projet |
+| Séries | Générateur de séries : un gabarit × 1 à 6 compartiments × plusieurs longueurs (7 ml, 8 ml…), tableau comparatif et export CSV |
+
+Chaque vérification porte un statut **Conforme**, **Non conforme**, **Non vérifié** (donnée absente) ou **Non applicable** (raison écrite). Le statut global ne déclare jamais conforme ce qui n'a pas été démontré.
+
+## Validation
+
+`npm run verif:dalot` contrôle :
+
+- le solveur contre un cas analytique (cadre carré : moment d'appui qL²/24, écart < 0,2 %) ;
+- l'étude hydraulique contre les trois notes de calcul Bangolo – Bloléquin (dalots 2,00 × 2,00, 3,00 × 2,00 et 2 × 3,00 × 2,00) : Qp, tirant d'eau, vitesse et Froude retrouvés à l'identique ;
+- le calcul complet des modèles et d'une série 2, 3, 4 cellules × 7 et 8 ml.
+
+## Code
+
+- `src/lib/dalot/` : moteur de calcul (TypeScript pur, exécuté dans le navigateur et côté serveur)
+  - `fields.ts` données, modèles d'ouvrages et séries ; `frame.ts` portique ; `convoys.ts` convois ; `analysis.ts` cas, balayage, combinaisons ;
+    `ba.ts` / `design.ts` béton armé ; `geotech.ts` ; `heads.ts` ; `hydro.ts` ; `quantities.ts` ; `drawings.ts` / `dxf.ts` / `svg.ts` plans ;
+    `diagrams.ts` ; `note-docx.ts` note Word ; `engine.ts` enchaînement et optimiseur
+- `src/app/(app)/dalots/` : pages (liste, séries, espace de travail par étude)
+- `src/lib/actions/dalots.ts` : actions serveur (création, séries, enregistrement automatique, devis)
+
+## Limites connues
+
+- Biais de l'ouvrage non traité (dalots droits uniquement) ; contact radier-sol linéaire (bilatéral), vérifié a posteriori.
+- Les terrassements du métré sont des estimations forfaitaires.
+- Outil d'aide au calcul : les notes et plans doivent être vérifiés et visés par un ingénieur qualifié.

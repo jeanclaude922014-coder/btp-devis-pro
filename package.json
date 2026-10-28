@@ -7,13 +7,15 @@
     "build": "prisma migrate deploy && next build",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "verif:dalot": "tsx scripts/verif-dalot.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@react-pdf/renderer": "^4.5.1",
     "bcryptjs": "^3.0.3",
+    "docx": "^9.15.0",
     "jsonwebtoken": "^9.0.3",
     "next": "16.2.10",
     "pg": "^8.22.0",
