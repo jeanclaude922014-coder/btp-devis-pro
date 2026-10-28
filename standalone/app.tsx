@@ -42,6 +42,7 @@ function App() {
   const [items, setItems] = useState<StudyItem[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast>(null);
+  const [help, setHelp] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -57,26 +58,33 @@ function App() {
       }
       if (alive) { setStore(s); setItems(list); }
     })();
-    // Enregistreur de fichiers de la plateforme (le DXF part dans un .zip).
-    const runtime = (window as unknown as { claude?: { use(n: string): Promise<unknown> } }).claude;
-    runtime?.use("downloads").then((d) => {
-      const dl = d as Saves;
-      if (!dl || !alive) return;
-      setSaver(async (blob, filename) => {
-        let data = blob, name = filename;
-        if (/\.dxf$/i.test(filename)) {
-          data = zipFiles([{ name: filename, data: new Uint8Array(await blob.arrayBuffer()) }]);
-          name = filename.replace(/\.dxf$/i, ".zip");
-        }
-        try {
-          await dl.save({ filename: name, data });
-          setToast({ kind: "ok", text: `${name} enregistré.` });
-        } catch (e) {
-          const code = (e as { code?: string })?.code;
-          if (code !== "declined") setToast({ kind: "err", text: `Enregistrement impossible (${code ?? "erreur"}).` });
-        }
-      });
-    }).catch(() => undefined);
+    // Enregistreur de fichiers de la plateforme (le DXF part dans un .zip). Tant qu'il n'est pas
+    // disponible, un clic sur « Télécharger » affiche la marche à suivre au lieu d'échouer en silence.
+    const runtime = (window as unknown as { claude?: { use?(n: string): Promise<unknown> } }).claude;
+    let dl: Saves = null;
+    setSaver(async (blob, filename) => {
+      if (!dl) {
+        setHelp(true);
+        return;
+      }
+      let data = blob, name = filename;
+      if (/\.dxf$/i.test(filename)) {
+        data = zipFiles([{ name: filename, data: new Uint8Array(await blob.arrayBuffer()) }]);
+        name = filename.replace(/\.dxf$/i, ".zip");
+      }
+      try {
+        await dl.save({ filename: name, data });
+        setToast({ kind: "ok", text: `${name} enregistré.` });
+      } catch (e) {
+        const code = (e as { code?: string })?.code;
+        if (code === "declined") return;
+        if (code === "rate_limited") setToast({ kind: "err", text: "Une demande d'enregistrement est déjà ouverte : répondez-y, puis réessayez." });
+        else setHelp(true);
+      }
+    });
+    if (typeof runtime?.use === "function") {
+      runtime.use("downloads").then((d) => { if (alive) dl = d as Saves; }).catch(() => undefined);
+    }
     return () => { alive = false; };
   }, []);
 
@@ -115,12 +123,44 @@ function App() {
       ) : (
         <Home items={items} store={store} onOpen={setOpenId} onCreate={async (list) => { for (const it of list) await upsert(it); }} onRemove={remove} />
       )}
+      {help && <DownloadHelp onClose={() => setHelp(false)} />}
       {toast && (
         <div role="status" className={`fixed bottom-4 right-4 z-50 rounded-lg px-4 py-2 text-sm shadow-lg ${toast.kind === "ok" ? "bg-green-700 text-white" : "bg-red-700 text-white"}`}
           style={{ marginBottom: "env(safe-area-inset-bottom, 0px)" }}>
           {toast.text}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Affiché quand la plateforme ne peut pas enregistrer de fichier depuis cette vue. */
+function DownloadHelp({ onClose }: { onClose: () => void }) {
+  const [msg, setMsg] = useState("");
+  const allow = async () => {
+    const perms = await (window as unknown as { claude?: { use?(n: string): Promise<unknown> } }).claude?.use?.("permissions").catch(() => null) as
+      { request(n: string[]): Promise<Record<string, string>>; manage(): Promise<void> } | null | undefined;
+    if (!perms) { setMsg("Cette vue ne permet pas de gérer les autorisations : ouvrez la page dans claude.ai depuis un navigateur."); return; }
+    const st = await perms.request(["downloads"]).catch(() => ({} as Record<string, string>));
+    if (st.downloads === "granted") { setMsg("Téléchargements autorisés : rechargez la page puis relancez le téléchargement."); return; }
+    await perms.manage().catch(() => setMsg("Ouvrez le menu « Autorisations » de la page et activez les téléchargements."));
+  };
+  return (
+    <div role="dialog" aria-labelledby="dl-titre" className="fixed inset-x-0 top-0 z-50 border-b border-amber-300 bg-amber-50 text-amber-950 shadow-lg"
+      style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+      <div className="mx-auto max-w-4xl space-y-2 py-4" style={{ paddingLeft: "max(16px, env(safe-area-inset-left, 0px))", paddingRight: "max(16px, env(safe-area-inset-right, 0px))" }}>
+        <h2 id="dl-titre" className="font-semibold">Le fichier n&apos;a pas pu être enregistré depuis cette vue</h2>
+        <ul className="list-disc space-y-1 pl-5 text-sm">
+          <li>Ouvrez DalotPro dans <strong>claude.ai depuis un navigateur</strong> (Chrome, Edge ou Safari, sur ordinateur de préférence) : l&apos;application mobile et l&apos;aperçu à côté de la conversation n&apos;autorisent pas toujours l&apos;enregistrement.</li>
+          <li>Autorisez les téléchargements pour cette page, puis relancez l&apos;export.</li>
+          <li>Sinon, demandez le fichier à Claude dans la conversation : il le génère et vous l&apos;envoie directement.</li>
+        </ul>
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={allow} className="rounded-md bg-amber-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-amber-800">Autoriser les téléchargements</button>
+          <button onClick={onClose} className="rounded-md border border-amber-400 bg-white px-3 py-1.5 text-sm font-medium text-amber-900">Fermer</button>
+          {msg && <span className="text-sm">{msg}</span>}
+        </div>
+      </div>
     </div>
   );
 }
