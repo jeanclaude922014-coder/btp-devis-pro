@@ -142,7 +142,11 @@ function sheetCoffrage(study: Study, origin: Pt, num: string): Sheet {
     }
     for (const side of [-1, 1] as const) {
       const xe = side < 0 ? 0 : L;
-      if (hHead > 0) p.rect(side < 0 ? -t.murTeteEp : L, 0, t.murTeteEp, B, "COFFRAGE");
+      if (hHead > 0) {
+        // Mur de tête dans la longueur de l'ouvrage, prolongé jusqu'aux racines des ailes.
+        const yw = t.debord + (t.murs ? t.ep / Math.cos(hg.a) : 0);
+        p.rect(side < 0 ? 0 : L - t.murTeteEp, -yw, t.murTeteEp, B + 2 * yw, "COFFRAGE");
+      }
       if (t.radierLong > 0) {
         const wl = hg.across > 0 ? t.radierLong * Math.tan(hg.a) : 0;
         p.poly([[xe, -t.debord], [xe + side * t.radierLong, -t.debord - wl], [xe + side * t.radierLong, B + t.debord + wl], [xe, B + t.debord]], "COFFRAGE", true);

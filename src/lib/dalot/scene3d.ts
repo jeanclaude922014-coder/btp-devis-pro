@@ -169,13 +169,17 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
   // Le mur de tête, quand il existe (remblai sur la dalle), sert de guide-roue : le garde-corps est posé
   // sur son couronnement. Sinon, guide-roue autonome en rive de dalle.
   const murT = hHead > 0.3;
+  // Mur de tête (ou guide-roue) dans la longueur de l'ouvrage, prolongé jusqu'aux racines des ailes
+  // (épaisseur de l'aile mesurée en travers) : les ailes viennent s'y encastrer.
+  const yWing = t.murs ? t.ep / Math.cos(a) : 0;
+  const xMt0 = -t.debord - yWing, wMt = B + 2 * (t.debord + yWing);
   const gcBase = H + (murT ? hHead : t.guideRoues ? GUIDE_ROUE.h : 0);
-  const gcZ = (z0: number, s: number) => (murT ? z0 + (s * t.murTeteEp) / 2 : t.guideRoues ? z0 - (s * GUIDE_ROUE.w) / 2 : z0 - (s * GARDE_CORPS.post) / 2);
+  const gcZ = (z0: number, s: number) => (murT ? z0 - (s * t.murTeteEp) / 2 : t.guideRoues ? z0 - (s * GUIDE_ROUE.w) / 2 : z0 - (s * GARDE_CORPS.post) / 2);
   const ends = [{ z0: 0, s: -1 }, { z0: L, s: 1 }] as const;
   for (const { z0, s } of ends) {
-    if (hHead > 0.3) addConcrete(new THREE.BoxGeometry(B, hHead, t.murTeteEp), V(B / 2, H + hHead / 2, z0 + s * t.murTeteEp / 2), "MUR_TETE");
+    if (hHead > 0.3) addConcrete(new THREE.BoxGeometry(wMt, hHead, t.murTeteEp), V(xMt0 + wMt / 2, H + hHead / 2, z0 - s * t.murTeteEp / 2), "MUR_TETE");
     // Guide-roue sur la rive de la dalle (support du garde-corps).
-    if (t.guideRoues && !murT) addConcrete(new THREE.BoxGeometry(B, GUIDE_ROUE.h, GUIDE_ROUE.w), V(B / 2, H + GUIDE_ROUE.h / 2, z0 - s * GUIDE_ROUE.w / 2), "GUIDE_ROUES");
+    if (t.guideRoues && !murT) addConcrete(new THREE.BoxGeometry(wMt, GUIDE_ROUE.h, GUIDE_ROUE.w), V(xMt0 + wMt / 2, H + GUIDE_ROUE.h / 2, z0 - s * GUIDE_ROUE.w / 2), "GUIDE_ROUES");
     if (t.radierLong > 0) {
       const dB = t.debord;
       const w = B + 2 * dB + 2 * t.radierLong * tanA;
@@ -410,9 +414,9 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
         // Mur de tête : barres verticales en attente dans la dalle, filants horizontaux.
         if (hHead > 0.3) {
           for (const zf of [c, t.murTeteEp - c]) {
-            const z = z0 + s * zf;
-            for (let px = c; px <= B - c + 1e-9; px += hw.bars.s) bars.seg(V(px, H - inp.es + c, z), V(px, H + hHead - c, z));
-            for (let py = H + 0.05; py <= H + hHead - c + 1e-9; py += hw.rep.s) bars.seg(V(c, py, z), V(B - c, py, z), false);
+            const z = z0 - s * zf;
+            for (let px = xMt0 + c; px <= xMt0 + wMt - c + 1e-9; px += hw.bars.s) bars.seg(V(px, H - inp.es + c, z), V(px, H + hHead - c, z));
+            for (let py = H + 0.05; py <= H + hHead - c + 1e-9; py += hw.rep.s) bars.seg(V(xMt0 + c, py, z), V(xMt0 + wMt - c, py, z), false);
           }
         }
         // Radier de tête : deux nappes de barres transversales, barres longitudinales.

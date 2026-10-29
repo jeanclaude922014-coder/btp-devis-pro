@@ -368,7 +368,12 @@ function vuePlan(study: Study, detail: boolean): View {
     draw: (p) => {
       p.rect(0, 0, L, B, "COFFRAGE");
       for (const c of cells) { p.line([0, c.x0], [L, c.x0], "COFFRAGE"); p.line([0, c.x1], [L, c.x1], "COFFRAGE"); }
-      if (ept > 0) { p.line([ept, 0], [ept, B], "COFFRAGE"); p.line([L - ept, 0], [L - ept, B], "COFFRAGE"); }
+      // Mur de tête (guide-roue) dans la longueur de l'ouvrage, prolongé jusqu'aux racines des ailes.
+      if (ept > 0) {
+        const yw = d + (t.murs ? t.ep / Math.cos(g.a) : 0);
+        p.rect(0, -yw, ept, B + 2 * yw, "COFFRAGE");
+        p.rect(L - ept, -yw, ept, B + 2 * yw, "COFFRAGE");
+      }
       for (const side of [-1, 1] as const) {
         const xe = side < 0 ? 0 : L;
         if (radL > 0) {
@@ -813,7 +818,8 @@ function vuePlanTete(ctx: Ctx, detail: boolean): View {
       p.line([0, -em - 0.5], [0, -em], "COFFRAGE");
       p.line([B, -em - 0.5], [B, -em], "COFFRAGE");
       p.line([-p.th(4), -em - 0.5], [B + p.th(4), -em - 0.5], "AXES");
-      p.rect(0, -em, B, em, "COFFRAGE");
+      const yw = db + (t.murs ? t.ep / Math.cos(g.a) : 0);
+      p.rect(-yw, -em, B + 2 * yw, em, "COFFRAGE");
       const mt = ctx.bar("MUR DE TÊTE", "Face côté remblai");
       const mr = ctx.bar("MUR DE TÊTE", "Répartition");
       p.line([c, -c], [B - c, -c], "ACIERS");

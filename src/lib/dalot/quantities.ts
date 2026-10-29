@@ -159,14 +159,16 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
 
   // ── OUVRAGE DE TÊTE (deux extrémités) ──
   const hw = heads.headWall;
+  // Mur de tête prolongé jusqu'aux racines des ailes (épaisseur de l'aile mesurée en travers).
+  const Bmt = B + 2 * (t.debord + (t.murs ? t.ep / Math.cos((t.angle * Math.PI) / 180) : 0));
   const tanA = Math.tan((t.angle * Math.PI) / 180);
   // Radier de tête trapézoïdal : petite base B + 2·débord, grande base + 2·L·tan(angle) ; Wrt = largeur moyenne.
   const Wrt = B + 2 * t.debord + (t.murs ? t.radierLong * tanA : 0);
   const cm = (x: number) => Math.round(x * 100);
   if (hw.H > 0.3) {
-    add(TETE, "MUR DE TÊTE", "Face côté remblai — barres en attente dans la dalle", hw.bars, "L", [hw.H - c, anchor(hw.bars.phi)], 2 * nAcross(B - 2 * c, hw.bars.s), { nElem: 2 });
-    add(TETE, "MUR DE TÊTE", "Face vue — barres verticales", { phi: 10, s: 0.2 }, "L", [hw.H - c, anchor(10)], 2 * nAcross(B - 2 * c, 0.2), { nElem: 2 });
-    add(TETE, "MUR DE TÊTE", "Répartition horizontale deux faces", hw.rep, "droite", [B - 2 * c], 2 * 2 * nAcross(hw.H - c, hw.rep.s), { nElem: 2 });
+    add(TETE, "MUR DE TÊTE", "Face côté remblai — barres en attente dans la dalle", hw.bars, "L", [hw.H - c, anchor(hw.bars.phi)], 2 * nAcross(Bmt - 2 * c, hw.bars.s), { nElem: 2 });
+    add(TETE, "MUR DE TÊTE", "Face vue — barres verticales", { phi: 10, s: 0.2 }, "L", [hw.H - c, anchor(10)], 2 * nAcross(Bmt - 2 * c, 0.2), { nElem: 2 });
+    add(TETE, "MUR DE TÊTE", "Répartition horizontale deux faces", hw.rep, "droite", [Bmt - 2 * c], 2 * 2 * nAcross(hw.H - c, hw.rep.s), { nElem: 2 });
   }
   if (t.radierLong > 0) {
     const wMin = B + 2 * t.debord - 2 * c, wMax = B + 2 * t.debord + 2 * t.radierLong * tanA * (t.murs ? 1 : 0) - 2 * c;
@@ -202,7 +204,7 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
   // ── Volumes, surfaces ──
   const cells = inp.openings.reduce((s, o) => s + o * inp.hInt, 0);
   const vBody = (B * Hout - cells + 4 * n * (inp.gousset ** 2 / 2)) * L;
-  const vHead = 2 * B * hw.H * t.murTeteEp + (t.guideRoues && !(hw.H > 0.3) ? 2 * B * GUIDE_ROUE.w * GUIDE_ROUE.h : 0);
+  const vHead = 2 * Bmt * hw.H * t.murTeteEp + (t.guideRoues && !(hw.H > 0.3) ? 2 * Bmt * GUIDE_ROUE.w * GUIDE_ROUE.h : 0);
   const Havg = heads.wing ? (heads.wing.Htot + heads.wing.Hend) / 2 : 0;
   const vWing = heads.wing ? 4 * t.long * (Havg * t.ep + t.semelle * t.semEp) : 0;
   const vRad = 2 * Wrt * t.radierLong * inp.er;
