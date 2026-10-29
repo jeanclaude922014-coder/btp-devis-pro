@@ -22,6 +22,8 @@ import { bodyBars, cellOutline, cmTxt, fmt, geometry, Pen, repMap, type Layer, t
 import type { Study } from "./engine";
 import { fitView, headGeom, sketch, type Pad, type Region } from "./plans";
 import { BAR_PARTS, GARDE_CORPS, gardeCorpsPosts, type BarMark, type BarPart } from "./quantities";
+import * as THREE from "three";
+import { buildScene, governing, type Scene3DOptions } from "./scene3d";
 
 type Model = "cafe" | "paia";
 type Align = "left" | "center" | "right";
@@ -376,9 +378,10 @@ function vuePlan(study: Study, detail: boolean): View {
           if (t.becheProf > 0) {
             const xb = xr - side * t.becheEp;
             p.line([xb, -(radL - t.becheEp) * (t.murs ? g.tanA : 0)], [xb, B + (radL - t.becheEp) * (t.murs ? g.tanA : 0)], "AXES");
-            p.text([xr - side * (t.becheEp / 2) - p.th(1), B / 2], 2.4, `BÊCHE ${cmTxt(t.becheEp)} × ${cmTxt(t.becheProf)}`, "TEXTE", "center", 90);
+            p.text([xr - side * (t.becheEp / 2) - p.th(1), B / 2], 2.4, `BÊCHE ${cmTxt(t.becheEp)} × ${cmTxt(t.becheProf)} (cachée)`, "TEXTE", "center", 90);
           }
-          p.bubble([xe + side * radL * 0.55, B / 2 + (side < 0 ? 0 : 0)], cmTxt(g.inp.er), 6);
+          p.bubble([xe + side * radL * 0.55, B / 2], cmTxt(g.inp.er), 6);
+          p.text([xe + side * radL * 0.5, B / 2 + p.th(6)], 2.2, `Radier de tête ép. ${cmTxt(g.inp.er)}`, "TEXTE", "center");
         }
         if (t.murs) {
           for (const edge of [0, B]) {
@@ -585,7 +588,7 @@ function elevationTete(study: Study): View {
 
 // ── Ferraillage du corps ───────────────────────────────────
 
-function sectionFerraillage(ctx: Ctx, withDims: boolean): View {
+function sectionFerraillage(ctx: Ctx, withDims: boolean, column = false): View {
   const study = ctx.study;
   const g = geo(study);
   const { inp, B, Hout, cells } = g;
@@ -595,8 +598,14 @@ function sectionFerraillage(ctx: Ctx, withDims: boolean): View {
   const gd = (id: string) => study.design.groups.find((x) => x.id === id);
   return {
     ext: { x0: 0, y0: 0, w: B, h: Hout },
-    pad: { l: 30, r: 30, b: withDims ? 44 : 30, t: 30 },
+    pad: { l: column ? 84 : 30, r: column ? 84 : 30, b: withDims ? 44 : 30, t: 30 },
     draw: (p) => {
+      // Repères : autour de la coupe, ou en colonnes latérales avec désignation et croquis coté.
+      const items: { from: Pt; b: BarMark }[] = [];
+      const T = (from: Pt, to: Pt, b: BarMark | undefined) => {
+        if (!b) return;
+        if (column) items.push({ from, b }); else tag(p, ctx, from, to, b, 6);
+      };
       p.rect(0, 0, B, Hout, "COFFRAGE");
       for (const cl of cells) p.poly(cellOutline(cl.x0, cl.x1, inp.er, inp.er + inp.hInt, inp.gousset), "COFFRAGE", true);
       for (const b of bars) {
@@ -604,7 +613,7 @@ function sectionFerraillage(ctx: Ctx, withDims: boolean): View {
         if (b.label) {
           const [ax, ay] = b.anchor;
           const d = p.th(21);
-          tag(p, ctx, [ax, ay], [ax + b.dir[0] * d, ay + b.dir[1] * d], ctx.mark(rep.get(b.kind)), 6);
+          T([ax, ay], [ax + b.dir[0] * d, ay + b.dir[1] * d], ctx.mark(rep.get(b.kind)));
         }
       }
       const re = gd("radier_ext"), ri = gd("radier_int"), de = gd("dalle_ext"), di = gd("dalle_int"), pe = gd("pext_ext"), pi = gd("pext_int");
@@ -626,7 +635,7 @@ function sectionFerraillage(ctx: Ctx, withDims: boolean): View {
         comb(p, [cl.x0, inp.er], [cl.x0, inp.er + inp.hInt], [1, 0], pi?.rep.s ?? sW, 1.5);
         comb(p, [cl.x1, inp.er], [cl.x1, inp.er + inp.hInt], [-1, 0], pi?.rep.s ?? sW, 1.5);
       }
-      const call = (b: BarMark | undefined, from: Pt, to: Pt) => { if (b) tag(p, ctx, from, to, b, 6); };
+      const call = (b: BarMark | undefined, from: Pt, to: Pt) => T(from, to, b);
       call(ctx.bar("RADIER", "Répartition"), [B * 0.62, c + 0.02], [B * 0.62, -p.th(21)]);
       call(ctx.bar("RADIER", "Chaises"), [B * 0.8, inp.er / 2], [B * 0.8, -p.th(21)]);
       call(ctx.bar("DALLE", "Répartition"), [B * 0.62, Hout - c - 0.02], [B * 0.62, Hout + p.th(21)]);
@@ -634,7 +643,25 @@ function sectionFerraillage(ctx: Ctx, withDims: boolean): View {
       call(ctx.bar("PIÉDROITS", "Répartition"), [c + 0.035, Hout * 0.68], [-p.th(21), Hout * 0.68]);
       call(ctx.bar("PIÉDROITS", "Épingles"), [inp.eExt / 2, Hout * 0.32], [-p.th(21), Hout * 0.32]);
       const eq = ctx.bar("DALLE", "Équerres");
-      if (eq) tag(p, ctx, [B - c - 0.12, Hout - c - 0.04], [B + p.th(21), Hout - c - 0.04], eq, 6);
+      T([B - c - 0.12, Hout - c - 0.04], [B + p.th(21), Hout - c - 0.04], eq);
+      if (column) {
+        for (const side of [-1, 1] as const) {
+          const list = items.filter((it) => (side < 0 ? it.from[0] <= B / 2 : it.from[0] > B / 2)).sort((u, v) => v.from[1] - u.from[1]);
+          const step = p.th(13);
+          const y0 = Hout / 2 + ((list.length - 1) * step) / 2;
+          const xb = side < 0 ? -p.th(46) : B + p.th(46);
+          list.forEach((it, i) => {
+            const y = y0 - i * step;
+            const xk = side < 0 ? -p.th(10) - i * p.th(1.6) : B + p.th(10) + i * p.th(1.6);
+            p.bubble([xb, y], ctx.label(it.b), 6);
+            p.poly([[xb - side * p.th(3), y], [xk, y], [xk, it.from[1]], it.from], "COTATION");
+            p.circle(it.from, p.th(0.5), "ACIERS");
+            const xt = xb + side * p.th(5);
+            p.text([xt, y + p.th(1)], 2.2, barText(it.b), "TEXTE", side < 0 ? "right" : "left", 0, true);
+            sketch(p, it.b, xt + side * p.th(15), y - p.th(4.2), p.th(18), p.th(4.5));
+          });
+        }
+      }
       if (withDims) {
         p.chainH([0, ...cells.flatMap((cl) => [cl.x0, cl.x1]), B], 0, -p.th(32), false);
         p.dimH(0, B, 0, -p.th(39));
@@ -652,8 +679,92 @@ function hypotheses(pg: Page, ctx: Ctx, r: Region) {
   pg.text(r.x + r.w - 3, r.y + r.h - 8, 3.2, `RC ≥ ${mat.ls} Ø`, "right", true);
   const col1 = [`Matériau : Acier FeE${inp.fe}`, `Béton : C${inp.fc28}/${inp.fc28 + 5}`, `Fissuration ${inp.fissuration === "prejudiciable" ? "préjudiciable" : "très préjudiciable"}`];
   const col2 = [`Enrobage : ${cmTxt(inp.cover)} cm`, `Longueur de recouvrement : ${mat.ls} Ø`, "BAEL 91 mod. 99 — Fasc. 61 titre II — contrôle EC2"];
-  col1.forEach((s, i) => pg.text(r.x + 4, r.y + r.h - 17 - i * 6, 3.2, s, "left", true));
-  col2.forEach((s, i) => pg.text(r.x + r.w * 0.45, r.y + r.h - 17 - i * 6, i === 2 ? 2.4 : 3.2, s, "left", i < 2));
+  if (r.w >= 150) {
+    col1.forEach((s, i) => pg.text(r.x + 4, r.y + r.h - 17 - i * 6, 3.2, s, "left", true));
+    col2.forEach((s, i) => pg.text(r.x + r.w * 0.45, r.y + r.h - 17 - i * 6, i === 2 ? 2.4 : 3.2, s, "left", i < 2));
+  } else {
+    [...col1, ...col2].forEach((s, i) => pg.text(r.x + 3, r.y + r.h - 16 - i * 5, i === 5 ? 1.9 : 2.6, s, "left", i !== 5));
+  }
+}
+
+/** Bloc NOTES des plans de coffrage. */
+function notesBox(pg: Page, ctx: Ctx, r: Region) {
+  const inp = ctx.study.input;
+  pg.rect(r.x, r.y, r.w, r.h);
+  pg.text(r.x + 2, r.y + r.h - 4.5, 2.8, "NOTES :", "left", true);
+  pg.line(r.x + 2, r.y + r.h - 5.3, r.x + 17, r.y + r.h - 5.3, "TEXTE");
+  const lines = [
+    "Cotes en centimètres, niveaux en mètres (± 0,000 = dessus du radier).",
+    "Béton de propreté dosé à 150 kg/m³, épaisseur 10 cm.",
+    `Béton armé C${inp.fc28}/${inp.fc28 + 5} dosé à 350 kg/m³ (CPJ 42,5) ; enrobage ${cmTxt(inp.cover)} cm.`,
+    `Aciers HA FeE${inp.fe} ; recouvrements ${ctx.study.design.mat.ls} Ø.`,
+    "Remblai latéritique compacté à 95 % OPM par couches de 20 cm.",
+    "Cure humide 7 jours minimum ; badigeon bitumineux sur parements enterrés.",
+  ];
+  const size = r.w < 120 ? 1.8 : 2.1;
+  lines.forEach((l, i) => pg.text(r.x + 3, r.y + r.h - 10 - i * (size * 1.75), size, `– ${l}`, "left"));
+}
+
+/**
+ * Perspective axonométrique vectorielle de la maquette 3D (arêtes du béton, aciers barre par barre,
+ * convoi et diffusion, enveloppe des moments) : elle passe telle quelle dans le DXF, le SVG et le PDF.
+ */
+function perspective(study: Study, o: Scene3DOptions, az = -0.7, el = 0.52): View {
+  const gov = o.convoy ? governing(study, o.convoy) : null;
+  const { scene } = buildScene(study, o, gov);
+  scene.updateMatrixWorld(true);
+  const R = [Math.cos(az), 0, -Math.sin(az)];
+  const U = [-Math.sin(el) * Math.sin(az), Math.cos(el), -Math.sin(el) * Math.cos(az)];
+  const v = new THREE.Vector3();
+  const pr = (): Pt => [v.x * R[0] + v.y * R[1] + v.z * R[2], v.x * U[0] + v.y * U[1] + v.z * U[2]];
+  const segs: { a: Pt; b: Pt; layer: Layer }[] = [];
+  scene.traverse((obj) => {
+    const ud = obj.userData.layer as string | undefined;
+    let geo: THREE.BufferGeometry | undefined;
+    let layer: Layer | undefined;
+    if ((obj as THREE.LineSegments).isLineSegments) {
+      geo = (obj as THREE.LineSegments).geometry as THREE.BufferGeometry;
+      layer = ud === "ACIERS" || ud === "MOMENTS_MAX" ? "ACIERS" : ud === "REPARTITION" ? "REPARTITION" : ud === "MOMENTS_MIN" ? "COTATION" : "COFFRAGE";
+    } else if ((obj as THREE.Mesh).isMesh && (ud === "DIFFUSION" || ud === "CONVOI")) {
+      geo = new THREE.EdgesGeometry((obj as THREE.Mesh).geometry as THREE.BufferGeometry);
+      layer = "TERRAIN";
+    }
+    const pos = geo?.getAttribute("position");
+    if (!pos || !layer) return;
+    for (let i = 0; i + 1 < pos.count; i += 2) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(obj.matrixWorld);
+      const a = pr();
+      v.fromBufferAttribute(pos, i + 1).applyMatrix4(obj.matrixWorld);
+      segs.push({ a, b: pr(), layer });
+    }
+  });
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const sg of segs) for (const q of [sg.a, sg.b]) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]); }
+  if (!segs.length) { x0 = y0 = 0; x1 = y1 = 1; }
+  return {
+    ext: { x0, y0, w: x1 - x0, h: y1 - y0 },
+    pad: { l: 4, r: 4, b: 4, t: 4 },
+    draw: (p) => { for (const sg of segs) p.line(sg.a, sg.b, sg.layer); },
+  };
+}
+
+function perspectivesSheet(pg: Page, ctx: Ctx, area: Region, below: boolean) {
+  const study = ctx.study;
+  const cv = study.analysis.traffic.find((x) => x.positions.length)?.def.id ?? "";
+  const cvLabel = study.analysis.traffic.find((x) => x.def.id === cv)?.def.label ?? "";
+  const base: Scene3DOptions = { concrete: "transparent", fill: false, convoy: "", rebar: false, cut: false, efforts: false };
+  const pos = below ? "below" : "above";
+  const xm = area.x + area.w * 0.56;
+  pg.line(xm, area.y, xm, area.y + area.h, "CADRE");
+  pg.line(xm, area.y + area.h / 2, area.x + area.w, area.y + area.h / 2, "CADRE");
+  pg.place({ x: area.x, y: area.y, w: xm - area.x, h: area.h }, perspective(study, { ...base, rebar: true }), { text: "MAQUETTE 3D FERRAILLÉE — TOUT LE FERRAILLAGE, BARRE PAR BARRE", pos, scale: false, size: 3.4 });
+  pg.place({ x: xm, y: area.y + area.h / 2, w: area.x + area.w - xm, h: area.h / 2 }, perspective(study, { ...base, convoy: cv }), { text: cv ? `CONVOI ${cvLabel} À SA POSITION LA PLUS DÉFAVORABLE` : "MAQUETTE 3D DE L'OUVRAGE", pos, scale: false, size: 3 });
+  pg.place({ x: xm, y: area.y, w: area.x + area.w - xm, h: area.h / 2 }, perspective(study, { ...base, efforts: true }, -0.3, 0.2), { text: "ENVELOPPE DES MOMENTS ELU SUR LA MAQUETTE", pos, scale: false, size: 3 });
+  // Légendes : en haut des zones quand les titres sont dessous, en bas sinon.
+  const ly = (top: number, bottom: number) => (below ? top - 5 : bottom + 3);
+  pg.text(xm + 3, ly(area.y + area.h, area.y + area.h / 2), 1.8, "Orange : roues et volumes de diffusion jusqu'au feuillet moyen de la dalle.", "left");
+  pg.text(xm + 3, ly(area.y + area.h / 2, area.y), 1.8, "Rouge : moments positifs ; bleu : moments négatifs (ELU).", "left");
+  pg.text(area.x + 3, ly(area.y + area.h, area.y), 1.8, "Rouge : aciers principaux ; bleu : aciers de répartition. Perspective axonométrique, sans échelle.", "left");
 }
 
 // ── Ouvrages de tête ───────────────────────────────────────
@@ -1176,7 +1287,8 @@ export function buildModelSheets(study: Study, model: Model): Sheet[] {
         const xd = area.x + area.w * 0.74;
         pg.line(xd, 42, xd, 289);
         pg.place({ x: area.x, y: area.y, w: xd - area.x - 2, h: area.h }, vuePlan(study, true), { text: `VUE EN PLAN DU ${nm}`, pos: "below" });
-        pg.place({ x: xd + 2, y: area.y + 40, w: area.x + area.w - xd - 4, h: area.h - 60 }, detailRaccord(study), { text: "Détail", pos: "below", scale: true });
+        pg.place({ x: xd + 2, y: area.y + 56, w: area.x + area.w - xd - 4, h: area.h - 62 }, detailRaccord(study), { text: "Détail", pos: "below", scale: true });
+        notesBox(pg, ctx, { x: xd + 3, y: area.y + 3, w: area.x + area.w - xd - 6, h: 48 });
       },
     });
     list.push({
@@ -1193,10 +1305,10 @@ export function buildModelSheets(study: Study, model: Model): Sheet[] {
     list.push({
       id: "ferraillage", title: "Plan de ferraillage du corps", role: "ferraillage",
       draw: (pg) => {
-        pg.place({ x: area.x, y: area.y + 18, w: area.w * 0.52, h: area.h - 18 }, sectionFerraillage(ctx, false));
-        hypotheses(pg, ctx, { x: area.x + area.w * 0.52 + 4, y: area.y + area.h * 0.42, w: area.w * 0.46, h: 38 });
-        pg.title(area.x + area.w * 0.62, area.y + 8, 6, `PLAN DE FERRAILLAGE_${nm}`);
-        pg.text(area.x + area.w * 0.75, area.y + area.h * 0.42 - 10, 2.6, `Longueur de l'ouvrage L = ${fmt(study.input.L)} m`, "center");
+        pg.place({ x: area.x, y: area.y + 16, w: area.w * 0.74, h: area.h - 16 }, sectionFerraillage(ctx, false, true));
+        hypotheses(pg, ctx, { x: area.x + area.w * 0.75, y: area.y + area.h * 0.45, w: area.w * 0.25 - 2, h: 46 });
+        pg.title(area.x + area.w * 0.5, area.y + 7, 6, `PLAN DE FERRAILLAGE_${nm}`);
+        pg.text(area.x + area.w * 0.875, area.y + area.h * 0.45 - 8, 2.4, `Longueur de l'ouvrage L = ${fmt(study.input.L)} m`, "center");
       },
     });
     for (const f of nomenclaturePages(ctx, "CORPS DU DALOT", `Nomenclature des aciers _ corps du ${nm}`)) {
@@ -1236,7 +1348,8 @@ export function buildModelSheets(study: Study, model: Model): Sheet[] {
         pg.place({ x: area.x, y: top, w: area.w * 0.58, h: area.y + area.h - top }, coupeLong(study), { text: "COUPE AA", pos: "above" });
         pg.place({ x: area.x + area.w * 0.58, y: top, w: area.w * 0.42, h: area.y + area.h - top }, coupeTrans(study), { text: "COUPE BB", pos: "above" });
         pg.place({ x: area.x, y: area.y, w: area.w * 0.58, h: top - area.y }, vuePlan(study, false), { text: "VUE EN PLAN", pos: "above" });
-        pg.place({ x: area.x + area.w * 0.6, y: area.y + 20, w: area.w * 0.36, h: top - area.y - 30 }, detailRaccord(study), { text: 'DÉTAIL "1"', pos: "above" });
+        pg.place({ x: area.x + area.w * 0.6, y: area.y + 40, w: area.w * 0.36, h: top - area.y - 44 }, detailRaccord(study), { text: 'DÉTAIL "1"', pos: "above" });
+        notesBox(pg, ctx, { x: area.x + area.w * 0.6, y: area.y + 2, w: area.w * 0.38, h: 34 });
       },
     });
     list.push({
@@ -1296,6 +1409,9 @@ export function buildModelSheets(study: Study, model: Model): Sheet[] {
       list.push({ id: `nomenclature-gc-${list.length}`, title: "Nomenclature du garde-corps", draw: (pg) => f(pg) });
     }
   }
+
+  // Perspectives 3D (maquette ferraillée, convoi, moments), en fin de dossier.
+  list.push({ id: "perspectives-3d", title: "Perspectives 3D", draw: (pg) => perspectivesSheet(pg, ctx, area, model === "cafe") });
 
   // Rendu : chaque planche à droite de la précédente, cartouche selon le modèle.
   const total = list.length;

@@ -100,3 +100,12 @@ et ces cotes.
 - **Note Word** : figures 3D (maquette avec convoi, moments sur la maquette, maquette ferraillée) et
   chapitre des contrôles internes.
 - **Plans** : chaque repère porte sa désignation « 53HA10 esp=15cm ».
+
+## Version 5 — vues de la maquette dans les plans
+
+- Planche **« Perspectives 3D »** ajoutée aux deux modèles : maquette ferraillée barre par barre, convoi à sa
+  position défavorable avec volumes de diffusion, enveloppe des moments ELU. Perspective axonométrique
+  vectorielle (projection de la scène `scene3d.ts`) : elle passe dans le DXF, le SVG et le PDF.
+- Plan de ferraillage (modèle Bangolo) : repères en colonnes latérales avec désignation « 47HA10 esp=15cm »,
+  croquis de façonnage coté et rappels orthogonaux vers les barres.
+- Coffrage : « Radier de tête ép. … », « Bêche … (cachée) », bloc NOTES.

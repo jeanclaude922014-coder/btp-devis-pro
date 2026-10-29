@@ -54,10 +54,10 @@ const demo = runStudy(defaultSpec());
 if (!demo.ok || demo.study.status !== "conforme") { failed++; console.log("ÉCHEC  l'ouvrage de démonstration doit être conforme"); }
 else console.log("OK   ouvrage de démonstration conforme");
 
-// 4. Dossiers de plans sur les modèles types : 8 planches chacun, cotes de la vue en plan.
+// 4. Dossiers de plans sur les modèles types : 8 planches et perspectives 3D, cotes de la vue en plan.
 for (const [id, model, ids] of [
-  ["r200x200", "cafe", ["garde", "vue-plan", "coupes", "ferraillage", "nomenclature", "ferraillage-tete", "mur-aile", "grille-tete"]],
-  ["r3x400x400", "paia", ["titre", "coffrage", "corps", "nomenclature-corps", "garde-corps", "nomenclature-gc", "tetes", "nomenclature-tetes"]],
+  ["r200x200", "cafe", ["garde", "vue-plan", "coupes", "ferraillage", "nomenclature", "ferraillage-tete", "mur-aile", "grille-tete", "perspectives-3d"]],
+  ["r3x400x400", "paia", ["titre", "coffrage", "corps", "nomenclature-corps", "garde-corps", "nomenclature-gc", "tetes", "nomenclature-tetes", "perspectives-3d"]],
 ] as const) {
   const res = runStudy(specFromPreset(id));
   if (!res.ok) { failed++; console.log(`ÉCHEC  ${id} : calcul impossible`); continue; }
