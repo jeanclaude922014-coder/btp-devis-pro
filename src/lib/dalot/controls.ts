@@ -67,12 +67,15 @@ export function modelControls(inp: DalotInput, an: Analysis): Check[] {
     });
   }
 
-  // Convois cochés effectivement promenés sur l'ouvrage.
+  // Convois cochés effectivement appliqués : effets non nuls sur la dalle (charges réparties comprises).
   for (const t of an.traffic) {
+    let eff = 0;
+    for (const mm of m.members.filter((x) => x.kind === "dalle")) for (let k = 0; k < mm.nodes.length; k++) eff = Math.max(eff, Math.abs(t.max[mm.station0 + k]), Math.abs(t.min[mm.station0 + k]));
     out.push({
       id: `CTRL-CONVOI-${t.def.id}`, domain: DOM, element: t.def.label,
-      label: "Convoi promené sur la dalle : positions défavorables trouvées", value: t.positions.length, unit: "positions",
-      status: t.positions.length > 0 ? "conforme" : "non_verifie", ref: "Contrôle interne — lignes d'influence",
+      label: "Convoi appliqué au modèle : moment maximal non nul dans la dalle", value: eff, unit: "kN·m/m",
+      status: eff > 1e-6 ? "conforme" : "non_verifie", ref: "Contrôle interne — lignes d'influence",
+      detail: t.positions.length ? `${t.positions.length} positions défavorables retenues.` : "Charge répartie : appliquée sur les travées défavorables.",
     });
   }
   return out;
