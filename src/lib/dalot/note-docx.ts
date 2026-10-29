@@ -45,9 +45,9 @@ function table(head: string[], rows: (string | number)[][], widths?: number[], o
   const w = widths ?? head.map(() => 1 / head.length);
   const cell = (text: string, header: boolean, i: number, fill?: string) => new TableCell({
     width: { size: Math.round(total * (w[i] ?? 0)), type: WidthType.DXA },
-    shading: header ? { type: ShadingType.CLEAR, fill: "1E3A5F", color: "auto" } : fill ? { type: ShadingType.CLEAR, fill, color: "auto" } : undefined,
+    shading: header ? { type: ShadingType.CLEAR, fill: "D9D9D9", color: "auto" } : fill ? { type: ShadingType.CLEAR, fill, color: "auto" } : undefined,
     margins: { top: 40, bottom: 40, left: 70, right: 70 },
-    children: [new Paragraph({ children: [new TextRun({ text, bold: header, size: header ? 17 : 16, color: header ? "FFFFFF" : undefined, font: FONT })] })],
+    children: [new Paragraph({ children: [new TextRun({ text, bold: header, size: header ? 17 : 16, color: header ? "000000" : undefined, font: FONT })] })],
   });
   const statusFill: Record<string, string> = { Conforme: "DCFCE7", "Non conforme": "FEE2E2", "Non vérifié": "FEF3C7", "Non applicable": "F1F5F9" };
   return new Table({
@@ -101,7 +101,7 @@ export async function buildNoteDocx(study: Study, images: NoteImages): Promise<B
   // ── Page de garde ──
   body.push(
     P(" ", { spacingAfter: 1200 }),
-    P("NOTE DE CALCUL", { bold: true, size: 48, align: AlignmentType.CENTER, color: "1E3A5F" }),
+    P("NOTE DE CALCUL", { bold: true, size: 48, align: AlignmentType.CENTER, color: "000000" }),
     P("Dalot cadre en béton armé", { size: 30, align: AlignmentType.CENTER, color: "334155" }),
     P(" ", { spacingAfter: 400 }),
     P(id.projet, { bold: true, size: 32, align: AlignmentType.CENTER }),
@@ -117,7 +117,7 @@ export async function buildNoteDocx(study: Study, images: NoteImages): Promise<B
     P(" ", { spacingAfter: 300 }),
     table(["Visa", "Nom", "Date", "Signature"], [["Établi par", id.auteur, today, ""], ["Vérifié par", "", "", ""], ["Approuvé par", "", "", ""]], [0.2, 0.35, 0.2, 0.25]),
     new Paragraph({ children: [new PageBreak()] }),
-    P("SOMMAIRE", { bold: true, size: 28, color: "1E3A5F" }),
+    P("SOMMAIRE", { bold: true, size: 28, color: "000000" }),
     new TableOfContents("Sommaire", { hyperlink: true, headingStyleRange: "1-2" }),
     new Paragraph({ children: [new PageBreak()] }),
   );
@@ -223,17 +223,34 @@ export async function buildNoteDocx(study: Study, images: NoteImages): Promise<B
 
   // 8. Charges permanentes
   const cl = an.caseLoads;
+  const Bm = an.model.xRight - an.model.xLeft;
+  const n = inp.openings.length;
+  const gousW = inp.gousset > 0 ? 4 * n * (inp.gammaBA * inp.gousset ** 2) / 2 : 0;
+  const sumW = cl.selfWalls.reduce((acc, w) => acc + w, 0);
+  const Gtot = (cl.selfTop + cl.gTop + cl.selfRaft) * Bm + sumW + gousW;
+  let Rsol = 0;
+  an.model.raftNodes.forEach((_, k) => { Rsol += an.cases.G[3 * ns + k] * an.model.raftTrib[k]; });
   body.push(H1("8. Charges permanentes"),
     FORMULA(`Poids propre de la dalle : g1 = γBA·es = ${f(inp.gammaBA, 0)} × ${f(inp.es)} = ${f(cl.selfTop)} kN/m²`),
     FORMULA(`Remblai et chaussée : g2 = γr·hr + γch·ech = ${f(inp.gammaR, 0)} × ${f(inp.hr)} + ${f(inp.gammaCh, 0)} × ${f(inp.ech)} = ${f(cl.gTop)} kN/m²`),
-    FORMULA(`Poids propre du radier : ${f(cl.selfRaft)} kN/m² ; piédroits : ${cl.selfWalls.map((w) => f(w)).join(" ; ")} kN par mètre de bande`),
-    P("Le poids des goussets est ramené aux nœuds d'angle."));
+    FORMULA(`Poids propre du radier : g3 = γBA·er = ${f(inp.gammaBA, 0)} × ${f(inp.er)} = ${f(cl.selfRaft)} kN/m²`),
+    ...an.model.members.filter((m) => m.kind.startsWith("piedroit")).sort((a, b) => a.index - b.index).map((m) =>
+      FORMULA(`${m.label} : Pw = γBA·e·h = ${f(inp.gammaBA, 0)} × ${f(m.thickness)} × ${f(inp.hInt)} = ${f(cl.selfWalls[m.index] ?? inp.gammaBA * m.thickness * inp.hInt)} kN par mètre de bande`)),
+    ...(gousW > 0 ? [FORMULA(`Goussets : Pg = 4·n·γBA·g²/2 = 4 × ${n} × ${f(inp.gammaBA, 0)} × ${f(inp.gousset)}² / 2 = ${f(gousW)} kN/m (ramené aux nœuds d'angle)`)] : []),
+    FORMULA(`Charge permanente totale : G = (g1 + g2 + g3)·B + ΣPw${gousW > 0 ? " + Pg" : ""} = (${f(cl.selfTop)} + ${f(cl.gTop)} + ${f(cl.selfRaft)}) × ${f(Bm)} + ${f(sumW)}${gousW > 0 ? ` + ${f(gousW)}` : ""} = ${f(Gtot)} kN/m`),
+    FORMULA(`Pression moyenne sous le radier due à G : G / B = ${f(Gtot)} / ${f(Bm)} = ${f(Gtot / Bm)} kPa (contrôle : réactions du sol du modèle = ${f(Rsol)} kN/m)`),
+    P("Les charges sont appliquées par mètre de longueur d'ouvrage (bande de 1 m) : g1 et g2 sur la dalle, g3 sur le radier, Pw le long des piédroits."));
 
   // 9. Poussées
   const sigTop = cl.gTop, sigBot = cl.gTop + inp.gammaR * Hout;
   body.push(H1("9. Poussée des terres"),
-    FORMULA(`σv(z) = g2 + γr·z ; σh = K·σv' + u — en tête : σv = ${f(sigTop)} kPa ; en pied : σv = ${f(sigBot)} kPa`),
-    FORMULA(`Pmax : K = ${f(inp.Kmax)} → σh de ${f(inp.Kmax * sigTop)} à ${f(inp.Kmax * sigBot)} kPa ; Pmin : K = ${f(inp.Kmin)} → σh de ${f(inp.Kmin * sigTop)} à ${f(inp.Kmin * sigBot)} kPa`, "Guide SETRA PICF"),
+    FORMULA(`Contrainte verticale : σv(z) = g2 + γr·z, z compté depuis l'extrados de la dalle ; σh = K·σv' + u`),
+    FORMULA(`En tête des piédroits (z = 0) : σv = g2 = ${f(sigTop)} kPa`),
+    FORMULA(`En pied des piédroits (z = H = ${f(Hout)} m) : σv = g2 + γr·H = ${f(sigTop)} + ${f(inp.gammaR, 0)} × ${f(Hout)} = ${f(sigBot)} kPa`),
+    FORMULA(`Poussée maximale (K = Kmax = ${f(inp.Kmax)}) : σh tête = ${f(inp.Kmax)} × ${f(sigTop)} = ${f(inp.Kmax * sigTop)} kPa ; σh pied = ${f(inp.Kmax)} × ${f(sigBot)} = ${f(inp.Kmax * sigBot)} kPa`, "Guide SETRA PICF"),
+    FORMULA(`Poussée minimale (K = Kmin = ${f(inp.Kmin)}) : σh tête = ${f(inp.Kmin)} × ${f(sigTop)} = ${f(inp.Kmin * sigTop)} kPa ; σh pied = ${f(inp.Kmin)} × ${f(sigBot)} = ${f(inp.Kmin * sigBot)} kPa`),
+    FORMULA(`Résultante sur un piédroit (Kmax) : Fh = (σh tête + σh pied)/2 × H = (${f(inp.Kmax * sigTop)} + ${f(inp.Kmax * sigBot)})/2 × ${f(Hout)} = ${f(((inp.Kmax * sigTop + inp.Kmax * sigBot) / 2) * Hout)} kN/m, appliquée à ${f((Hout / 3) * (2 * inp.Kmax * sigTop + inp.Kmax * sigBot) / (inp.Kmax * sigTop + inp.Kmax * sigBot))} m au-dessus de la sous-face du radier`),
+    FORMULA(`Résultante sur un piédroit (Kmin) : Fh = (${f(inp.Kmin * sigTop)} + ${f(inp.Kmin * sigBot)})/2 × ${f(Hout)} = ${f(((inp.Kmin * sigTop + inp.Kmin * sigBot) / 2) * Hout)} kN/m`),
     P(inp.pousseeMode === "repos" ? "Hypothèse retenue : terres au repos K0 = 1 − sin φ' ; la poussée minimale est une fraction de K0."
       : inp.pousseeMode === "active" ? "Hypothèse retenue : poussée active de Rankine Ka = tan²(45° − φ'/2), justifiée par un déplacement suffisant des piédroits ; la poussée minimale est une fraction de Ka."
       : "Hypothèse retenue : encadrement de la poussée entre Kmin et Kmax (guide SETRA PICF)."),
@@ -291,6 +308,45 @@ export async function buildNoteDocx(study: Study, images: NoteImages): Promise<B
       [...an.combos].sort((a, b) => ["ELU", "ELS", "EC2"].indexOf(a.state) - ["ELU", "ELS", "EC2"].indexOf(b.state) || a.id.localeCompare(b.id))
         .map((c) => [c.id, c.state, c.label]), [0.12, 0.1, 0.78]));
 
+  // Décomposition d'une valeur extrême de l'enveloppe : combinaison gouvernante et part de chaque cas.
+  const detailRows = () => {
+    const rows: string[][] = [];
+    const part = (env: typeof an.elu, off: number, q: number, isMax: boolean) => {
+      const ci = isMax ? env.cMax[off + q] : env.cMin[off + q];
+      const cb = an.combos[ci];
+      const P = cb.earth === "max" ? an.cases.Pmax : an.cases.Pmin;
+      const t = cb.convoy >= 0 ? an.traffic[cb.convoy] : null;
+      const g = cb.gG * an.cases.G[off + q], pp = cb.gP * P[off + q];
+      const qq = t ? cb.gQ * (isMax ? t.max[off + q] + Math.max(0, an.cases.Qr[off + q]) : t.min[off + q] + Math.min(0, an.cases.Qr[off + q])) : 0;
+      return { cb, g, pp, qq, tot: isMax ? env.max[off + q] : env.min[off + q] };
+    };
+    for (const m of an.model.members) {
+      const pos = (k: number) => {
+        const nd = an.model.nodes[m.nodes[k]], n0 = an.model.nodes[m.nodes[0]];
+        return `${m.kind === "dalle" || m.kind === "radier" ? "x" : "y"} = ${f(Math.hypot(nd.x - n0.x, nd.y - n0.y))} m`;
+      };
+      const pick = (env: typeof an.elu, off: number, isMax: boolean) => {
+        let kk = 0;
+        m.nodes.forEach((_, k) => {
+          const v = isMax ? env.max[off + m.station0 + k] : env.min[off + m.station0 + k];
+          const b = isMax ? env.max[off + m.station0 + kk] : env.min[off + m.station0 + kk];
+          if (isMax ? v > b : v < b) kk = k;
+        });
+        return kk;
+      };
+      const items: [string, typeof an.elu, number, boolean][] = [
+        ["M ELU max", an.elu, 0, true], ["M ELU min", an.elu, 0, false], ["M ELS max", an.els, 0, true], ["M ELS min", an.els, 0, false],
+        ["V ELU max", an.elu, ns, true], ["V ELU min", an.elu, ns, false], ["N ELU min", an.elu, 2 * ns, false],
+      ];
+      for (const [lab, env, off, isMax] of items) {
+        const k = pick(env, off, isMax);
+        const d = part(env, off, m.station0 + k, isMax);
+        rows.push([m.label, lab, pos(k), `${d.cb.id} : ${d.cb.label}`, f(d.g, 1), f(d.pp, 1), f(d.qq, 1), f(d.tot, 1)]);
+      }
+    }
+    return rows;
+  };
+
   // 16. Sollicitations
   body.push(H1("14. Sollicitations"),
     table(["Barre", "M ELU max", "M ELU min", "M ELS max", "M ELS min", "V ELU |max|", "N ELU min"],
@@ -305,6 +361,9 @@ export async function buildNoteDocx(study: Study, images: NoteImages): Promise<B
           f(r(an.els.max, 0, Math.max, -Infinity), 1), f(r(an.els.min, 0, Math.min, Infinity), 1), f(vmax, 1), f(r(an.elu.min, 2 * ns, Math.min, Infinity), 1)];
       }), [0.28, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12]),
     P("Unités : kN·m/m et kN/m. Convention : M > 0 tend la face inférieure de la dalle, la face inférieure du radier et la face droite des piédroits ; N > 0 en traction.", { italic: true, size: 17 }),
+    H2("Détail des valeurs du tableau"),
+    P("Chaque valeur extrême est la somme des cas de charge élémentaires, pondérés par la combinaison qui la gouverne : γG·G (poids propre, remblai et chaussée), γP·P (poussée des terres Kmax ou Kmin), γQ·(trafic + surcharge de remblai q). Les effets du trafic sont caractéristiques, majorés du coefficient dynamique δ, à la position la plus défavorable du convoi. La section est repérée par son abscisse le long de la barre.", { size: 18 }),
+    table(["Barre", "Effet", "Section", "Combinaison", "γG·G", "γP·P", "γQ·(Q + q)", "Total"], detailRows(), [0.17, 0.09, 0.09, 0.29, 0.09, 0.09, 0.09, 0.09]),
     ...image(images.moments, 600, "Figure 2 — Enveloppe des moments fléchissants ELU (kN·m/m), tracée côté fibre tendue."),
     ...image(images.tranchant, 600, "Figure 3 — Enveloppe des efforts tranchants ELU (kN/m)."),
     ...image(images.moments3d, 600, "Figure 3 bis — Enveloppe des moments ELU tracée sur la maquette 3D, valeurs extrêmes repérées (rouge : moments positifs, bleu : moments négatifs)."),
@@ -415,9 +474,9 @@ export async function buildNoteDocx(study: Study, images: NoteImages): Promise<B
 
   const header = new Header({
     children: [new Paragraph({
-      border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "1E3A5F", space: 4 } },
+      border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "000000", space: 4 } },
       children: [
-        new TextRun({ text: `Note de calcul — ${id.projet} — ${id.ouvrage}`, size: 16, font: FONT, color: "1E3A5F", bold: true }),
+        new TextRun({ text: `Note de calcul — ${id.projet} — ${id.ouvrage}`, size: 16, font: FONT, color: "000000", bold: true }),
         new TextRun({ text: `\tAuteur : ${id.auteur}`, size: 16, font: FONT, color: "475569" }),
       ],
       tabStops: [{ type: "right", position: 9638 }],
@@ -441,7 +500,7 @@ export async function buildNoteDocx(study: Study, images: NoteImages): Promise<B
     styles: {
       default: { document: { run: { font: FONT, size: 20 } } },
       paragraphStyles: [
-        { id: "Heading1", name: "Heading 1", basedOn: "Normal", next: "Normal", quickFormat: true, run: { font: FONT, size: 28, bold: true, color: "1E3A5F" } },
+        { id: "Heading1", name: "Heading 1", basedOn: "Normal", next: "Normal", quickFormat: true, run: { font: FONT, size: 28, bold: true, color: "000000" } },
         { id: "Heading2", name: "Heading 2", basedOn: "Normal", next: "Normal", quickFormat: true, run: { font: FONT, size: 23, bold: true, color: "334155" } },
       ],
     },
