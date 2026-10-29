@@ -212,6 +212,7 @@ export const FIELDS: FieldDef[] = [
   { key: "murTeteEp", section: "tetes", group: "Mur de tête", label: "Épaisseur du mur de tête", unit: "m", kind: "number", default: 0.2, min: 0.15, max: 0.5, step: 0.01 },
   { key: "murTeteRevanche", section: "tetes", group: "Mur de tête", label: "Revanche au-dessus de la chaussée", unit: "m", kind: "number", default: 0.2, min: 0, max: 1, step: 0.05 },
   { key: "radierTeteLong", section: "tetes", group: "Radiers de tête et bêches", label: "Longueur des radiers de tête", unit: "m", kind: "number", default: 1.5, min: 0, max: 5, step: 0.1 },
+  { key: "radierDebord", section: "tetes", group: "Radiers de tête et bêches", label: "Débord latéral du radier de tête au droit de l'ouvrage (chaque côté)", unit: "m", kind: "number", default: 0, min: 0, max: 3, step: 0.05, help: "Petite base du radier de tête = largeur de l'ouvrage + 2 × débord. Grande base = petite base + 2 × longueur × tan(angle des ailes)." },
   { key: "becheProf", section: "tetes", group: "Radiers de tête et bêches", label: "Profondeur des bêches parafouilles", unit: "m", kind: "number", default: 0.8, min: 0, max: 3, step: 0.05 },
   { key: "becheEp", section: "tetes", group: "Radiers de tête et bêches", label: "Épaisseur des bêches", unit: "m", kind: "number", default: 0.25, min: 0.15, max: 0.6, step: 0.01 },
   { key: "guideRoues", section: "tetes", group: "Équipements", label: "Guide-roues sur murs de tête", kind: "bool", default: true },
@@ -313,7 +314,7 @@ export type DalotInput = {
   tanDiff: number; pas: number;
   tetes: {
     murs: boolean; angle: number; long: number; ep: number; semelle: number; semEp: number; patin: number; beche: number;
-    murTeteEp: number; revanche: number; radierLong: number; becheProf: number; becheEp: number; guideRoues: boolean; gardeCorps: boolean;
+    murTeteEp: number; revanche: number; radierLong: number; debord: number; becheProf: number; becheEp: number; guideRoues: boolean; gardeCorps: boolean;
   };
   talus: { actif: boolean; pente: number; phi: number; c: number };
   hydro: {
@@ -400,7 +401,7 @@ export function toInput(spec: DalotSpec): DalotInput {
       murs: v.teteMurs === true, angle: num(v.aileAngle, 30), long: num(v.aileLong, 2.5), ep: num(v.aileEp, 0.25),
       semelle: num(v.aileSemelle, 2.4), semEp: num(v.aileSemEp, 0.3), patin: num(v.aileTalon, 0.4), beche: num(v.aileBeche, 0),
       murTeteEp: num(v.murTeteEp, 0.2), revanche: num(v.murTeteRevanche, 0.2),
-      radierLong: num(v.radierTeteLong, 1.5), becheProf: num(v.becheProf, 0.8), becheEp: num(v.becheEp, 0.25),
+      radierLong: num(v.radierTeteLong, 1.5), debord: Math.max(0, num(v.radierDebord, 0)), becheProf: num(v.becheProf, 0.8), becheEp: num(v.becheEp, 0.25),
       guideRoues: v.guideRoues === true, gardeCorps: v.gardeCorps === true,
     },
     talus: { actif: v.talusActif === true, pente: num(v.talusPente, 1.5), phi: num(v.talusPhi, 30), c: num(v.talusC, 0) },

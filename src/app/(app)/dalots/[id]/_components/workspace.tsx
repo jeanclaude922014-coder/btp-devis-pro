@@ -10,7 +10,7 @@ import type { CheckStatus } from "@/lib/dalot/checks";
 import type { GroupId } from "@/lib/dalot/design";
 import { optimizeThicknesses, runStudy, type RunOutcome } from "@/lib/dalot/engine";
 import { FIELD_BY_KEY, normalizeSpec, type DalotSpec, type FieldValue } from "@/lib/dalot/fields";
-import { FieldsPanel, GeometryAside, HydroAside, sectionState, type SpecApi } from "./data-panels";
+import { FieldsPanel, GeometryAside, HeadsAside, HydroAside, sectionState, type SpecApi } from "./data-panels";
 import { downloadText, slug } from "./download";
 import {
   ChecksPanel, CombosPanel, DesignPanel, EffortsPanel, HeadsPanel, NotePanel, PlansPanel, QuantitiesPanel, StatusBadge, SynthesePanel,
@@ -200,7 +200,7 @@ export function DalotWorkspace({ id, seriesName, initialSpec, projects }: {
           {current.section ? (
             <FieldsPanel
               section={current.section} title={current.label} intro={current.intro ?? ""} api={api}
-              aside={current.section === "geometrie" ? <GeometryAside spec={spec} />
+              aside={current.section === "geometrie" ? <GeometryAside spec={spec} /> : current.section === "tetes" ? <HeadsAside api={api} />
                 : current.section === "hydro" ? <HydroAside outcome={outcome} />
                 : current.section === "convois" && study ? <ConvoySummary outcome={outcome} /> : undefined}
             />

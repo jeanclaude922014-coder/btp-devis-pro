@@ -353,15 +353,15 @@ function geo(study: Study) {
   const tanA = Math.tan(hg.a);
   const xl = Math.max(radL, hg.along);
   const gc = t.gardeCorps;
-  return { inp, B, Hout, cells, n, hg, t, ept, yTop, radL, tanA, xl, gc, L: inp.L, a: hg.a };
+  return { inp, B, Hout, cells, n, hg, t, ept, yTop, radL, tanA, xl, gc, L: inp.L, a: hg.a, d: t.debord };
 }
 
 // ── Vues de coffrage ───────────────────────────────────────
 
 function vuePlan(study: Study, detail: boolean): View {
   const g = geo(study);
-  const { B, L, t, hg, xl, ept, radL, cells } = g;
-  const acr = hg.across + (t.murs ? t.ep : 0);
+  const { B, L, t, hg, xl, ept, radL, cells, d } = g;
+  const acr = hg.across + (t.murs ? t.ep : 0) + d;
   return {
     ext: { x0: -xl, y0: -acr, w: L + 2 * xl, h: B + 2 * acr },
     pad: { l: 22, r: 22, b: 12, t: 24 },
@@ -374,10 +374,10 @@ function vuePlan(study: Study, detail: boolean): View {
         if (radL > 0) {
           const wl = t.murs ? radL * g.tanA : 0;
           const xr = xe + side * radL;
-          p.poly([[xe, 0], [xr, -wl], [xr, B + wl], [xe, B]], "COFFRAGE", true);
+          p.poly([[xe, -d], [xr, -d - wl], [xr, B + d + wl], [xe, B + d]], "COFFRAGE", true);
           if (t.becheProf > 0) {
             const xb = xr - side * t.becheEp;
-            p.line([xb, -(radL - t.becheEp) * (t.murs ? g.tanA : 0)], [xb, B + (radL - t.becheEp) * (t.murs ? g.tanA : 0)], "AXES");
+            p.line([xb, -d - (radL - t.becheEp) * (t.murs ? g.tanA : 0)], [xb, B + d + (radL - t.becheEp) * (t.murs ? g.tanA : 0)], "AXES");
             p.text([xr - side * (t.becheEp / 2) - p.th(1), B / 2], 2.4, `BÊCHE ${cmTxt(t.becheEp)} × ${cmTxt(t.becheProf)} (cachée)`, "TEXTE", "center", 90);
           }
           p.bubble([xe + side * radL * 0.55, B / 2], cmTxt(g.inp.er), 6);
@@ -388,8 +388,8 @@ function vuePlan(study: Study, detail: boolean): View {
             const sy = edge === 0 ? -1 : 1;
             const d: Pt = [side * Math.cos(g.a), sy * Math.sin(g.a)];
             const nn: Pt = [-side * Math.sin(g.a), sy * Math.cos(g.a)];
-            const A: Pt = [xe, edge];
-            const Bw: Pt = [xe + d[0] * t.long, edge + d[1] * t.long];
+            const A: Pt = [xe, edge + sy * g.d];
+            const Bw: Pt = [A[0] + d[0] * t.long, A[1] + d[1] * t.long];
             p.poly([A, Bw, [Bw[0] + nn[0] * t.ep, Bw[1] + nn[1] * t.ep], [A[0] + nn[0] * t.ep, A[1] + nn[1] * t.ep]], "COFFRAGE", true);
             const mid: Pt = [xe + d[0] * t.long * 0.5 + nn[0] * (t.ep + p.th(3)), edge + d[1] * t.long * 0.5 + nn[1] * (t.ep + p.th(3))];
             let rot = (Math.atan2(d[1], d[0]) * 180) / Math.PI;
@@ -413,13 +413,13 @@ function vuePlan(study: Study, detail: boolean): View {
       p.text([-xl + p.th(2), B + p.th(2)], 2.6, "AMONT", "TEXTE");
       p.text([L + xl - p.th(2), B + p.th(2)], 2.6, "AVAL", "TEXTE", "right");
       // Cotes
-      const yD = B + hg.across + (t.murs ? t.ep : 0);
+      const yD = B + acr;
       p.chainH([-xl, 0, L, L + xl], yD, yD + p.th(14), false);
       const xs2 = ept > 0 ? [-xl, 0, ept, L - ept, L, L + xl] : [-xl, 0, L, L + xl];
       p.chainH(xs2, yD, yD + p.th(8), false);
-      const ys = [-hg.across, 0, ...cells.flatMap((c) => [c.x0, c.x1]), B, B + hg.across].filter((v, i, arr) => i === 0 || v - arr[i - 1] > 1e-6);
+      const ys = [-hg.across - d, -d, 0, ...cells.flatMap((c) => [c.x0, c.x1]), B, B + d, B + d + hg.across].filter((v, i, arr) => i === 0 || v - arr[i - 1] > 1e-6);
       p.chainV(ys, L + xl, L + xl + p.th(8), false);
-      if (hg.across > 0) p.dimV(-hg.across, B + hg.across, -xl, -xl - p.th(8));
+      if (hg.across + d > 0) p.dimV(-hg.across - d, B + hg.across + d, -xl, -xl - p.th(8));
       if (detail) {
         p.circle([L, 0], p.th(8), "COFFRAGE", true);
         leader(p, [L + p.th(5), -p.th(6)], [L + p.th(4), -hg.across - p.th(4)], "Détail", 3.2);
@@ -557,7 +557,7 @@ function coupeTrans(study: Study): View {
 function elevationTete(study: Study): View {
   const g = geo(study);
   const { inp, B, cells, hg, t, yTop } = g;
-  const acr = hg.across;
+  const acr = hg.across + g.d;
   return {
     ext: { x0: -acr, y0: -t.becheProf, w: B + 2 * acr, h: yTop + t.becheProf },
     pad: { l: 22, r: 10, b: 14, t: 18 },
@@ -709,9 +709,9 @@ function notesBox(pg: Page, ctx: Ctx, r: Region) {
  * Perspective axonométrique vectorielle de la maquette 3D (arêtes du béton, aciers barre par barre,
  * convoi et diffusion, enveloppe des moments) : elle passe telle quelle dans le DXF, le SVG et le PDF.
  */
-function perspective(study: Study, o: Scene3DOptions, az = -0.7, el = 0.52): View {
+function perspective(study: Study, o: Scene3DOptions, az = -0.7, el = 0.52, withLabels: false | "all" | "effort" = false): View {
   const gov = o.convoy ? governing(study, o.convoy) : null;
-  const { scene } = buildScene(study, o, gov);
+  const { scene, labels } = buildScene(study, o, gov);
   scene.updateMatrixWorld(true);
   const R = [Math.cos(az), 0, -Math.sin(az)];
   const U = [-Math.sin(el) * Math.sin(az), Math.cos(el), -Math.sin(el) * Math.cos(az)];
@@ -725,6 +725,7 @@ function perspective(study: Study, o: Scene3DOptions, az = -0.7, el = 0.52): Vie
     if ((obj as THREE.LineSegments).isLineSegments) {
       geo = (obj as THREE.LineSegments).geometry as THREE.BufferGeometry;
       layer = ud === "ACIERS" || ud === "MOMENTS_MAX" ? "ACIERS" : ud === "REPARTITION" ? "REPARTITION" : ud === "MOMENTS_MIN" ? "COTATION" : "COFFRAGE";
+      if (ud === "PRESSIONS") layer = "TERRAIN";
     } else if ((obj as THREE.Mesh).isMesh && (ud === "DIFFUSION" || ud === "CONVOI")) {
       geo = new THREE.EdgesGeometry((obj as THREE.Mesh).geometry as THREE.BufferGeometry);
       layer = "TERRAIN";
@@ -744,27 +745,50 @@ function perspective(study: Study, o: Scene3DOptions, az = -0.7, el = 0.52): Vie
   return {
     ext: { x0, y0, w: x1 - x0, h: y1 - y0 },
     pad: { l: 4, r: 4, b: 4, t: 4 },
-    draw: (p) => { for (const sg of segs) p.line(sg.a, sg.b, sg.layer); },
+    draw: (p) => {
+      for (const sg of segs) p.line(sg.a, sg.b, sg.layer);
+      if (!withLabels) return;
+      // Étiquettes de la maquette : texte encadré, rappel vers le point annoté.
+      for (const l of labels.filter((x) => withLabels === "all" || x.kind === "effort")) {
+        v.copy(l.p);
+        const q = pr();
+        const w = p.th(l.text.length * 1.18 + 2), h = p.th(3.2);
+        const at: Pt = [q[0] + p.th(4), q[1] + p.th(4)];
+        p.line(q, [at[0], at[1]], "COTATION");
+        p.rect(at[0], at[1] - h / 2, w, h, l.kind === "effort" ? "COTATION" : l.kind === "load" ? "TERRAIN" : "CADRE");
+        p.text([at[0] + w / 2, at[1] - p.th(0.75)], 1.9, l.text, l.kind === "effort" ? "COTATION" : l.kind === "load" ? "TERRAIN" : "TEXTE", "center", 0, true);
+      }
+    },
   };
 }
 
-function perspectivesSheet(pg: Page, ctx: Ctx, area: Region, below: boolean) {
+const P3D_BASE: Scene3DOptions = { concrete: "transparent", fill: false, convoy: "", rebar: false, cut: false, efforts: false };
+
+/** Planche « Perspectives 3D » 1/2 : maquette ferraillée pleine page. */
+function perspectiveRebarSheet(pg: Page, ctx: Ctx, area: Region, below: boolean) {
+  pg.place(area, perspective(ctx.study, { ...P3D_BASE, rebar: true }), { text: "MAQUETTE 3D FERRAILLÉE — TOUT LE FERRAILLAGE, BARRE PAR BARRE", pos: below ? "below" : "above", scale: false, size: 4 });
+  pg.text(area.x + 3, below ? area.y + area.h - 5 : area.y + 3, 2, "Rouge : aciers principaux ; bleu : aciers de répartition. Corps, murs et radiers de tête, bêches, murs en aile, semelles et garde-corps. Perspective axonométrique, sans échelle.", "left");
+}
+
+/** Planche « Perspectives 3D » 2/2 : convoi, pressions et enveloppes d'efforts annotées. */
+function perspectiveLoadsSheet(pg: Page, ctx: Ctx, area: Region, below: boolean) {
   const study = ctx.study;
   const cv = study.analysis.traffic.find((x) => x.positions.length)?.def.id ?? "";
   const cvLabel = study.analysis.traffic.find((x) => x.def.id === cv)?.def.label ?? "";
-  const base: Scene3DOptions = { concrete: "transparent", fill: false, convoy: "", rebar: false, cut: false, efforts: false };
   const pos = below ? "below" : "above";
-  const xm = area.x + area.w * 0.56;
+  const xm = area.x + area.w * 0.6;
   pg.line(xm, area.y, xm, area.y + area.h, "CADRE");
   pg.line(xm, area.y + area.h / 2, area.x + area.w, area.y + area.h / 2, "CADRE");
-  pg.place({ x: area.x, y: area.y, w: xm - area.x, h: area.h }, perspective(study, { ...base, rebar: true }), { text: "MAQUETTE 3D FERRAILLÉE — TOUT LE FERRAILLAGE, BARRE PAR BARRE", pos, scale: false, size: 3.4 });
-  pg.place({ x: xm, y: area.y + area.h / 2, w: area.x + area.w - xm, h: area.h / 2 }, perspective(study, { ...base, convoy: cv }), { text: cv ? `CONVOI ${cvLabel} À SA POSITION LA PLUS DÉFAVORABLE` : "MAQUETTE 3D DE L'OUVRAGE", pos, scale: false, size: 3 });
-  pg.place({ x: xm, y: area.y, w: area.x + area.w - xm, h: area.h / 2 }, perspective(study, { ...base, efforts: true }, -0.3, 0.2), { text: "ENVELOPPE DES MOMENTS ELU SUR LA MAQUETTE", pos, scale: false, size: 3 });
-  // Légendes : en haut des zones quand les titres sont dessous, en bas sinon.
+  pg.place({ x: area.x, y: area.y, w: xm - area.x, h: area.h }, perspective(study, { ...P3D_BASE, convoy: cv, pressures: true }, -0.7, 0.52, "all"),
+    { text: cv ? `CONVOI ${cvLabel} À SA POSITION LA PLUS DÉFAVORABLE — CHARGES ET PRESSIONS` : "MAQUETTE 3D ANNOTÉE — PRESSIONS", pos, scale: false, size: 3.2 });
+  pg.place({ x: xm, y: area.y + area.h / 2, w: area.x + area.w - xm, h: area.h / 2 }, perspective(study, { ...P3D_BASE, efforts: true }, -0.45, 0.35, "effort"),
+    { text: "ENVELOPPE DES MOMENTS ELU", pos, scale: false, size: 3 });
+  pg.place({ x: xm, y: area.y, w: area.x + area.w - xm, h: area.h / 2 }, perspective(study, { ...P3D_BASE, efforts: true, effortKind: "V" }, -0.45, 0.35, "effort"),
+    { text: "ENVELOPPE DES EFFORTS TRANCHANTS ELU", pos, scale: false, size: 3 });
   const ly = (top: number, bottom: number) => (below ? top - 5 : bottom + 3);
-  pg.text(xm + 3, ly(area.y + area.h, area.y + area.h / 2), 1.8, "Orange : roues et volumes de diffusion jusqu'au feuillet moyen de la dalle.", "left");
-  pg.text(xm + 3, ly(area.y + area.h / 2, area.y), 1.8, "Rouge : moments positifs ; bleu : moments négatifs (ELU).", "left");
-  pg.text(area.x + 3, ly(area.y + area.h, area.y), 1.8, "Rouge : aciers principaux ; bleu : aciers de répartition. Perspective axonométrique, sans échelle.", "left");
+  pg.text(area.x + 3, ly(area.y + area.h, area.y), 1.8, "Brun : roues et volumes de diffusion jusqu'au feuillet moyen, poussée des terres (Kmax, surcharge incluse), pression du sol (ELS). Bleu : valeurs d'efforts.", "left");
+  pg.text(xm + 3, ly(area.y + area.h, area.y + area.h / 2), 1.8, "Rouge : moments positifs ; bleu : moments négatifs (kN·m/m).", "left");
+  pg.text(xm + 3, ly(area.y + area.h / 2, area.y), 1.8, "Vert : efforts tranchants max / min (kN/m).", "left");
 }
 
 // ── Ouvrages de tête ───────────────────────────────────────
@@ -772,10 +796,10 @@ function perspectivesSheet(pg: Page, ctx: Ctx, area: Region, below: boolean) {
 /** Vue en plan d'une tête (amont) : radier de tête, murs en aile, mur de tête, ferraillage. */
 function vuePlanTete(ctx: Ctx, detail: boolean): View {
   const g = geo(ctx.study);
-  const { inp, B, t, hg, radL, ept } = g;
+  const { inp, B, t, hg, radL, ept, d: db } = g;
   const c = inp.cover;
   const tan = t.murs ? g.tanA : 0;
-  const acr = hg.across + (t.murs ? t.ep : 0) + 0.1;
+  const acr = hg.across + (t.murs ? t.ep : 0) + 0.1 + db;
   const yMax = Math.max(radL, hg.along) + 0.1;
   const em = Math.max(ept, 0.2);
   return {
@@ -795,12 +819,12 @@ function vuePlanTete(ctx: Ctx, detail: boolean): View {
       if (mr) tag(p, ctx, [B * 0.7, -em + c], [B * 0.7, yMax + p.th(14)], mr, 6);
       // Radier de tête
       if (radL > 0) {
-        const xl = (y: number) => -y * tan, xr = (y: number) => B + y * tan;
-        p.poly([[0, 0], [B, 0], [xr(radL), radL], [xl(radL), radL]], "COFFRAGE", true);
+        const xl = (y: number) => -db - y * tan, xr = (y: number) => B + db + y * tan;
+        p.poly([[-db, 0], [B + db, 0], [xr(radL), radL], [xl(radL), radL]], "COFFRAGE", true);
         if (t.becheProf > 0) p.line([xl(radL - t.becheEp), radL - t.becheEp], [xr(radL - t.becheEp), radL - t.becheEp], "AXES");
         for (let y = c; y <= radL - c + 1e-9; y += 0.2) p.line([xl(y) + c, y], [xr(y) - c, y], "ACIERS");
         for (let x = xl(radL) + c; x <= xr(radL) - c + 1e-9; x += 0.2) {
-          const y0 = x < 0 && tan > 0 ? -x / tan : x > B && tan > 0 ? (x - B) / tan : 0;
+          const y0 = x < -db && tan > 0 ? (-db - x) / tan : x > B + db && tan > 0 ? (x - B - db) / tan : 0;
           if (y0 < radL - c) p.line([x, y0 + c], [x, radL - c], "REPARTITION");
         }
         const ti = ctx.bar("RADIER DE TÊTE", "Nappe inférieure"), ts = ctx.bar("RADIER DE TÊTE", "Nappe supérieure"), tl = ctx.bar("RADIER DE TÊTE", "Barres longitudinales");
@@ -815,7 +839,7 @@ function vuePlanTete(ctx: Ctx, detail: boolean): View {
       // Murs en aile : deux nappes et barres verticales vues en bout
       if (t.murs) {
         for (const side of [-1, 1] as const) {
-          const x0 = side < 0 ? 0 : B;
+          const x0 = side < 0 ? -db : B + db;
           const d: Pt = [side * Math.sin(g.a), Math.cos(g.a)];
           const nn: Pt = [side * Math.cos(g.a), -Math.sin(g.a)];
           const A: Pt = [x0, 0], E: Pt = [x0 + d[0] * t.long, d[1] * t.long];
@@ -837,7 +861,7 @@ function vuePlanTete(ctx: Ctx, detail: boolean): View {
           leader(p, [-p.th(6), p.th(6)], [-acr - p.th(2), radL * 0.3 + p.th(10)], "Détail", 4);
         }
       }
-      p.chainH([-hg.across, 0, B, B + hg.across].filter((v, i, a) => i === 0 || v - a[i - 1] > 1e-6), -em - 0.5, -em - 0.5 - p.th(6), false);
+      p.chainH([-hg.across - db, -db, 0, B, B + db, B + db + hg.across].filter((v, i, a) => i === 0 || v - a[i - 1] > 1e-6), -em - 0.5, -em - 0.5 - p.th(6), false);
     },
   };
 }
@@ -1083,17 +1107,18 @@ function byDiameter(bars: BarMark[]) {
 /** Tableau de nomenclature (une ou deux colonnes de tableau sur la planche). Rend la hauteur occupée. */
 function nomenclatureTable(pg: Page, ctx: Ctx, bars: BarMark[], r: Region, titleTxt: string, reserveB: number) {
   const cafe = ctx.model === "cafe";
+  // La désignation (élément et rôle de la barre) précède le schéma coté, comme sur les nomenclatures types.
   const cols: Col[] = cafe
     ? [
-      { head: "Position", w: 14 }, { head: "Nuance", sub: "d'acier", w: 15 }, { head: "Diamètre", w: 14 },
-      { head: "Nombre", sub: "dans un élém.", w: 16 }, { head: "", sub: "élément", w: 13 }, { head: "", sub: "total", w: 13 },
-      { head: "Esp", sub: "(m)", w: 12 }, { head: "Longueur", sub: "(m)", w: 15 }, { head: "Longueur", sub: "total (m)", w: 17 },
-      { head: "Schéma (cm)", w: 56 },
+      { head: "Pos.", w: 10 }, { head: "Nuance", sub: "d'acier", w: 13 }, { head: "Ø", w: 9 },
+      { head: "Nombre", sub: "dans un élém.", w: 13 }, { head: "", sub: "élément", w: 11 }, { head: "", sub: "total", w: 11 },
+      { head: "Esp", sub: "(m)", w: 10 }, { head: "Long.", sub: "(m)", w: 12 }, { head: "Long.", sub: "total (m)", w: 14 },
+      { head: "Désignation", w: 50 }, { head: "Schéma (cm)", w: 42 },
     ]
     : [
-      { head: "Repère", w: 12 }, { head: "Nbre", sub: "par élém.", w: 15 }, { head: "HA", w: 10 }, { head: "Long.", sub: "1 barre (cm)", w: 17 },
-      { head: "Écart.", sub: "(cm)", w: 13 }, { head: "Nbre élém.", sub: "ident.", w: 15 }, { head: "Nbre total", sub: "barres", w: 15 },
-      { head: "Longueur", sub: "totale (m)", w: 17 }, { head: "CROQUIS", w: 56 },
+      { head: "Repère", w: 11 }, { head: "Désignation", w: 50 }, { head: "HA", w: 9 }, { head: "Nombre", sub: "élém. × barres", w: 18 },
+      { head: "Long.", sub: "1 barre (cm)", w: 15 }, { head: "Écart.", sub: "(cm)", w: 12 }, { head: "Nbre total", sub: "barres", w: 14 },
+      { head: "Longueur", sub: "totale (m)", w: 15 }, { head: "CROQUIS", w: 42 },
     ];
   const tw = cols.reduce((s, c) => s + c.w, 0);
   const headH = 12, rowH = 10.5;
@@ -1122,13 +1147,17 @@ function nomenclatureTable(pg: Page, ctx: Ctx, bars: BarMark[], r: Region, title
     y -= headH;
     for (const b of chunk) {
       const per1 = b.count / b.nElem;
+      const desig = `${b.element.charAt(0)}${b.element.slice(1).toLocaleLowerCase("fr-FR")} : ${b.designation.charAt(0).toLocaleLowerCase("fr-FR")}${b.designation.slice(1)}`;
       const vals = cafe
         ? [ctx.label(b), `FeE${ctx.study.input.fe}`, String(b.phi), fmt(per1, 0), b.nElem > 1 ? `1x${b.nElem}` : "1", String(b.count),
-          b.s > 0 ? fmt(b.s, 2) : b.spacingLabel, fmt(b.length), fmt(b.totalLength)]
-        : [ctx.label(b), fmt(per1, 0), String(b.phi), String(Math.round(b.length * 100)), b.s > 0 ? String(Math.round(b.s * 100)) : b.spacingLabel,
-          String(b.nElem), String(b.count), fmt(b.totalLength)];
+          b.s > 0 ? fmt(b.s, 2) : b.spacingLabel, fmt(b.length), fmt(b.totalLength), ""]
+        : [ctx.label(b), "", String(b.phi), b.nElem > 1 ? `${b.nElem}x${fmt(per1, 0)}` : fmt(per1, 0), String(Math.round(b.length * 100)),
+          b.s > 0 ? String(Math.round(b.s * 100)) : b.spacingLabel, String(b.count), fmt(b.totalLength)];
+      const di = cols.findIndex((c) => c.head === "Désignation");
       for (let i = 0; i < cols.length; i++) pg.rect(xs[i], y - rowH, cols[i].w, rowH);
-      vals.forEach((v, i) => pg.text((xs[i] + xs[i + 1]) / 2, y - rowH / 2 - 1, i === 0 ? 2.6 : 2.2, v, "center", i === 0));
+      vals.forEach((v, i) => { if (v) pg.text((xs[i] + xs[i + 1]) / 2, y - rowH / 2 - 1, i === 0 ? 2.6 : 2.2, v, "center", i === 0); });
+      const dl = wrap(desig, 34, 3);
+      dl.forEach((l, k) => pg.text(xs[di] + 1.2, y - rowH / 2 + (dl.length - 1) * 1.5 - k * 3 - 0.6, 1.6, l, "left"));
       const last = cols.length - 1;
       sketch(pg.pen, b, pg.u((xs[last] + xs[last + 1]) / 2), pg.u(y - rowH / 2 - 0.5), pg.u(cols[last].w - 22), pg.u(rowH - 3.5));
       y -= rowH;
@@ -1411,7 +1440,8 @@ export function buildModelSheets(study: Study, model: Model): Sheet[] {
   }
 
   // Perspectives 3D (maquette ferraillée, convoi, moments), en fin de dossier.
-  list.push({ id: "perspectives-3d", title: "Perspectives 3D", draw: (pg) => perspectivesSheet(pg, ctx, area, model === "cafe") });
+  list.push({ id: "perspectives-3d", title: "Perspectives 3D — maquette ferraillée", draw: (pg) => perspectiveRebarSheet(pg, ctx, area, model === "cafe") });
+  list.push({ id: "perspectives-charges", title: "Perspectives 3D — charges et sollicitations", draw: (pg) => perspectiveLoadsSheet(pg, ctx, area, model === "cafe") });
 
   // Rendu : chaque planche à droite de la précédente, cartouche selon le modèle.
   const total = list.length;

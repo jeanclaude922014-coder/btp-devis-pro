@@ -66,6 +66,8 @@ export type Analysis = {
   ec2: Envelope;
   /** Combinaisons à vide (sans trafic) pour la vérification du contact du radier. */
   quantities: { ns: number; nRaft: number };
+  /** Matrice d'influence IM[q·nTop + j] (effet q d'une charge unitaire au nœud j de la dalle). */
+  influence: { IM: Flat; nTop: number; xTop: number[] };
 };
 
 export function flat(r: Response): Flat {
@@ -264,6 +266,7 @@ export function runAnalysis(inp: DalotInput): Analysis {
   return {
     model, ctx, D, nq,
     cases: { G, Pmax, Pmin, Qr },
+    influence: { IM, nTop, xTop },
     caseLoads: { gTop, selfTop, selfRaft, selfWalls },
     traffic, combos,
     elu: envelope("ELU"), els: envelope("ELS"), ec2: envelope("EC2"),
@@ -375,4 +378,25 @@ function isSymmetric(blocks: StripBlock[]) {
   const a = blocks.map(key).sort().join(";");
   const m = blocks.map(mirror).sort().join(";");
   return a === m;
+}
+
+/**
+ * « Simulation dynamique » : effet q (moment, effort tranchant…) pendant le passage d'un convoi,
+ * position par position (essieu de référence en X). Le maximum des courbes est l'enveloppe exacte.
+ */
+export function trafficHistory(an: Analysis, inp: DalotInput, t: TrafficEnvelope, q: number) {
+  const { IM, nTop, xTop } = an.influence;
+  const m = an.model;
+  const spread = transverseSpread(inp);
+  const blocksBy = t.def.configs.map((cfg) => stripBlocks(cfg, an.D, spread).blocks);
+  const curves = new Map<string, { label: string; pts: { X: number; v: number }[] }>();
+  for (const p of t.positions) {
+    const F = blocksToNodal(placeBlocks(blocksBy[p.config], p.X, p.reversed), xTop, m.xLeft, m.xRight);
+    let s = 0;
+    for (let j = 0; j < nTop; j++) s += IM[q * nTop + j] * F[j];
+    const key = `${p.config}|${p.reversed}`;
+    if (!curves.has(key)) curves.set(key, { label: `${t.def.configs[p.config].label}${p.reversed ? " (sens inverse)" : ""}`, pts: [] });
+    curves.get(key)!.pts.push({ X: p.X - m.xLeft, v: s * t.delta });
+  }
+  return Array.from(curves.values());
 }

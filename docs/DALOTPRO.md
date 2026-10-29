@@ -109,3 +109,17 @@ et ces cotes.
 - Plan de ferraillage (modèle Bangolo) : repères en colonnes latérales avec désignation « 47HA10 esp=15cm »,
   croquis de façonnage coté et rappels orthogonaux vers les barres.
 - Coffrage : « Radier de tête ép. … », « Bêche … (cachée) », bloc NOTES.
+
+## Version 6 — maquette annotée, simulation des convois, réglage des têtes
+
+- **Maquette 3D annotée** (bouton « Valeurs ») : aile (angle, longueur), radier de tête (épaisseur), pied de
+  bêche, amont / aval, poids du convoi, pression q au feuillet moyen, moment du convoi ; « Pressions » : poussée
+  des terres (Kmax, surcharge) sur les piédroits et pression du sol ELS sous le radier ; « Effort tranchant » en
+  plus des moments, valeurs extrêmes repérées. Mêmes annotations dans la note Word et sur les planches 3D.
+- **Simulation du passage des convois → enveloppe exacte** : courbe du moment au point critique de la dalle
+  (travée et appui) pour chaque convoi, configuration et sens ; écran des sollicitations et note de calcul.
+- **Plans** : deux planches « Perspectives 3D » (maquette ferraillée ; charges et sollicitations annotées).
+- **Nomenclatures** : colonne Désignation (élément et rôle de la barre), nombre au format « 2x24 ».
+- **Réglage des têtes par boutons** (rubrique Ouvrages de tête) : longueur, épaisseur et angle des ailes
+  (degrés / 30 gr), longueur du radier de tête, petite base (nouveau champ « débord latéral ») et grande base
+  (par l'angle), alignement du radier sur l'extrémité des ailes ; schéma coté en direct.

@@ -13,7 +13,7 @@ import { optimizeThicknesses, runStudy, type RunOutcome } from "@/lib/dalot/engi
 import {
   DALOT_PRESETS, normalizeSpec, seriesSpec, SERIES_TYPES, specFromPreset, type DalotSpec, type FieldValue,
 } from "@/lib/dalot/fields";
-import { FieldsPanel, GeometryAside, HydroAside, sectionState, type SpecApi } from "@/app/(app)/dalots/[id]/_components/data-panels";
+import { FieldsPanel, GeometryAside, HeadsAside, HydroAside, sectionState, type SpecApi } from "@/app/(app)/dalots/[id]/_components/data-panels";
 import { downloadText, setSaver, slug } from "@/app/(app)/dalots/[id]/_components/download";
 import { NAV, type NavItem } from "@/app/(app)/dalots/[id]/_components/nav";
 import {
@@ -552,7 +552,7 @@ function Workspace({ item, onBack, onSave, onDelete, onDuplicate }: {
 
           {current.section ? (
             <FieldsPanel section={current.section} title={current.label} intro={current.intro ?? ""} api={api}
-              aside={current.section === "geometrie" ? <GeometryAside spec={spec} /> : current.section === "hydro" ? <HydroAside outcome={outcome} /> : undefined} />
+              aside={current.section === "geometrie" ? <GeometryAside spec={spec} /> : current.section === "tetes" ? <HeadsAside api={api} /> : current.section === "hydro" ? <HydroAside outcome={outcome} /> : undefined} />
           ) : !study ? (
             <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500">{computing ? "Calcul en cours…" : "Complétez les données obligatoires pour lancer le calcul."}</div>
           ) : (

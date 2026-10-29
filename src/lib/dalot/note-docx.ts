@@ -14,7 +14,7 @@ import { FIELD_BY_KEY } from "./fields";
 import { convoyLibrary, diffusionDepth } from "./convoys";
 
 export type NoteImage = { data: Uint8Array; width: number; height: number };
-export type NoteImages = Partial<Record<"section" | "coffrage" | "ferraillage" | "moments" | "tranchant" | "normal" | "maquette" | "ferraillage3d" | "moments3d", NoteImage>> & {
+export type NoteImages = Partial<Record<"section" | "coffrage" | "ferraillage" | "moments" | "tranchant" | "normal" | "maquette" | "ferraillage3d" | "moments3d" | "tranchant3d" | "passagePlus" | "passageMoins", NoteImage>> & {
   convois?: { label: string; img: NoteImage }[];
 };
 
@@ -183,7 +183,7 @@ export async function buildNoteDocx(study: Study, images: NoteImages): Promise<B
       ["Largeur roulable / chargeable", `${f(inp.Lr)} m / ${f(inp.Lc)} m`],
     ], [0.45, 0.55]),
     ...image(images.coffrage ?? images.section, 600, "Figure 1 — Coupe transversale de coffrage cotée (m)."),
-    ...image(images.maquette, 600, "Figure 1 bis — Maquette 3D de l'ouvrage complet (corps, têtes, murs en aile) avec le convoi à sa position la plus défavorable et ses volumes de diffusion."));
+    ...image(images.maquette, 600, "Figure 1 bis — Maquette 3D annotée de l'ouvrage complet (ailes, radiers de tête, bêches), convoi à sa position la plus défavorable avec volumes de diffusion, poussée des terres et pression du sol."));
 
   // 5. Matériaux
   body.push(H1("5. Matériaux"),
@@ -275,7 +275,13 @@ export async function buildNoteDocx(study: Study, images: NoteImages): Promise<B
         return [t.def.label, "M max (mi-travée)", `${f(t.max[best])} kN·m/m`,
           pos ? `x = ${f(pos.X)} m${pos.reversed ? " (sens inverse)" : ""}` : "—", pos ? t.def.configs[pos.config].label : "—"];
       }), [0.12, 0.22, 0.2, 0.26, 0.2]),
-    ...(images.convois ?? []).flatMap((c, i) => image(c.img, 600, `Figure C${i + 1} — Convoi ${c.label} à la position du moment maximal en travée : vue en long avec diffusion, vue en plan avec empreintes diffusées et bande de calcul.`)));
+    ...(images.convois ?? []).flatMap((c, i) => image(c.img, 600, `Figure C${i + 1} — Convoi ${c.label} à la position du moment maximal en travée : vue en long avec diffusion, vue en plan avec empreintes diffusées et bande de calcul.`)),
+    ...(images.passagePlus || images.passageMoins ? [
+      H2("Simulation du passage des convois → enveloppe exacte"),
+      P("Chaque convoi est promené sur l'ouvrage au pas de calcul, dans les deux sens et dans toutes ses configurations. Les courbes donnent le moment au point le plus sollicité de la dalle en fonction de la position de l'essieu de référence ; leur extremum est la valeur retenue dans l'enveloppe.", { size: 18 }),
+    ] : []),
+    ...image(images.passagePlus, 600, "Figure C+ — Passage des convois : moment positif au point critique de la dalle (travée)."),
+    ...image(images.passageMoins, 600, "Figure C− — Passage des convois : moment négatif au point critique de la dalle (appui)."));
 
   // 15. Combinaisons
   body.push(H1("13. Combinaisons d'actions"),
@@ -300,7 +306,8 @@ export async function buildNoteDocx(study: Study, images: NoteImages): Promise<B
     P("Unités : kN·m/m et kN/m. Convention : M > 0 tend la face inférieure de la dalle, la face inférieure du radier et la face droite des piédroits ; N > 0 en traction.", { italic: true, size: 17 }),
     ...image(images.moments, 600, "Figure 2 — Enveloppe des moments fléchissants ELU (kN·m/m), tracée côté fibre tendue."),
     ...image(images.tranchant, 600, "Figure 3 — Enveloppe des efforts tranchants ELU (kN/m)."),
-    ...image(images.moments3d, 600, "Figure 3 bis — Enveloppe des moments ELU tracée sur la maquette 3D (rouge : moments positifs, bleu : moments négatifs)."));
+    ...image(images.moments3d, 600, "Figure 3 bis — Enveloppe des moments ELU tracée sur la maquette 3D, valeurs extrêmes repérées (rouge : moments positifs, bleu : moments négatifs)."),
+    ...image(images.tranchant3d, 600, "Figure 3 ter — Enveloppe des efforts tranchants ELU sur la maquette 3D, valeurs extrêmes repérées."));
 
   // 17. Réactions du sol
   body.push(H1("15. Réactions du sol"),

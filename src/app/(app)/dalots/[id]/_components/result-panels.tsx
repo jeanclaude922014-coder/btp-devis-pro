@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { DIAMETERS, SPACINGS } from "@/lib/dalot/ba";
 import { checksToCsv, countByStatus, DOMAINS, ratio, STATUS_LABELS, type CheckStatus } from "@/lib/dalot/checks";
 import type { GroupId } from "@/lib/dalot/design";
-import { convoyFigure, envelopeSvg, type Quantity } from "@/lib/dalot/diagrams";
+import { convoyFigure, envelopeSvg, passageSvg, type Quantity } from "@/lib/dalot/diagrams";
 import { buildSheets } from "@/lib/dalot/drawings";
 import { renderSceneImage } from "@/lib/dalot/scene3d";
 import { sheetsToDxf } from "@/lib/dalot/dxf";
@@ -179,6 +179,8 @@ export function EffortsPanel({ study }: { study: Study }) {
   const an = study.analysis;
   const env = an[state];
   const svg = useMemo(() => envelopeSvg(an, env, q), [an, env, q]);
+  const [sg, setSg] = useState<1 | -1>(1);
+  const passage = useMemo(() => passageSvg(study, sg), [study, sg]);
   const ns = an.quantities.ns;
   const off = q === "M" ? 0 : q === "V" ? ns : 2 * ns;
   return (
@@ -191,6 +193,19 @@ export function EffortsPanel({ study }: { study: Study }) {
       }>
         <div className="mx-auto max-w-3xl" dangerouslySetInnerHTML={{ __html: svg }} />
       </Card>
+      {passage && (
+        <Card title="Simulation du passage des convois → enveloppe exacte" actions={
+          <div className="flex gap-1">{([[1, "Travée (M+)"], [-1, "Appui (M−)"]] as const).map(([v, l]) => (
+            <button key={v} onClick={() => setSg(v)} className={`rounded px-2 py-1 text-xs font-medium ${sg === v ? "bg-blue-800 text-white" : "bg-slate-100 text-slate-600"}`}>{l}</button>
+          ))}</div>
+        }>
+          <div className="mx-auto max-w-4xl" dangerouslySetInnerHTML={{ __html: passage }} />
+          <p className="mt-2 text-xs text-slate-500">
+            Chaque convoi est promené sur la dalle au pas de calcul, dans les deux sens et dans toutes ses configurations ; la courbe donne le moment caractéristique (δ inclus) au point le plus sollicité.
+            Le point noir est l&apos;extremum retenu dans l&apos;enveloppe.
+          </p>
+        </Card>
+      )}
       <Card title="Valeurs extrêmes par barre">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -564,12 +579,16 @@ export function NotePanel({ study }: { study: Study }) {
       try {
         const cv = study.analysis.traffic.find((x) => x.positions.length)?.def.id ?? "";
         const base = { concrete: "opaque" as const, fill: false, convoy: "", rebar: false, cut: false, efforts: false };
-        images.maquette = (await renderSceneImage(study, { ...base, convoy: cv }, 1600, 1000)) ?? undefined;
-        images.ferraillage3d = (await renderSceneImage(study, { ...base, concrete: "transparent", rebar: true }, 1600, 1000)) ?? undefined;
-        images.moments3d = (await renderSceneImage(study, { ...base, concrete: "transparent", efforts: true }, 1600, 1000, "face")) ?? undefined;
+        images.maquette = (await renderSceneImage(study, { ...base, concrete: "transparent", convoy: cv, pressures: true }, 1600, 1000)) ?? undefined;
+        images.ferraillage3d = (await renderSceneImage(study, { ...base, concrete: "transparent", rebar: true }, 1600, 1000, "iso", false)) ?? undefined;
+        images.moments3d = (await renderSceneImage(study, { ...base, concrete: "transparent", efforts: true }, 1600, 1000)) ?? undefined;
+        images.tranchant3d = (await renderSceneImage(study, { ...base, concrete: "transparent", efforts: true, effortKind: "V" }, 1600, 1000)) ?? undefined;
       } catch {
         /* pas de WebGL */
       }
+      const pp = passageSvg(study, 1), pm = passageSvg(study, -1);
+      if (pp) images.passagePlus = await svgToPng(pp, 1400);
+      if (pm) images.passageMoins = await svgToPng(pm, 1400);
       for (const t of study.analysis.traffic.filter((x) => x.positions.length)) {
         const svg = convoyFigure(study, t.def.id);
         if (svg) images.convois!.push({ label: t.def.label, img: await svgToPng(svg, 1400) });

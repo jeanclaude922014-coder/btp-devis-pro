@@ -19,7 +19,24 @@ export type Scene3DOptions = {
   rebar: boolean;
   cut: boolean;
   efforts: boolean;
+  /** Effort tracé sur la maquette : moments (défaut) ou efforts tranchants. */
+  effortKind?: "M" | "V";
+  /** Diagrammes de poussée des terres et de pression du sol sous le radier. */
+  pressures?: boolean;
 };
+
+/** Étiquette 3D (cotes, charges, valeurs d'efforts). */
+export type Label3D = { p: THREE.Vector3; text: string; kind: "geo" | "load" | "effort" };
+
+const fr = (x: number, d = 2) => x.toFixed(d).replace(".", ",");
+
+/** Angle des ailes en grades quand la valeur ronde y est (27° = 30 gr, comme sur les plans types). */
+function angle(deg: number) {
+  const gr = (deg * 10) / 9;
+  const roundGr = Math.abs(gr - Math.round(gr)) < 0.15 && Math.round(gr) % 5 === 0;
+  const roundDeg = Math.abs(deg - Math.round(deg)) < 0.05 && Math.round(deg) % 5 === 0;
+  return roundGr && !roundDeg ? `${Math.round(gr)} gr` : `${Math.round(deg)}°`;
+}
 
 export type CameraPreset = "iso" | "dessus" | "face" | "cote";
 
@@ -130,6 +147,7 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
     parent.add(edges);
   };
   const bars = new Bars();
+  const labels: Label3D[] = [];
 
   // ── Corps : section extrudée sur la longueur ──
   const shape = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(B, 0), new THREE.Vector2(B, H), new THREE.Vector2(0, H)]);
@@ -152,9 +170,10 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
   for (const { z0, s } of ends) {
     if (hHead > 0) addConcrete(new THREE.BoxGeometry(B, hHead, t.murTeteEp), V(B / 2, H + hHead / 2, z0 + s * t.murTeteEp / 2), "MUR_TETE");
     if (t.radierLong > 0) {
-      const w = B + 2 * t.radierLong * tanA;
-      // Radier de tête trapézoïdal (s'évase entre les murs en aile).
-      const sh = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(B, 0), new THREE.Vector2(B + t.radierLong * tanA, t.radierLong), new THREE.Vector2(-t.radierLong * tanA, t.radierLong)]);
+      const dB = t.debord;
+      const w = B + 2 * dB + 2 * t.radierLong * tanA;
+      // Radier de tête trapézoïdal : petite base B + 2·débord, grande base w (s'évase entre les murs en aile).
+      const sh = new THREE.Shape([new THREE.Vector2(-dB, 0), new THREE.Vector2(B + dB, 0), new THREE.Vector2(B + dB + t.radierLong * tanA, t.radierLong), new THREE.Vector2(-dB - t.radierLong * tanA, t.radierLong)]);
       const geo = new THREE.ExtrudeGeometry(sh, { depth: inp.er, bevelEnabled: false });
       geo.rotateX(Math.PI / 2);
       geo.translate(0, inp.er, 0);
@@ -172,7 +191,7 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
     const hRoot = Math.min(wing.Htot, H + hHead);
     const ws = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(t.long, 0), new THREE.Vector2(t.long, wing.Hend), new THREE.Vector2(0, hRoot)]);
     const geo = new THREE.ExtrudeGeometry(ws, { depth: t.ep, bevelEnabled: false });
-    for (const [sx, xr] of [[-1, 0], [1, B]] as const) for (const [sz, zr] of [[-1, 0], [1, L]] as const) {
+    for (const [sx, xr] of [[-1, -t.debord], [1, B + t.debord]] as const) for (const [sz, zr] of [[-1, 0], [1, L]] as const) {
       const dx = sx * Math.sin(a), dz = sz * Math.cos(a);
       const grp = new THREE.Group();
       grp.position.set(xr, 0, zr);
@@ -184,6 +203,21 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
       addConcrete(new THREE.BoxGeometry(t.long, t.semEp, t.semelle), V(t.long / 2, -t.semEp / 2, zf + t.semelle / 2), "SEMELLES", grp);
     }
   }
+
+  // ── Étiquettes de géométrie ──
+  scene.updateMatrixWorld(true);
+  if (wing && t.murs && wingGroups.length) {
+    const hRoot = Math.min(wing.Htot, H + hHead);
+    for (const { grp } of [wingGroups[0], wingGroups[3] ?? wingGroups[0]]) {
+      labels.push({ p: grp.localToWorld(V(t.long * 0.5, (hRoot + wing.Hend) / 2 + 0.3, t.ep / 2)), text: `Aile ${angle(t.angle)}, L = ${fr(t.long)} m`, kind: "geo" });
+    }
+  }
+  if (t.radierLong > 0) {
+    labels.push({ p: V(B / 2, inp.er + 0.05, -t.radierLong * 0.45), text: `Radier de tête e = ${fr(inp.er)} m`, kind: "geo" });
+    if (t.becheProf > 0) labels.push({ p: V(B / 2 - B * 0.3, -t.becheProf, -t.radierLong), text: `Bêche, pied à −${fr(t.becheProf)} m`, kind: "geo" });
+  }
+  labels.push({ p: V(B / 2, H + 0.2, -Math.max(t.radierLong, 0.5) * 0.9), text: "AMONT", kind: "geo" });
+  labels.push({ p: V(B / 2, H + 0.2, L + Math.max(t.radierLong, 0.5) * 0.9), text: "AVAL", kind: "geo" });
 
   // ── Garde-corps ──
   if (t.gardeCorps) {
@@ -224,6 +258,12 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
     const { footprint } = stripBlocks(cfg, study.analysis.D, transverseSpread(inp));
     const diffMat = new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide });
     const yb = H - inp.es / 2;
+    const totalP = cfg.patches.reduce((sum, p) => sum + p.P, 0);
+    const qMax = Math.max(...footprint.map((f) => (cfg.coef * f.P) / (f.ax * f.ay)));
+    const pc = cfg.patches.reduce((acc, p) => [acc[0] + toX(p.x) / cfg.patches.length, acc[1] + (z0 + p.y) / cfg.patches.length], [0, 0]);
+    labels.push({ p: V(pc[0], top + 1.4, pc[1]), text: `${gov.t.def.label} : ${fr(totalP, 1)} kN`, kind: "load" });
+    labels.push({ p: V(pc[0], yb + 0.1, pc[1]), text: `q = ${fr(qMax, 1)} kPa au feuillet moyen`, kind: "load" });
+    labels.push({ p: V(pc[0] + 0.8, top + 0.9, pc[1]), text: `M = ${gov.value >= 0 ? "+" : ""}${fr(gov.value, 1)} kN·m/m (δ inclus)`, kind: "effort" });
     cfg.patches.forEach((p, i) => {
       const cx = toX(p.x), cz = z0 + p.y;
       const box = new THREE.Mesh(new THREE.BoxGeometry(p.ax, 0.25, p.ay), wheelMat);
@@ -248,25 +288,72 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
     });
   }
 
-  // ── Enveloppe des moments ELU tracée dans la bande de calcul (côté fibre tendue) ──
+  // ── Poussée des terres sur les piédroits et pression du sol sous le radier (plan à mi-longueur) ──
+  if (o.pressures) {
+    const zP = L / 2;
+    const gTop = study.analysis.caseLoads.gTop;
+    const sh = (y: number) => inp.Kmax * (gTop + inp.gammaR * Math.max(0, H - y) + inp.qRemblai);
+    const pTop = sh(H), pBot = sh(0);
+    const kP = (Math.min(B, H) * 0.35) / Math.max(pBot, 1);
+    const redMat = new THREE.MeshBasicMaterial({ color: 0xdc2626, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false });
+    const quad = (pts: number[][], mat: THREE.Material) => {
+      const pos: number[] = [];
+      for (const k of [0, 1, 2, 0, 2, 3]) pos.push(...pts[k]);
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+      const m = new THREE.Mesh(g, mat);
+      m.userData.layer = "PRESSIONS";
+      scene.add(m);
+      const e = new THREE.LineSegments(new THREE.EdgesGeometry(g), new THREE.LineBasicMaterial({ color: (mat as THREE.MeshBasicMaterial).color }));
+      e.userData.layer = "PRESSIONS";
+      scene.add(e);
+    };
+    for (const [xw, sgn] of [[0, -1], [B, 1]] as const) {
+      quad([[xw, H, zP], [xw + sgn * pTop * kP, H, zP], [xw + sgn * pBot * kP, 0, zP], [xw, 0, zP]], redMat);
+    }
+    labels.push({ p: V(-pTop * kP - 0.1, H, zP), text: `${fr(pTop, 1)} kPa`, kind: "load" });
+    labels.push({ p: V(-pBot * kP - 0.1, 0.1, zP), text: `${fr(pBot, 1)} kPa`, kind: "load" });
+    // Pression de contact (enveloppe ELS) aux nœuds du radier.
+    const an = study.analysis;
+    const ns = an.quantities.ns;
+    const pr = model.raftNodes.map((id, k) => ({ x: model.nodes[id].x - model.xLeft, p: Math.max(0, an.els.max[3 * ns + k]) }));
+    const pm = Math.max(...pr.map((q) => q.p), 1);
+    const kS = (H * 0.3) / pm;
+    const blueMat = new THREE.MeshBasicMaterial({ color: 0x2563eb, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false });
+    for (let k = 0; k < pr.length - 1; k++) {
+      quad([[pr[k].x, 0, zP], [pr[k + 1].x, 0, zP], [pr[k + 1].x, -pr[k + 1].p * kS, zP], [pr[k].x, -pr[k].p * kS, zP]], blueMat);
+    }
+    const iM = pr.reduce((bi, q, i) => (q.p > pr[bi].p ? i : bi), 0);
+    labels.push({ p: V(pr[iM].x, -pr[iM].p * kS - 0.15, zP), text: `σ sol = ${fr(pr[iM].p, 1)} kPa (ELS)`, kind: "load" });
+  }
+
+  // ── Enveloppe ELU des moments (ou des efforts tranchants) dans le plan de la bande de calcul ──
   if (o.efforts) {
     const an = study.analysis;
     const env = an.elu;
+    const ns = an.quantities.ns;
+    const off = o.effortKind === "V" ? ns : 0;
     let vmax = 1e-9;
-    for (let k = 0; k < an.quantities.ns; k++) vmax = Math.max(vmax, Math.abs(env.max[k]), Math.abs(env.min[k]));
+    for (let k = 0; k < ns; k++) vmax = Math.max(vmax, Math.abs(env.max[off + k]), Math.abs(env.min[off + k]));
     const amp = (Math.min(B, H) * 0.3) / vmax;
-    const zP = o.cut ? L / 2 + 0.02 : -0.06;
+    const zP = o.concrete === "opaque" && !o.cut ? -0.06 : L / 2;
     const yOff = inp.er / 2;
-    for (const [vals, color] of [[env.max, 0xdc2626], [env.min, 0x2563eb]] as const) {
+    const unit = o.effortKind === "V" ? "kN/m" : "kN·m/m";
+    const cols = o.effortKind === "V" ? [0x059669, 0x0d9488] : [0xdc2626, 0x2563eb];
+    for (const [vals, color, isMax] of [[env.max, cols[0], true], [env.min, cols[1], false]] as const) {
       const tris: number[] = [], lines: number[] = [];
+      let ext = { v: 0, x: 0, y: 0 };
       for (const m of model.members) {
         const a0 = model.nodes[m.nodes[0]], a1 = model.nodes[m.nodes[m.nodes.length - 1]];
         const ux = (a1.x - a0.x) / m.length, uy = (a1.y - a0.y) / m.length;
         const nx = -uy, ny = ux;
         const pt = (k: number) => {
           const nd = model.nodes[m.nodes[k]];
-          const v = -vals[m.station0 + k] * amp;
-          return { ax: nd.x - model.xLeft, ay: nd.y + yOff, cx: nd.x - model.xLeft + nx * v, cy: nd.y + yOff + ny * v };
+          const val = vals[off + m.station0 + k];
+          const v = -val * amp;
+          const r = { ax: nd.x - model.xLeft, ay: nd.y + yOff, cx: nd.x - model.xLeft + nx * v, cy: nd.y + yOff + ny * v };
+          if (isMax ? val > ext.v : val < ext.v) ext = { v: val, x: r.cx, y: r.cy };
+          return r;
         };
         for (let k = 0; k < m.nodes.length - 1; k++) {
           const p0 = pt(k), p1 = pt(k + 1);
@@ -276,12 +363,13 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
       }
       const g1 = new THREE.BufferGeometry();
       g1.setAttribute("position", new THREE.Float32BufferAttribute(tris, 3));
-      scene.add(new THREE.Mesh(g1, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false })));
+      scene.add(new THREE.Mesh(g1, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false })));
       const g2 = new THREE.BufferGeometry();
       g2.setAttribute("position", new THREE.Float32BufferAttribute(lines, 3));
       const ls = new THREE.LineSegments(g2, new THREE.LineBasicMaterial({ color }));
-      ls.userData.layer = color === 0xdc2626 ? "MOMENTS_MAX" : "MOMENTS_MIN";
+      ls.userData.layer = isMax ? "MOMENTS_MAX" : "MOMENTS_MIN";
       scene.add(ls);
+      if (ext.v !== 0) labels.push({ p: V(ext.x, ext.y, zP), text: `${ext.v > 0 ? "+" : ""}${fr(ext.v, 1)} ${unit}`, kind: "effort" });
     }
   }
 
@@ -319,22 +407,23 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
         if (t.radierLong > 0) {
           for (let d = c; d <= t.radierLong - c + 1e-9; d += 0.2) {
             const z = z0 + s * d;
-            for (const py of [c, inp.er - c]) bars.seg(V(-d * tanA + c, py, z), V(B + d * tanA - c, py, z));
+            for (const py of [c, inp.er - c]) bars.seg(V(-t.debord - d * tanA + c, py, z), V(B + t.debord + d * tanA - c, py, z));
           }
-          const xa = -t.radierLong * tanA + c, xb = B + t.radierLong * tanA - c;
+          const xa = -t.debord - t.radierLong * tanA + c, xb = B + t.debord + t.radierLong * tanA - c;
           for (let px = xa; px <= xb + 1e-9; px += 0.2) {
-            const d0 = tanA > 0 ? Math.max(0, px < 0 ? -px / tanA : px > B ? (px - B) / tanA : 0) : 0;
+            const d0 = tanA > 0 ? Math.max(0, px < -t.debord ? (-t.debord - px) / tanA : px > B + t.debord ? (px - B - t.debord) / tanA : 0) : 0;
             if (d0 >= t.radierLong - c) continue;
             for (const py of [c + 0.012, inp.er - c - 0.012]) bars.seg(V(px, py, z0 + s * Math.max(c, d0 + c)), V(px, py, z0 + s * (t.radierLong - c)), false);
           }
           // Bêche : cadres verticaux et filants.
           if (t.becheProf > 0) {
             const zb0 = z0 + s * (t.radierLong - t.becheEp + c), zb1 = z0 + s * (t.radierLong - c);
-            const w = B + 2 * t.radierLong * tanA;
-            for (let px = -t.radierLong * tanA + c; px <= -t.radierLong * tanA + w - c + 1e-9; px += 0.2) {
+            const w = B + 2 * t.debord + 2 * t.radierLong * tanA;
+            const xw = -t.debord - t.radierLong * tanA;
+            for (let px = xw + c; px <= xw + w - c + 1e-9; px += 0.2) {
               bars.poly([V(px, inp.er - c, zb0), V(px, -t.becheProf + c, zb0), V(px, -t.becheProf + c, zb1), V(px, inp.er - c, zb1)]);
             }
-            for (let py = -t.becheProf + c; py <= 0; py += 0.25) for (const zz of [zb0, zb1]) bars.seg(V(-t.radierLong * tanA + c, py, zz), V(-t.radierLong * tanA + w - c, py, zz), false);
+            for (let py = -t.becheProf + c; py <= 0; py += 0.25) for (const zz of [zb0, zb1]) bars.seg(V(xw + c, py, zz), V(xw + w - c, py, zz), false);
           }
         }
       }
@@ -381,7 +470,7 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
   }
 
   const R = Math.max(B + 2 * ext * tanA, L + 2 * ext, H) * 1.25;
-  return { scene, B, L, H, R, center: V(B / 2, H / 2, L / 2) };
+  return { scene, B, L, H, R, center: V(B / 2, H / 2, L / 2), labels };
 }
 
 /** Position de caméra pour une vue type. */
@@ -396,9 +485,9 @@ export function cameraFor(preset: CameraPreset, center: THREE.Vector3, R: number
 }
 
 /** Rendu hors écran d'une vue de la maquette (images de la note de calcul). */
-export async function renderSceneImage(study: Study, o: Scene3DOptions, width: number, height: number, preset: CameraPreset = "iso") {
+export async function renderSceneImage(study: Study, o: Scene3DOptions, width: number, height: number, preset: CameraPreset = "iso", labelsOn = true) {
   const gov = o.convoy ? governing(study, o.convoy) : null;
-  const { scene, R, center } = buildScene(study, o, gov);
+  const { scene, R, center, labels } = buildScene(study, o, gov);
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -409,7 +498,16 @@ export async function renderSceneImage(study: Study, o: Scene3DOptions, width: n
   camera.position.copy(cameraFor(preset, center, R));
   camera.lookAt(center);
   renderer.render(scene, camera);
-  const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, "image/png"));
+  // Étiquettes dessinées par-dessus le rendu (cotes, charges, valeurs extrêmes).
+  const out = document.createElement("canvas");
+  out.width = width;
+  out.height = height;
+  const ctx2 = out.getContext("2d");
+  if (ctx2) {
+    ctx2.drawImage(canvas, 0, 0);
+    if (labelsOn) drawLabels(ctx2, labels, camera, width, height);
+  }
+  const blob: Blob | null = await new Promise((res) => (ctx2 ? out : canvas).toBlob(res, "image/png"));
   renderer.dispose();
   scene.traverse((obj) => {
     const m = obj as THREE.Mesh;
@@ -419,4 +517,27 @@ export async function renderSceneImage(study: Study, o: Scene3DOptions, width: n
   });
   if (!blob) return null;
   return { data: new Uint8Array(await blob.arrayBuffer()), width, height };
+}
+
+const LABEL_COLORS: Record<Label3D["kind"], string> = { geo: "#0f172a", load: "#9a3412", effort: "#1d4ed8" };
+
+/** Dessine les étiquettes 3D sur un canevas 2D (cadre blanc, texte coloré selon la nature). */
+export function drawLabels(ctx: CanvasRenderingContext2D, labels: Label3D[], camera: THREE.Camera, width: number, height: number) {
+  const size = Math.round(width / 85);
+  ctx.font = `bold ${size}px Arial, Helvetica, sans-serif`;
+  ctx.textBaseline = "middle";
+  for (const l of labels) {
+    const v = l.p.clone().project(camera);
+    if (v.z > 1 || Math.abs(v.x) > 1.05 || Math.abs(v.y) > 1.05) continue;
+    const x = ((v.x + 1) / 2) * width, y = ((1 - v.y) / 2) * height;
+    const w = ctx.measureText(l.text).width + size * 0.8;
+    ctx.fillStyle = "rgba(255,255,255,0.88)";
+    ctx.fillRect(x - w / 2, y - size * 0.75, w, size * 1.5);
+    ctx.strokeStyle = LABEL_COLORS[l.kind];
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x - w / 2, y - size * 0.75, w, size * 1.5);
+    ctx.fillStyle = LABEL_COLORS[l.kind];
+    ctx.textAlign = "center";
+    ctx.fillText(l.text, x, y);
+  }
 }

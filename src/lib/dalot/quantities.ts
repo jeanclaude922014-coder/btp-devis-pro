@@ -156,7 +156,8 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
   // ── OUVRAGE DE TÊTE (deux extrémités) ──
   const hw = heads.headWall;
   const tanA = Math.tan((t.angle * Math.PI) / 180);
-  const Wrt = t.murs ? B + t.radierLong * tanA : B;
+  // Radier de tête trapézoïdal : petite base B + 2·débord, grande base + 2·L·tan(angle) ; Wrt = largeur moyenne.
+  const Wrt = B + 2 * t.debord + (t.murs ? t.radierLong * tanA : 0);
   const cm = (x: number) => Math.round(x * 100);
   if (hw.H > 0.3) {
     add(TETE, "MUR DE TÊTE", "Face côté remblai — barres en attente dans la dalle", hw.bars, "L", [hw.H - c, anchor(hw.bars.phi)], 2 * nAcross(B - 2 * c, hw.bars.s), { nElem: 2 });
@@ -164,7 +165,7 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
     add(TETE, "MUR DE TÊTE", "Répartition horizontale deux faces", hw.rep, "droite", [B - 2 * c], 2 * 2 * nAcross(hw.H - c, hw.rep.s), { nElem: 2 });
   }
   if (t.radierLong > 0) {
-    const wMin = B - 2 * c, wMax = B + 2 * t.radierLong * tanA * (t.murs ? 1 : 0) - 2 * c;
+    const wMin = B + 2 * t.debord - 2 * c, wMax = B + 2 * t.debord + 2 * t.radierLong * tanA * (t.murs ? 1 : 0) - 2 * c;
     const vl = `var (${cm(wMin)}/${cm(wMax)})`;
     const rows = nAcross(t.radierLong - 2 * c, 0.2);
     add(TETE, "RADIER DE TÊTE", "Nappe inférieure — barres transversales", { phi: 10, s: 0.2 }, "crochets", [hook, (wMin + wMax) / 2, hook], 2 * rows, { nElem: 2, varLabel: vl });

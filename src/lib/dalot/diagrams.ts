@@ -3,7 +3,7 @@
  * portique, et coupe transversale cotée « vivante » de l'écran de saisie.
  */
 
-import { transverseSpread, type Analysis, type Envelope } from "./analysis";
+import { trafficHistory, transverseSpread, type Analysis, type Envelope } from "./analysis";
 import { stripBlocks } from "./convoys";
 import type { DalotInput } from "./fields";
 
@@ -228,4 +228,82 @@ export function convoyFigure(study: import("./engine").Study, convoyId: string):
   const t = study.analysis.traffic.find((x) => x.def.id === convoyId);
   if (!t) return null;
   return convoySvg(study, convoyId, spread, (ci) => stripBlocks(t.def.configs[ci], study.analysis.D, spread));
+}
+
+/** Station de la dalle la plus sollicitée par les convois (moment positif en travée ou négatif sur appui). */
+export function criticalSlabStation(study: import("./engine").Study, sign: 1 | -1) {
+  const an = study.analysis;
+  let best = -1, val = 0, node = -1;
+  for (const m of an.model.members.filter((mm) => mm.kind === "dalle")) {
+    for (let k = 0; k < m.nodes.length; k++) {
+      const q = m.station0 + k;
+      for (const t of an.traffic) {
+        if (!t.positions.length) continue;
+        const v = sign > 0 ? t.max[q] : t.min[q];
+        if (sign * v > sign * val) { val = v; best = q; node = m.nodes[k]; }
+      }
+    }
+  }
+  if (best < 0) return null;
+  return { q: best, value: val, x: an.model.nodes[node].x - an.model.xLeft };
+}
+
+/**
+ * « Simulation dynamique → enveloppe exacte » : moment au point critique de la dalle pendant le
+ * passage de chaque convoi (une courbe par configuration et par sens), maximum repéré.
+ */
+export function passageSvg(study: import("./engine").Study, sign: 1 | -1, opts: { width?: number } = {}): string | null {
+  const crit = criticalSlabStation(study, sign);
+  if (!crit) return null;
+  const an = study.analysis;
+  const series: { label: string; color: string; pts: { X: number; v: number }[] }[] = [];
+  const palette = ["#1d4ed8", "#dc2626", "#059669", "#d97706", "#7c3aed", "#0891b2", "#be185d", "#4d7c0f"];
+  let ci = 0;
+  for (const t of an.traffic.filter((x) => x.positions.length)) {
+    const col = palette[ci++ % palette.length];
+    for (const c of trafficHistory(an, study.input, t, crit.q)) series.push({ label: `${t.def.label} — ${c.label}`, color: col, pts: c.pts });
+  }
+  if (!series.length) return null;
+  const W = opts.width ?? 900, Hh = 460, ml = 70, mr = 220, mt = 40, mb = 50;
+  let x0 = Infinity, x1 = -Infinity, v0 = 0, v1 = 0;
+  for (const s of series) for (const p of s.pts) { x0 = Math.min(x0, p.X); x1 = Math.max(x1, p.X); v0 = Math.min(v0, p.v); v1 = Math.max(v1, p.v); }
+  const span = v1 - v0 || 1;
+  v1 += span * 0.14; v0 -= span * 0.14;
+  const pw = W - ml - mr, ph = Hh - mt - mb;
+  const X = (x: number) => ml + ((x - x0) / (x1 - x0 || 1)) * pw;
+  const Y = (v: number) => mt + ph - ((v - v0) / (v1 - v0 || 1)) * ph;
+  const parts: string[] = [];
+  parts.push(`<rect x="0" y="0" width="${W}" height="${Hh}" fill="#ffffff"/>`);
+  parts.push(`<text x="${ml}" y="22" font-size="15" font-weight="bold" fill="#0f172a">Passage des convois — ${sign > 0 ? "moment positif en travée" : "moment négatif sur appui"} de la dalle${crit.x !== undefined ? ` (x = ${f1(crit.x)} m)` : ""}</text>`);
+  // Axes et graduations
+  const step = (r: number) => { const e = Math.pow(10, Math.floor(Math.log10(r / 5 || 1))); return [1, 2, 5, 10].map((k) => k * e).find((s) => r / s <= 6) ?? 10 * e; };
+  const sv = step(v1 - v0), sx = step(x1 - x0);
+  for (let v = Math.ceil(v0 / sv) * sv; v <= v1 + 1e-9; v += sv) {
+    parts.push(`<line x1="${ml}" y1="${Y(v)}" x2="${ml + pw}" y2="${Y(v)}" stroke="${Math.abs(v) < 1e-9 ? "#475569" : "#e2e8f0"}" stroke-width="1"/>`);
+    parts.push(`<text x="${ml - 6}" y="${Y(v) + 4}" font-size="11" text-anchor="end" fill="#475569">${f1(v)}</text>`);
+  }
+  for (let x = Math.ceil(x0 / sx) * sx; x <= x1 + 1e-9; x += sx) {
+    parts.push(`<line x1="${X(x)}" y1="${mt}" x2="${X(x)}" y2="${mt + ph}" stroke="#f1f5f9" stroke-width="1"/>`);
+    parts.push(`<text x="${X(x)}" y="${mt + ph + 22}" font-size="11" text-anchor="middle" fill="#475569">${f1(x)}</text>`);
+  }
+  parts.push(`<text x="${ml + pw / 2}" y="${Hh - 10}" font-size="12" text-anchor="middle" fill="#334155">Position de l'essieu de référence depuis le bord gauche de l'ouvrage (m)</text>`);
+  parts.push(`<text x="16" y="${mt + ph / 2}" font-size="12" text-anchor="middle" fill="#334155" transform="rotate(-90 16 ${mt + ph / 2})">M (kN·m/m), δ inclus</text>`);
+  // Ouvrage sous l'axe des abscisses
+  const B = an.model.xRight - an.model.xLeft;
+  if (x0 <= 0 && x1 >= B) {
+    parts.push(`<rect x="${X(0)}" y="${mt + ph + 3}" width="${X(B) - X(0)}" height="6" fill="#94a3b8"/>`);
+    parts.push(`<text x="${X(B) + 4}" y="${mt + ph + 9}" font-size="10" fill="#64748b">ouvrage</text>`);
+  }
+  series.forEach((s, i) => {
+    const d = s.pts.map((p, k) => `${k ? "L" : "M"}${X(p.X).toFixed(1)},${Y(p.v).toFixed(1)}`).join("");
+    parts.push(`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${i % 2 ? 1.2 : 1.8}"${i % 2 ? ' stroke-dasharray="5 3"' : ""}/>`);
+    parts.push(`<line x1="${ml + pw + 14}" y1="${mt + 10 + i * 16}" x2="${ml + pw + 34}" y2="${mt + 10 + i * 16}" stroke="${s.color}" stroke-width="2"${i % 2 ? ' stroke-dasharray="5 3"' : ""}/>`);
+    parts.push(`<text x="${ml + pw + 40}" y="${mt + 14 + i * 16}" font-size="10" fill="#334155">${esc(s.label.length > 30 ? s.label.slice(0, 29) + "…" : s.label)}</text>`);
+  });
+  // Enveloppe exacte : extremum de toutes les courbes
+  let best = { X: 0, v: 0 };
+  for (const s of series) for (const p of s.pts) if (sign * p.v > sign * best.v) best = p;
+  parts.push(`<circle cx="${X(best.X)}" cy="${Y(best.v)}" r="5" fill="#0f172a"/>`);
+  parts.push(`<text x="${X(best.X) + 8}" y="${Y(best.v) + (sign > 0 ? -8 : 18)}" font-size="16" font-weight="bold" fill="#0f172a">${best.v >= 0 ? "+" : ""}${f1(best.v)} kN·m/m</text>`);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${Hh}" width="100%" font-family="Arial, Helvetica, sans-serif">${parts.join("")}</svg>`;
 }

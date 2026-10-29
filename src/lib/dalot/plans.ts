@@ -145,7 +145,7 @@ function sheetCoffrage(study: Study, origin: Pt, num: string): Sheet {
       if (hHead > 0) p.rect(side < 0 ? -t.murTeteEp : L, 0, t.murTeteEp, B, "COFFRAGE");
       if (t.radierLong > 0) {
         const wl = hg.across > 0 ? t.radierLong * Math.tan(hg.a) : 0;
-        p.poly([[xe, 0], [xe + side * t.radierLong, -wl], [xe + side * t.radierLong, B + wl], [xe, B]], "COFFRAGE", true);
+        p.poly([[xe, -t.debord], [xe + side * t.radierLong, -t.debord - wl], [xe + side * t.radierLong, B + t.debord + wl], [xe, B + t.debord]], "COFFRAGE", true);
       }
       if (t.murs) {
         for (const edge of [0, B]) {
