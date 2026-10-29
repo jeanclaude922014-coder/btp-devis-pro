@@ -66,9 +66,9 @@ export function designHeads(inp: DalotInput, mat: Materials): HeadsResult {
   const dom = "Ouvrages de tête";
   const st = (ok: boolean) => (ok ? "conforme" : "non_conforme") as Check["status"];
 
-  // Mur de tête : retient le remblai et la chaussée au-dessus de la dalle.
-  const hHead = inp.hr + inp.ech + t.revanche;
-  const headWall = cantilever("Mur de tête", hHead, t.murTeteEp, Ka, inp.gammaR, inp.qRemblai, mat);
+  // Guide-roue sur l'about de la dalle (20 cm sur les plans types) ; au-delà de 0,30 m, calculé en mur de tête.
+  const hHead = t.guideRoues ? t.grH : 0;
+  const headWall = cantilever("Mur de tête", hHead, hHead > 0.3 ? t.murTeteEp : t.grL, Ka, inp.gammaR, inp.qRemblai, mat);
   checks.push({
     id: "T-MT-F", domain: dom, element: "Mur de tête",
     label: `Flexion à l'encastrement sur la dalle (h = ${hHead.toFixed(2)} m) : As fournie ≥ As requise`,
@@ -85,7 +85,7 @@ export function designHeads(inp: DalotInput, mat: Materials): HeadsResult {
   if (t.murs) {
     // L'aile s'accroche au sommet du guide-roue (ou du mur de tête) posé sur l'about de la dalle supérieure,
     // comme sur les plans types : hauteur à l'enracinement = cadre + mur de tête ou guide-roue.
-    const Htot = Hext + (hHead > 0.3 ? hHead : t.guideRoues ? 0.4 : 0);
+    const Htot = Hext + hHead;
     const Hend = Math.max(0.6, Htot - (t.long * Math.cos(rad(t.angle))) / inp.talus.pente);
     // Ferraillage du voile au tiers de sa longueur : près de l'enracinement, le voile est tenu par
     // le mur de tête et le corps (fonctionnement en dalle sur deux côtés). La stabilité, elle,

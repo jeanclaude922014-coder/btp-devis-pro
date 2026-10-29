@@ -26,7 +26,7 @@ export function headGeom(study: Study) {
   const t = inp.tetes;
   const a = (t.angle * Math.PI) / 180;
   const w = study.heads.wing;
-  const hHead = study.heads.headWall.H > 0.3 ? study.heads.headWall.H : t.guideRoues ? 0.4 : 0;
+  const hHead = t.guideRoues ? t.grH : 0;
   const Hend = w ? w.Hend : 0;
   return { t, a, w, hHead, Hend, along: t.murs ? t.long * Math.cos(a) : 0, across: t.murs ? t.long * Math.sin(a) : 0 };
 }

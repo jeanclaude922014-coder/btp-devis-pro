@@ -21,7 +21,7 @@ import { barMass } from "./ba";
 import { bodyBars, cellOutline, cmTxt, fmt, geometry, Pen, repMap, type Layer, type Pt, type Sheet } from "./drawings";
 import type { Study } from "./engine";
 import { fitView, headGeom, sketch, type Pad, type Region } from "./plans";
-import { BAR_PARTS, GARDE_CORPS, GUIDE_ROUE, gardeCorpsPosts, type BarMark, type BarPart } from "./quantities";
+import { BAR_PARTS, GARDE_CORPS, gardeCorpsPosts, type BarMark, type BarPart } from "./quantities";
 import * as THREE from "three";
 import { buildScene, governing, type Scene3DOptions } from "./scene3d";
 
@@ -347,7 +347,8 @@ function geo(study: Study) {
   const { B, Hout, cells, n } = geometry(study);
   const hg = headGeom(study);
   const t = hg.t;
-  const ept = hg.hHead > 0 ? Math.min(t.murTeteEp, 0.4) : 0;
+  // Épaisseur de l'élément d'about : mur de tête (h > 0,30 m) ou guide-roue.
+  const ept = hg.hHead > 0 ? (study.heads.headWall.H > 0.3 ? Math.min(t.murTeteEp, 0.4) : t.grL) : 0;
   const yTop = Hout + hg.hHead;
   const radL = t.radierLong;
   const tanA = Math.tan(hg.a);
@@ -447,7 +448,7 @@ function detailRaccord(study: Study): View {
   const g = geo(study);
   const { t, ept, d } = g;
   const e = g.inp.eExt;
-  const ew = ept || GUIDE_ROUE.w;
+  const ew = ept || t.grL;
   const R = Math.max(0.8, 2.8 * Math.max(e, t.ep, ew));
   const clip = (a: Pt, b: Pt): [Pt, Pt] | null => {
     const dx = b[0] - a[0], dy = b[1] - a[1];
@@ -928,7 +929,7 @@ function detailAile(ctx: Ctx): View {
   const c = inp.cover;
   const e = inp.eExt;
   const db = g.d;
-  const em = Math.max(g.ept, GUIDE_ROUE.w);
+  const em = g.ept || t.grL;
   const lw = Math.max(0.9, 4 * t.ep), lp = Math.max(0.6, 2.5 * e), lr = Math.max(0.6, 2 * e);
   const d: Pt = [-Math.sin(g.a), Math.cos(g.a)];
   const ni: Pt = [Math.cos(g.a), Math.sin(g.a)];
@@ -1120,7 +1121,7 @@ function elevationGC(ctx: Ctx): View {
       p.line([-p.th(3), yb], [B + p.th(3), yb], "AXES");
       if (gr > 0) {
         p.rect(0, Hout, B, gr, "COFFRAGE");
-        p.text([B + p.th(2), Hout + gr / 2], 2, murT ? `Mur de tête ép. ${cmTxt(t.murTeteEp)} (guide-roue)` : `Guide-roue ${cmTxt(GUIDE_ROUE.w)} × ${cmTxt(GUIDE_ROUE.h)}`, "TEXTE");
+        p.text([B + p.th(2), Hout + gr / 2], 2, murT ? `Mur de tête ép. ${cmTxt(t.murTeteEp)} (guide-roue)` : `Guide-roue ${cmTxt(t.grL)} × ${cmTxt(t.grH)}`, "TEXTE");
       }
       for (const x of posts) {
         p.rect(x - G.post / 2, Hb, G.post, G.h - G.lisseH, "COFFRAGE");

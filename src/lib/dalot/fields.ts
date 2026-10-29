@@ -217,6 +217,8 @@ export const FIELDS: FieldDef[] = [
   { key: "radierDebord", section: "tetes", group: "Radiers de tête et bêches", label: "Débord latéral du radier de tête au droit de l'ouvrage (chaque côté)", unit: "m", kind: "number", default: 0, min: 0, max: 3, step: 0.05, help: "Petite base du radier de tête = largeur de l'ouvrage + 2 × débord. Grande base = petite base + 2 × longueur × tan(angle des ailes)." },
   { key: "becheProf", section: "tetes", group: "Radiers de tête et bêches", label: "Profondeur des bêches parafouilles", unit: "m", kind: "number", default: 0.8, min: 0, max: 3, step: 0.05 },
   { key: "becheEp", section: "tetes", group: "Radiers de tête et bêches", label: "Épaisseur des bêches", unit: "m", kind: "number", default: 0.25, min: 0.15, max: 0.6, step: 0.01 },
+  { key: "guideRoueH", section: "tetes", group: "Équipements", label: "Hauteur du guide-roue au-dessus de la dalle", unit: "m", kind: "number", default: 0.2, min: 0.1, max: 1.5, step: 0.05, help: "Parapet sur l'about de la dalle supérieure (20 cm sur les plans types). Au-delà de 0,30 m, il est calculé comme un mur de tête." },
+  { key: "guideRoueL", section: "tetes", group: "Équipements", label: "Largeur du guide-roue", unit: "m", kind: "number", default: 0.25, min: 0.15, max: 0.6, step: 0.01 },
   { key: "guideRoues", section: "tetes", group: "Équipements", label: "Guide-roues sur murs de tête", kind: "bool", default: true, help: "Toujours présent quand il y a des murs en aile : il assure le raccord entre les voiles et les ailes." },
   { key: "gardeCorps", section: "tetes", group: "Équipements", label: "Garde-corps en béton armé (poteaux et lisse)", kind: "bool", default: false, help: "Garde-corps de 1,00 m sur les deux rives de la dalle : poteaux 20 × 20 tous les 1,00 m environ, lisse 20 × 15." },
 
@@ -316,7 +318,7 @@ export type DalotInput = {
   tanDiff: number; pas: number;
   tetes: {
     murs: boolean; angle: number; long: number; ep: number; semelle: number; semEp: number; patin: number; beche: number;
-    murTeteEp: number; revanche: number; radierLong: number; debord: number; becheProf: number; becheEp: number; guideRoues: boolean; gardeCorps: boolean;
+    murTeteEp: number; revanche: number; radierLong: number; debord: number; becheProf: number; becheEp: number; guideRoues: boolean; gardeCorps: boolean; grH: number; grL: number;
   };
   talus: { actif: boolean; pente: number; phi: number; c: number };
   hydro: {
@@ -406,6 +408,7 @@ export function toInput(spec: DalotSpec): DalotInput {
       radierLong: num(v.radierTeteLong, 1.5), debord: Math.max(0, num(v.radierDebord, 0)), becheProf: num(v.becheProf, 0.8), becheEp: num(v.becheEp, 0.25),
       // Avec des murs en aile, un guide-roue (ou le mur de tête) est toujours présent : il fait le raccord voile / aile.
       guideRoues: v.guideRoues === true || v.teteMurs === true, gardeCorps: v.gardeCorps === true,
+      grH: num(v.guideRoueH, 0.2), grL: num(v.guideRoueL, 0.25),
     },
     talus: { actif: v.talusActif === true, pente: num(v.talusPente, 1.5), phi: num(v.talusPhi, 30), c: num(v.talusC, 0) },
     hydro: {
@@ -469,7 +472,7 @@ export const DALOT_PRESETS: DalotPreset[] = [
     id: "r2x300x300", label: "Dalot double 2 × 3,00 × 3,00 — plan type D07",
     description: "D'après le plan D07 : piédroits 25 cm, dalle et radier 30 cm, L = 7,00 m, murs en aile de 4,00 m à 30°, bêches 20 × 120, guide-roues 25 × 40, chaussée sur la dalle.",
     values: { ...RURAL, projet: "Dalot double 2 × 3,00 × 3,00", nCells: 2, opening: 3, hInt: 3, es: 0.3, er: 0.3, eExt: 0.25, eInt: 0.25, L: 7,
-      hr: 0, ech: 0, aileLong: 4, aileEp: 0.2, becheProf: 1.2, becheEp: 0.2, radierTeteLong: 2, guideRoues: true, hyActif: false,
+      hr: 0, ech: 0, aileLong: 4, aileEp: 0.2, becheProf: 1.2, becheEp: 0.2, radierTeteLong: 2, guideRoues: true, guideRoueH: 0.4, hyActif: false,
       maitreOuvrage: "", localisation: "Côte d'Ivoire", numPlan: "D07", modelePlans: "engc" },
   },
   {

@@ -46,7 +46,7 @@ const COMMERCIAL = 12;
 export const GARDE_CORPS = { h: 1.0, post: 0.2, lisseW: 0.2, lisseH: 0.15, sMax: 1.0, ancrage: 0.35 };
 
 /** Guide-roues sur les rives de la dalle (le garde-corps, s'il existe, est posé dessus). */
-export const GUIDE_ROUE = { w: 0.25, h: 0.4 };
+export const GUIDE_ROUE = { w: 0.25, h: 0.2 };
 
 /** Abscisses (axe des poteaux) des poteaux de garde-corps sur la largeur B de l'ouvrage. */
 export function gardeCorpsPosts(B: number) {
@@ -137,7 +137,7 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
   const t = inp.tetes;
   // Avec un mur de tête (remblai sur la dalle), le guide-roue est son couronnement : pas d'élément distinct.
   if (t.guideRoues && !(heads.headWall.H > 0.3)) {
-    const gw = GUIDE_ROUE.w, gh = GUIDE_ROUE.h;
+    const gw = t.grL, gh = t.grH;
     add(CORPS, "GUIDE-ROUES", "Cadres ouverts ancrés dans la dalle", { phi: 8, s: 0.2 }, "U", [gh - c + 0.19, gw - 2 * c, gh - c + 0.19], 2 * nAcross(B - 2 * c, 0.2), { nElem: 2 });
     add(CORPS, "GUIDE-ROUES", "Filants", { phi: 10, s: 0.2 }, "droite", [B - 2 * c], 2 * 4, { nElem: 2 });
   }
@@ -204,7 +204,7 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
   // ── Volumes, surfaces ──
   const cells = inp.openings.reduce((s, o) => s + o * inp.hInt, 0);
   const vBody = (B * Hout - cells + 4 * n * (inp.gousset ** 2 / 2)) * L;
-  const vHead = 2 * Bmt * hw.H * t.murTeteEp + (t.guideRoues && !(hw.H > 0.3) ? 2 * Bmt * GUIDE_ROUE.w * GUIDE_ROUE.h : 0);
+  const vHead = 2 * Bmt * hw.H * t.murTeteEp + (t.guideRoues && !(hw.H > 0.3) ? 2 * Bmt * t.grL * t.grH : 0);
   const Havg = heads.wing ? (heads.wing.Htot + heads.wing.Hend) / 2 : 0;
   const vWing = heads.wing ? 4 * t.long * (Havg * t.ep + t.semelle * t.semEp) : 0;
   const vRad = 2 * Wrt * t.radierLong * inp.er;
