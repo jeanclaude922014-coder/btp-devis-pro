@@ -535,12 +535,13 @@ function coupeLong(study: Study): View {
       }
       if (t.murs) {
         const hEnd = inp.er + hg.Hend;
-        p.line([0, yTop], [-hg.along, hEnd], "COFFRAGE");
-        p.line([L, yTop], [L + hg.along, hEnd], "COFFRAGE");
+        // L'aile part du niveau de l'extrados de la dalle supérieure.
+        p.line([0, Hout], [-hg.along, hEnd], "COFFRAGE");
+        p.line([L, Hout], [L + hg.along, hEnd], "COFFRAGE");
         p.line([-hg.along, inp.er], [-hg.along, hEnd], "COFFRAGE");
         p.line([L + hg.along, inp.er], [L + hg.along, hEnd], "COFFRAGE");
-        p.bubble([-hg.along * 0.4, inp.er + hg.Hend * 0.5 + (yTop - hEnd) * 0.2], cmTxt(t.ep), 6);
-        p.bubble([L + hg.along * 0.4, inp.er + hg.Hend * 0.5 + (yTop - hEnd) * 0.2], cmTxt(t.ep), 6);
+        p.bubble([-hg.along * 0.4, inp.er + hg.Hend * 0.5 + (Hout - hEnd) * 0.2], cmTxt(t.ep), 6);
+        p.bubble([L + hg.along * 0.4, inp.er + hg.Hend * 0.5 + (Hout - hEnd) * 0.2], cmTxt(t.ep), 6);
       }
       p.bubble([L / 2 + p.th(9), inp.er + inp.hInt / 2], cmTxt(inp.eExt), 6);
       // Axe de la chaussée, niveaux, pente
@@ -619,10 +620,10 @@ function elevationTete(study: Study): View {
       if (t.murs) {
         const hEnd = inp.er + hg.Hend;
         const k = p.th(2.2);
-        p.poly([[0, yTop], [-acr, hEnd], [-acr, inp.er]], "COFFRAGE");
-        p.poly([[B, yTop], [B + acr, hEnd], [B + acr, inp.er]], "COFFRAGE");
-        p.line([0, yTop - k], [-acr + k, hEnd - k * 0.3], "COFFRAGE");
-        p.line([B, yTop - k], [B + acr - k, hEnd - k * 0.3], "COFFRAGE");
+        p.poly([[0, g.Hout], [-acr, hEnd], [-acr, inp.er]], "COFFRAGE");
+        p.poly([[B, g.Hout], [B + acr, hEnd], [B + acr, inp.er]], "COFFRAGE");
+        p.line([0, g.Hout - k], [-acr + k, hEnd - k * 0.3], "COFFRAGE");
+        p.line([B, g.Hout - k], [B + acr - k, hEnd - k * 0.3], "COFFRAGE");
         p.bubble([-acr * 0.45, inp.er + (hEnd - inp.er) * 0.6], cmTxt(t.ep), 6);
         p.bubble([B + acr * 0.45, inp.er + (hEnd - inp.er) * 0.6], cmTxt(t.ep), 6);
       }

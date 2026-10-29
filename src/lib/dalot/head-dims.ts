@@ -13,7 +13,8 @@ export function headDimensions(inp: DalotInput) {
   const n = inp.openings.length;
   const B = 2 * inp.eExt + inp.openings.reduce((s, o) => s + o, 0) + (n - 1) * inp.eInt;
   const Hext = inp.er + inp.hInt + inp.es;
-  const Htot = Hext + inp.hr + inp.ech;
+  // L'aile s'arrête au raccord avec la dalle supérieure.
+  const Htot = Hext;
   const m = inp.talus.pente;
   const a = (t.angle * Math.PI) / 180;
   const cos = Math.cos(a), tan = Math.tan(a);

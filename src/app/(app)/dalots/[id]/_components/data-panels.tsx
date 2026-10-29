@@ -305,7 +305,7 @@ export function HeadsAside({ api }: { api: SpecApi }) {
         <table className="mt-2 w-full text-xs">
           <tbody className="divide-y divide-blue-100">
             <tr><td className="py-1 text-slate-600">Largeur extérieure de l&apos;ouvrage B = n·o + 2e + (n−1)·ei</td><td className="py-1 text-right font-semibold">{fr(B)} m</td></tr>
-            <tr><td className="py-1 text-slate-600">Hauteur à retenir à la racine H = er + h + es + hr + ech</td><td className="py-1 text-right font-semibold">{fr(dims.Htot)} m</td></tr>
+            <tr><td className="py-1 text-slate-600">Hauteur des ailes à la racine (arrêtées à la dalle supérieure) H = er + h + es</td><td className="py-1 text-right font-semibold">{fr(dims.Htot)} m</td></tr>
             {murs && <tr><td className="py-1 text-slate-600">Hauteur des ailes : racine / extrémité (talus {fr(dims.m, 1)}/1)</td><td className="py-1 text-right font-semibold">{fr(dims.Htot)} / {fr(dims.Hend)} m</td></tr>}
             {murs && <tr><td className="py-1 text-slate-600">Projection des ailes : le long de l&apos;axe / en travers</td><td className="py-1 text-right font-semibold">{fr(along)} / {fr(across)} m</td></tr>}
             <tr><td className="py-1 text-slate-600">Petite base du radier = B + 2·débord</td><td className="py-1 text-right font-semibold">{fr(pb)} m</td></tr>

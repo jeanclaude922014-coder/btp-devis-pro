@@ -210,8 +210,8 @@ function sheetCoffrage(study: Study, origin: Pt, num: string): Sheet {
       p.rect(xe - Math.min(0.25, t.murTeteEp), Hout, Math.min(0.25, t.murTeteEp), hHead, "COFFRAGE");
     }
     if (t.murs) {
-      p.line([xb, yTop], [Math.max(0, xb - hg.along), inp.er + hg.Hend], "COFFRAGE");
-      p.line([xe, yTop], [Math.min(Lt, xe + hg.along), inp.er + hg.Hend], "COFFRAGE");
+      p.line([xb, Hout], [Math.max(0, xb - hg.along), inp.er + hg.Hend], "COFFRAGE");
+      p.line([xe, Hout], [Math.min(Lt, xe + hg.along), inp.er + hg.Hend], "COFFRAGE");
       p.line([xb, inp.er], [xb, yTop], "COFFRAGE");
       p.line([xe, inp.er], [xe, yTop], "COFFRAGE");
       bub(p, [xb - hg.along * 0.45, inp.er + hg.Hend * 0.6], t.ep);

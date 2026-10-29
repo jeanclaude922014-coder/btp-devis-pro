@@ -439,7 +439,7 @@ const RURAL: Record<string, FieldValue> = {
   cv_Mc120: false, cv_Br: true, cv_Bt: true, cv_Bc: true, cv_A: true,
   soilPreset: "laterite_compacte", ks: 10000, qadm: 0.18, phiSol: 30, cSol: 0, gammaSol: 20, talusPhi: 30,
   aileAngle: 30, aileEp: 0.25, radierTeteLong: 1.5, becheProf: 1, becheEp: 0.25,
-  localisation: "Côte d'Ivoire", maitreOuvrage: "Conseil Café-Cacao",
+  localisation: "Côte d'Ivoire", maitreOuvrage: "",
   itineraire: "", modelePlans: "cafe",
   hyActif: true, hyMethode: "rationnelle", hyT: 10, hyMa: 350, hyMb: 0.38, hyK: 70, hyI: 0.6,
 };
@@ -462,8 +462,8 @@ export const DALOT_PRESETS: DalotPreset[] = [
   },
   {
     id: "r2x300x200", label: "Dalot double 2 × 3,00 × 2,00 — plan type",
-    description: "Note et plan types (Intercoton) : voiles 25 cm, dalle et radier 30 cm, L = 7,00 m. BV 5,00 km² → Qp ≈ 31,8 m³/s.",
-    values: { ...RURAL, projet: "Dalot 2 × 3,00 × 2,00", nCells: 2, opening: 3, hInt: 2, es: 0.3, er: 0.3, eExt: 0.25, eInt: 0.25, aileLong: 3.45, aileEp: 0.2, hyA: 5, hyL: 4.6, hyDH: 55, hyC: 0.33, hyI: 0.4, maitreOuvrage: "Intercoton" },
+    description: "Note et plan types : voiles 25 cm, dalle et radier 30 cm, L = 7,00 m. BV 5,00 km² → Qp ≈ 31,8 m³/s.",
+    values: { ...RURAL, projet: "Dalot 2 × 3,00 × 2,00", nCells: 2, opening: 3, hInt: 2, es: 0.3, er: 0.3, eExt: 0.25, eInt: 0.25, aileLong: 3.45, aileEp: 0.2, hyA: 5, hyL: 4.6, hyDH: 55, hyC: 0.33, hyI: 0.4 },
   },
   {
     id: "r2x300x300", label: "Dalot double 2 × 3,00 × 3,00 — plan type D07",
@@ -474,11 +474,11 @@ export const DALOT_PRESETS: DalotPreset[] = [
   },
   {
     id: "r3x400x400", label: "Dalot triple 3 × 4,00 × 4,00, L = 8,50 m — plan type",
-    description: "D'après le plan PAIA : piédroits 35 cm, dalle et radier 40 cm, L = 8,50 m, murs en aile de 7,41 m à 30 gr (6,60 m en plan), radiers de tête 6,60 m, bêches 25 × 130, garde-corps ; chaussée sur la dalle.",
+    description: "D'après le plan type : piédroits 35 cm, dalle et radier 40 cm, L = 8,50 m, murs en aile de 7,41 m à 30 gr (6,60 m en plan), radiers de tête 6,60 m, bêches 25 × 130, garde-corps ; chaussée sur la dalle.",
     values: { ...RURAL, projet: "Dalot 3 × 4,00 × 4,00", nCells: 3, opening: 4, hInt: 4, es: 0.4, er: 0.4, eExt: 0.35, eInt: 0.35, L: 8.5,
       hr: 0, ech: 0, aileLong: 7.41, aileAngle: 27, aileEp: 0.3, becheProf: 1.3, becheEp: 0.25, radierTeteLong: 6.6, hyActif: false,
       maitreOuvrage: "Ministère de l'Agriculture", localisation: "Côte d'Ivoire", pk: "PK 6+400", numPlan: "D01",
-      modelePlans: "paia", gardeCorps: true, guideRoues: false, ministere: "Ministère de l'Agriculture", maitreOeuvre: "PAIA",
+      modelePlans: "paia", gardeCorps: true, guideRoues: false, ministere: "Ministère de l'Agriculture", maitreOeuvre: "",
       marche: "Travaux de reprofilage lourd et traitement de points critiques sur 102,21 km de piste — Lot 1",
       itineraire: "", departement: "" },
   },

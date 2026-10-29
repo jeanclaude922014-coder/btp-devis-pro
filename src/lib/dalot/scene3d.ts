@@ -175,7 +175,8 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
   const xMt0 = -t.debord - yWing, wMt = B + 2 * (t.debord + yWing);
   const gcBase = H + (murT ? hHead : t.guideRoues ? GUIDE_ROUE.h : 0);
   // Les ailes montent jusqu'au sommet du mur de tête / guide-roue : pas de marche au raccord.
-  const wingRoot = Math.max(study.heads.wing?.Htot ?? 0, gcBase);
+  // L'aile s'arrête au raccord avec la dalle supérieure (le mur de tête / guide-roue repose sur sa racine).
+  const wingRoot = study.heads.wing?.Htot ?? H;
   const gcZ = (z0: number, s: number) => (murT ? z0 - (s * t.murTeteEp) / 2 : t.guideRoues ? z0 - (s * GUIDE_ROUE.w) / 2 : z0 - (s * GARDE_CORPS.post) / 2);
   const ends = [{ z0: 0, s: -1 }, { z0: L, s: 1 }] as const;
   for (const { z0, s } of ends) {
