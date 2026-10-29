@@ -40,6 +40,7 @@ type Ctx = {
   date: string;
   label: (b: BarMark | undefined) => string;
   rep: (rep: number | undefined) => string;
+  mark: (rep: number | undefined) => BarMark | undefined;
   bar: (element: string, prefix: string) => BarMark | undefined;
 };
 
@@ -73,6 +74,7 @@ function makeCtx(study: Study, model: Model): Ctx {
     study, model, name: dalotName(study), date: planDate(study.input.ident.datePlan),
     label,
     rep: (r) => label(r === undefined ? undefined : byRep.get(r)),
+    mark: (r) => (r === undefined ? undefined : byRep.get(r)),
     bar: (element, prefix) => bars.find((b) => b.element === element && b.designation.startsWith(prefix)),
   };
 }
@@ -312,6 +314,20 @@ function level(p: Pen, at: Pt, value: number, right = true) {
   const txt = `${value >= 0 ? "+" : ""}${value.toFixed(3).replace(".", ",")}`;
   p.line([at[0], at[1] + s * 1.4], [at[0] + (right ? 1 : -1) * p.th(12), at[1] + s * 1.4], "COTATION");
   p.text([at[0] + (right ? 1 : -1) * p.th(1), at[1] + s * 1.8], 2, txt, "COTATION", right ? "left" : "right");
+}
+
+/** Désignation d'une barre comme sur les plans DXF : « 53HA10 esp=15cm ». */
+function barText(b: BarMark) {
+  const n = Math.round(b.count / b.nElem);
+  return `${n}HA${b.phi}${b.s > 0 ? ` esp=${Math.round(b.s * 100)}cm` : ""}`;
+}
+
+/** Repère cerclé relié à la barre, suivi de sa désignation (nombre, diamètre, espacement). */
+function tag(p: Pen, ctx: Ctx, from: Pt, to: Pt, b: BarMark | undefined, mm = 6) {
+  p.callout(from, to, ctx.label(b), mm);
+  if (!b) return;
+  const right = to[0] >= from[0] - 1e-9;
+  p.text([to[0] + (right ? 1 : -1) * p.th(mm / 2 + 1), to[1] - p.th(0.8)], 1.9, barText(b), "TEXTE", right ? "left" : "right");
 }
 
 /** Étiquette reliée par une ligne brisée. */
@@ -588,7 +604,7 @@ function sectionFerraillage(ctx: Ctx, withDims: boolean): View {
         if (b.label) {
           const [ax, ay] = b.anchor;
           const d = p.th(21);
-          p.callout([ax, ay], [ax + b.dir[0] * d, ay + b.dir[1] * d], ctx.rep(rep.get(b.kind)), 6);
+          tag(p, ctx, [ax, ay], [ax + b.dir[0] * d, ay + b.dir[1] * d], ctx.mark(rep.get(b.kind)), 6);
         }
       }
       const re = gd("radier_ext"), ri = gd("radier_int"), de = gd("dalle_ext"), di = gd("dalle_int"), pe = gd("pext_ext"), pi = gd("pext_int");
@@ -610,7 +626,7 @@ function sectionFerraillage(ctx: Ctx, withDims: boolean): View {
         comb(p, [cl.x0, inp.er], [cl.x0, inp.er + inp.hInt], [1, 0], pi?.rep.s ?? sW, 1.5);
         comb(p, [cl.x1, inp.er], [cl.x1, inp.er + inp.hInt], [-1, 0], pi?.rep.s ?? sW, 1.5);
       }
-      const call = (b: BarMark | undefined, from: Pt, to: Pt) => { if (b) p.callout(from, to, ctx.label(b), 6); };
+      const call = (b: BarMark | undefined, from: Pt, to: Pt) => { if (b) tag(p, ctx, from, to, b, 6); };
       call(ctx.bar("RADIER", "Répartition"), [B * 0.62, c + 0.02], [B * 0.62, -p.th(21)]);
       call(ctx.bar("RADIER", "Chaises"), [B * 0.8, inp.er / 2], [B * 0.8, -p.th(21)]);
       call(ctx.bar("DALLE", "Répartition"), [B * 0.62, Hout - c - 0.02], [B * 0.62, Hout + p.th(21)]);
@@ -618,7 +634,7 @@ function sectionFerraillage(ctx: Ctx, withDims: boolean): View {
       call(ctx.bar("PIÉDROITS", "Répartition"), [c + 0.035, Hout * 0.68], [-p.th(21), Hout * 0.68]);
       call(ctx.bar("PIÉDROITS", "Épingles"), [inp.eExt / 2, Hout * 0.32], [-p.th(21), Hout * 0.32]);
       const eq = ctx.bar("DALLE", "Équerres");
-      if (eq) p.callout([B - c - 0.12, Hout - c - 0.04], [B + p.th(21), Hout - c - 0.04], ctx.label(eq), 6);
+      if (eq) tag(p, ctx, [B - c - 0.12, Hout - c - 0.04], [B + p.th(21), Hout - c - 0.04], eq, 6);
       if (withDims) {
         p.chainH([0, ...cells.flatMap((cl) => [cl.x0, cl.x1]), B], 0, -p.th(32), false);
         p.dimH(0, B, 0, -p.th(39));
@@ -664,8 +680,8 @@ function vuePlanTete(ctx: Ctx, detail: boolean): View {
       const mr = ctx.bar("MUR DE TÊTE", "Répartition");
       p.line([c, -c], [B - c, -c], "ACIERS");
       p.line([c, -em + c], [B - c, -em + c], "ACIERS");
-      if (mt) p.callout([B * 0.3, -c], [B * 0.3, yMax + p.th(14)], ctx.label(mt), 6);
-      if (mr) p.callout([B * 0.7, -em + c], [B * 0.7, yMax + p.th(14)], ctx.label(mr), 6);
+      if (mt) tag(p, ctx, [B * 0.3, -c], [B * 0.3, yMax + p.th(14)], mt, 6);
+      if (mr) tag(p, ctx, [B * 0.7, -em + c], [B * 0.7, yMax + p.th(14)], mr, 6);
       // Radier de tête
       if (radL > 0) {
         const xl = (y: number) => -y * tan, xr = (y: number) => B + y * tan;
@@ -678,11 +694,11 @@ function vuePlanTete(ctx: Ctx, detail: boolean): View {
         }
         const ti = ctx.bar("RADIER DE TÊTE", "Nappe inférieure"), ts = ctx.bar("RADIER DE TÊTE", "Nappe supérieure"), tl = ctx.bar("RADIER DE TÊTE", "Barres longitudinales");
         const yb = Math.min(radL - c, 0.2 * Math.floor(radL * 0.5 / 0.2) + c);
-        if (ti) p.callout([xl(yb) + 0.3, yb], [B * 0.25, radL + p.th(10)], ctx.label(ti), 6);
-        if (ts) p.callout([xr(yb) - 0.3, yb], [B * 0.75, radL + p.th(10)], ctx.label(ts), 6);
-        if (tl) p.callout([B * 0.5 + 0.1, radL * 0.7], [B * 0.5 + 0.1, yMax + p.th(14)], ctx.label(tl), 6);
+        if (ti) tag(p, ctx, [xl(yb) + 0.3, yb], [B * 0.25, radL + p.th(10)], ti, 6);
+        if (ts) tag(p, ctx, [xr(yb) - 0.3, yb], [B * 0.75, radL + p.th(10)], ts, 6);
+        if (tl) tag(p, ctx, [B * 0.5 + 0.1, radL * 0.7], [B * 0.5 + 0.1, yMax + p.th(14)], tl, 6);
         const bc = ctx.bar("BÊCHE", "Cadres");
-        if (bc) p.callout([B * 0.15, radL - t.becheEp / 2], [B * 0.15, yMax + p.th(14)], ctx.label(bc), 6);
+        if (bc) tag(p, ctx, [B * 0.15, radL - t.becheEp / 2], [B * 0.15, yMax + p.th(14)], bc, 6);
         p.dimV(0, radL, xr(radL), xr(radL) + p.th(6));
       }
       // Murs en aile : deux nappes et barres verticales vues en bout
@@ -701,9 +717,9 @@ function vuePlanTete(ctx: Ctx, detail: boolean): View {
           dots(p, [A[0] + nn[0] * (t.ep - c - 0.015), A[1] + nn[1] * (t.ep - c - 0.015)], [E[0] + nn[0] * (t.ep - c - 0.015) - d[0] * c, E[1] + nn[1] * (t.ep - c - 0.015) - d[1] * c], wv?.s || 0.2);
           dots(p, [A[0] + nn[0] * (c + 0.015), A[1] + nn[1] * (c + 0.015)], [E[0] + nn[0] * (c + 0.015) - d[0] * c, E[1] + nn[1] * (c + 0.015) - d[1] * c], 0.2);
           const m: Pt = [A[0] + d[0] * t.long * 0.55 + nn[0] * t.ep, A[1] + d[1] * t.long * 0.55 + nn[1] * t.ep];
-          if (wv) p.callout(m, [m[0] + side * p.th(16), m[1] + p.th(4)], ctx.label(wv), 6);
+          if (wv) tag(p, ctx, m, [m[0] + side * p.th(16), m[1] + p.th(4)], wv, 6);
           const m2: Pt = [A[0] + d[0] * t.long * 0.3, A[1] + d[1] * t.long * 0.3];
-          if (wh) p.callout(m2, [m2[0] + side * p.th(20), m2[1] - p.th(2)], ctx.label(wh), 6);
+          if (wh) tag(p, ctx, m2, [m2[0] + side * p.th(20), m2[1] - p.th(2)], wh, 6);
         }
         if (detail) {
           p.circle([0, 0], p.th(9), "COFFRAGE", true);
@@ -754,16 +770,16 @@ function detailAile(ctx: Ctx): View {
       const k1: Pt = [c, -0.5], k2: Pt = [A[0] + nn[0] * c + d[0] * 0.5, A[1] + nn[1] * c + d[1] * 0.5];
       p.poly([k1, [c, -c], [A2[0] - nn[0] * c, A2[1] - nn[1] * c], [A2[0] - nn[0] * c + d[0] * 0.5, A2[1] - nn[1] * c + d[1] * 0.5]], "ACIERS");
       p.poly([[e - c, -0.5], [e - c, -c], k2], "ACIERS");
-      if (cis) p.callout([c, -0.3], [-p.th(16), -0.3], ctx.label(cis), 6);
+      if (cis) tag(p, ctx, [c, -0.3], [-p.th(16), -0.3], cis, 6);
       const wv = ctx.bar("MUR EN L", "Voile — barres verticales côté remblai"), wf = ctx.bar("MUR EN L", "Voile — barres verticales face vue");
       const wh = ctx.bar("MUR EN L", "Voile — barres horizontales");
       const at = (s: number, o: number): Pt => [A[0] + d[0] * s + nn[0] * o, A[1] + d[1] * s + nn[1] * o];
-      if (wv) p.callout(at(lw * 0.7, t.ep - c), [at(lw * 0.7, t.ep)[0] - p.th(16), at(lw * 0.7, t.ep)[1]], ctx.label(wv), 6);
-      if (wf) p.callout(at(lw * 0.45, c), [at(lw * 0.45, 0)[0] + p.th(18), at(lw * 0.45, 0)[1]], ctx.label(wf), 6);
-      if (wh) p.callout(at(lw * 0.85, c), [at(lw * 0.85, 0)[0] + p.th(18), at(lw * 0.85, 0)[1] + p.th(5)], ctx.label(wh), 6);
-      const pr = ctx.rep(repMap(ctx.study).get("pext_ext"));
-      p.callout([e - c - 0.015, -lp * 0.6], [e + p.th(16), -lp * 0.6], pr, 6);
-      p.callout([c + 0.015, -lp * 0.6], [-p.th(16), -lp * 0.6], ctx.rep(repMap(ctx.study).get("pext_int")), 6);
+      if (wv) tag(p, ctx, at(lw * 0.7, t.ep - c), [at(lw * 0.7, t.ep)[0] - p.th(16), at(lw * 0.7, t.ep)[1]], wv, 6);
+      if (wf) tag(p, ctx, at(lw * 0.45, c), [at(lw * 0.45, 0)[0] + p.th(18), at(lw * 0.45, 0)[1]], wf, 6);
+      if (wh) tag(p, ctx, at(lw * 0.85, c), [at(lw * 0.85, 0)[0] + p.th(18), at(lw * 0.85, 0)[1] + p.th(5)], wh, 6);
+      const pr = ctx.mark(repMap(ctx.study).get("pext_ext"));
+      tag(p, ctx, [e - c - 0.015, -lp * 0.6], [e + p.th(16), -lp * 0.6], pr, 6);
+      tag(p, ctx, [c + 0.015, -lp * 0.6], [-p.th(16), -lp * 0.6], ctx.mark(repMap(ctx.study).get("pext_int")), 6);
     },
   };
 }
@@ -804,13 +820,13 @@ function elevationAile(ctx: Ctx): View | null {
       p.line([c, -c], [lg - c, -c], "REPARTITION");
       p.line([c, -se + c], [lg - c, -se + c], "REPARTITION");
       for (let y = c; y <= Math.min(w.Htot, 1.5); y += 0.25) p.line([-0.3 + c, y], [0.6, y + 0.12], "ACIERS");
-      if (wv) p.callout([lg * 0.35, top(lg * 0.35) * 0.6], [lg * 0.35, w.Htot + p.th(14)], ctx.label(wv), 6);
-      if (wf) p.callout([lg * 0.55, top(lg * 0.55) * 0.5], [lg * 0.55, w.Htot + p.th(14)], ctx.label(wf), 6);
-      if (wh) p.callout([c + 0.1, w.Htot * 0.55], [-0.3 - p.th(16), w.Htot * 0.55], ctx.label(wh), 6);
-      if (cis) p.callout([0.3, 0.4], [-0.3 - p.th(16), 0.4], ctx.label(cis), 6);
-      if (cou) p.callout([lg * 0.2, top(lg * 0.2) - c], [lg * 0.2 - p.th(4), w.Htot + p.th(14)], ctx.label(cou), 6);
-      if (sc) p.callout([lg * 0.7, -se / 2], [lg * 0.7, -se - p.th(12)], ctx.label(sc), 6);
-      if (sf) p.callout([lg * 0.85, -c], [lg + p.th(14), -se * 0.2], ctx.label(sf), 6);
+      if (wv) tag(p, ctx, [lg * 0.35, top(lg * 0.35) * 0.6], [lg * 0.35, w.Htot + p.th(14)], wv, 6);
+      if (wf) tag(p, ctx, [lg * 0.55, top(lg * 0.55) * 0.5], [lg * 0.55, w.Htot + p.th(14)], wf, 6);
+      if (wh) tag(p, ctx, [c + 0.1, w.Htot * 0.55], [-0.3 - p.th(16), w.Htot * 0.55], wh, 6);
+      if (cis) tag(p, ctx, [0.3, 0.4], [-0.3 - p.th(16), 0.4], cis, 6);
+      if (cou) tag(p, ctx, [lg * 0.2, top(lg * 0.2) - c], [lg * 0.2 - p.th(4), w.Htot + p.th(14)], cou, 6);
+      if (sc) tag(p, ctx, [lg * 0.7, -se / 2], [lg * 0.7, -se - p.th(12)], sc, 6);
+      if (sf) tag(p, ctx, [lg * 0.85, -c], [lg + p.th(14), -se * 0.2], sf, 6);
       // Repère de coupe 2-2
       const xs = lg * 0.45;
       p.line([xs, -se - p.th(6)], [xs, top(xs) + p.th(6)], "AXES");
@@ -853,13 +869,13 @@ function section22(ctx: Ctx): View | null {
       comb(p, [0, 0], [0, H], [-1, 0], w.rep.s);
       comb(p, [t.ep, 0], [t.ep, H], [1, 0], w.rep.s);
       comb(p, [xa, -se], [xb, -se], [0, -1], 0.2);
-      const L = (pre: string) => ctx.label(ctx.bar("MUR EN L", pre));
-      p.callout([t.ep - c, H * 0.7], [t.ep + p.th(18), H * 0.7], L("Voile — barres verticales côté remblai"), 6);
-      p.callout([c, H * 0.7], [-p.th(18), H * 0.7], L("Voile — barres verticales face vue"), 6);
-      p.callout([t.ep - c - 0.015, H * 0.45], [t.ep + p.th(18), H * 0.45], L("Voile — barres horizontales"), 6);
-      p.callout([(xa + xb) / 2 + 0.2, -se + c], [(xa + xb) / 2 + 0.2, -se - p.th(14)], L("Semelle — cadres"), 6);
-      p.callout([xb - c - 0.1, -c - 0.015], [xb + p.th(14), -c], L("Semelle — filants"), 6);
-      if (ctx.bar("MUR EN L", "Couronnement")) p.callout([t.ep / 2, H - c], [t.ep / 2, H + p.th(10)], L("Couronnement"), 6);
+      const L = (pre: string) => ctx.bar("MUR EN L", pre);
+      tag(p, ctx, [t.ep - c, H * 0.7], [t.ep + p.th(18), H * 0.7], L("Voile — barres verticales côté remblai"), 6);
+      tag(p, ctx, [c, H * 0.7], [-p.th(18), H * 0.7], L("Voile — barres verticales face vue"), 6);
+      tag(p, ctx, [t.ep - c - 0.015, H * 0.45], [t.ep + p.th(18), H * 0.45], L("Voile — barres horizontales"), 6);
+      tag(p, ctx, [(xa + xb) / 2 + 0.2, -se + c], [(xa + xb) / 2 + 0.2, -se - p.th(14)], L("Semelle — cadres"), 6);
+      tag(p, ctx, [xb - c - 0.1, -c - 0.015], [xb + p.th(14), -c], L("Semelle — filants"), 6);
+      if (ctx.bar("MUR EN L", "Couronnement")) tag(p, ctx, [t.ep / 2, H - c], [t.ep / 2, H + p.th(10)], L("Couronnement"), 6);
       p.dimH(xa, xb, -se, -se - p.th(20));
       p.dimH(0, t.ep, H, H + p.th(4));
     },
@@ -892,12 +908,12 @@ function elevationGC(ctx: Ctx): View {
       p.line([c, Hout + G.h - c], [B - c, Hout + G.h - c], "ACIERS");
       p.line([c, yl + c], [B - c, yl + c], "ACIERS");
       for (let x = c; x <= B - c + 1e-9; x += 0.2) p.line([x, yl + c], [x, Hout + G.h - c], "REPARTITION");
-      const L = (el: string, pre: string) => ctx.label(ctx.bar(el, pre));
+      const L = (el: string, pre: string) => ctx.bar(el, pre);
       const x1 = posts[1] ?? posts[0];
-      p.callout([x1 - G.post / 2 + c, Hout + 0.4], [x1 - G.post / 2 + c - p.th(3), Hout + G.h + p.th(14)], L("POTEAUX", "Barres verticales"), 6);
-      p.callout([x1, Hout + 0.2], [x1 + p.th(10), Hout + G.h + p.th(14)], L("POTEAUX", "Cadres"), 6);
-      p.callout([B * 0.5, Hout + G.h - c], [B * 0.5, Hout + G.h + p.th(14)], L("LISSE", "Filants"), 6);
-      p.callout([B * 0.5 + 0.3, yl + G.lisseH / 2], [B * 0.5 + 0.3 + p.th(10), Hout + G.h + p.th(14)], L("LISSE", "Cadres"), 6);
+      tag(p, ctx, [x1 - G.post / 2 + c, Hout + 0.4], [x1 - G.post / 2 + c - p.th(3), Hout + G.h + p.th(14)], L("POTEAUX", "Barres verticales"), 6);
+      tag(p, ctx, [x1, Hout + 0.2], [x1 + p.th(10), Hout + G.h + p.th(14)], L("POTEAUX", "Cadres"), 6);
+      tag(p, ctx, [B * 0.5, Hout + G.h - c], [B * 0.5, Hout + G.h + p.th(14)], L("LISSE", "Filants"), 6);
+      tag(p, ctx, [B * 0.5 + 0.3, yl + G.lisseH / 2], [B * 0.5 + 0.3 + p.th(10), Hout + G.h + p.th(14)], L("LISSE", "Cadres"), 6);
       const xm = (posts[0] + (posts[1] ?? B)) / 2;
       cutMark(p, [xm, yl + G.lisseH + p.th(3)], [0, -1], "1");
       cutMark(p, [posts[0] + 0.05, Hout + 0.3], [-1, 0], "2");
@@ -912,7 +928,7 @@ function coupeGC(ctx: Ctx, which: "lisse" | "poteau"): View {
   const G = GARDE_CORPS;
   const c = ctx.study.input.cover;
   const w = which === "lisse" ? G.lisseW : G.post, h = which === "lisse" ? G.lisseH : G.post;
-  const L = (el: string, pre: string) => ctx.label(ctx.bar(el, pre));
+  const L = (el: string, pre: string) => ctx.bar(el, pre);
   return {
     ext: { x0: 0, y0: 0, w, h },
     pad: { l: 8, r: 24, b: 16, t: 16 },
@@ -922,8 +938,8 @@ function coupeGC(ctx: Ctx, which: "lisse" | "poteau"): View {
       const r = p.th(1.3);
       for (const [x, y] of [[c + 0.012, c + 0.012], [w - c - 0.012, c + 0.012], [c + 0.012, h - c - 0.012], [w - c - 0.012, h - c - 0.012]] as Pt[]) p.circle([x, y], r, "ACIERS");
       const el = which === "lisse" ? "LISSE" : "POTEAUX";
-      p.callout([w - c - 0.012, h - c - 0.012], [w + p.th(16), h + p.th(8)], L(el, which === "lisse" ? "Filants" : "Barres verticales"), 7);
-      p.callout([w / 2, c], [w + p.th(16), -p.th(8)], L(el, "Cadres"), 7);
+      tag(p, ctx, [w - c - 0.012, h - c - 0.012], [w + p.th(16), h + p.th(8)], L(el, which === "lisse" ? "Filants" : "Barres verticales"), 7);
+      tag(p, ctx, [w / 2, c], [w + p.th(16), -p.th(8)], L(el, "Cadres"), 7);
       p.dimH(0, w, 0, -p.th(5));
       p.dimV(0, h, 0, -p.th(4));
     },

@@ -6,6 +6,7 @@ import { checksToCsv, countByStatus, DOMAINS, ratio, STATUS_LABELS, type CheckSt
 import type { GroupId } from "@/lib/dalot/design";
 import { convoyFigure, envelopeSvg, type Quantity } from "@/lib/dalot/diagrams";
 import { buildSheets } from "@/lib/dalot/drawings";
+import { renderSceneImage } from "@/lib/dalot/scene3d";
 import { sheetsToDxf } from "@/lib/dalot/dxf";
 import type { Study } from "@/lib/dalot/engine";
 import { buildNoteDocx, type NoteImages } from "@/lib/dalot/note-docx";
@@ -256,14 +257,19 @@ export function DesignPanel({
           </div>
         )}
       </Card>
-      <Card title="Ferraillage face par face (BAEL 91 mod. 99)">
+      <Card title="Ferraillage face par face (BAEL 91 mod. 99)" actions={
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => study.design.groups.forEach((g) => onImpose(g.id, { phi: g.bars.phi, s: g.bars.s }))} className={btn}>Imposer partout la disposition calculée</button>
+          <button onClick={() => study.design.groups.forEach((g) => onImpose(g.id, undefined))} disabled={!study.design.groups.some((g) => imposed[g.id])} className={btn}>Tout remettre au choix automatique</button>
+        </div>
+      }>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs text-slate-500">
               <tr>
                 <th className="px-2 py-1.5">Nappe</th><th className="px-2 py-1.5 text-right">Mu</th><th className="px-2 py-1.5 text-right">Ms</th>
                 <th className="px-2 py-1.5 text-right">As ELU</th><th className="px-2 py-1.5 text-right">As ELS</th><th className="px-2 py-1.5 text-right">As min</th>
-                <th className="px-2 py-1.5 text-right">As req.</th><th className="px-2 py-1.5">Armatures</th><th className="px-2 py-1.5 text-right">σs</th><th className="px-2 py-1.5 text-right">wk</th>
+                <th className="px-2 py-1.5 text-right">As req.</th><th className="px-2 py-1.5">Mode</th><th className="px-2 py-1.5">Armatures</th><th className="px-2 py-1.5 text-right">σs</th><th className="px-2 py-1.5 text-right">wk</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -281,6 +287,12 @@ export function DesignPanel({
                     <td className="px-2 py-1.5 text-right">{fr(g.AsELS)}</td>
                     <td className="px-2 py-1.5 text-right">{fr(g.AsMin)}</td>
                     <td className="px-2 py-1.5 text-right font-medium">{fr(g.AsReq)}</td>
+                    <td className="px-2 py-1.5">
+                      <select value={imp ? "impose" : "auto"} onChange={(e) => onImpose(g.id, e.target.value === "impose" ? { phi: g.bars.phi, s: g.bars.s } : undefined)}
+                        className={`rounded border px-1 py-0.5 text-xs ${imp ? "border-amber-400 bg-amber-50" : "border-slate-300"}`}>
+                        <option value="auto">Automatique</option><option value="impose">Imposé</option>
+                      </select>
+                    </td>
                     <td className="px-2 py-1.5">
                       <div className="flex items-center gap-1">
                         <select value={imp?.phi ?? g.bars.phi} onChange={(e) => onImpose(g.id, { phi: Number(e.target.value), s: imp?.s ?? g.bars.s })} className="rounded border border-slate-300 px-1 py-0.5 text-xs">
@@ -302,8 +314,8 @@ export function DesignPanel({
           </table>
         </div>
         <p className="mt-2 text-xs text-slate-500">
-          Moments en kN·m/m, sections en cm²/m, σs en MPa (limite {fr(mat.sigmaS, 1)} MPa), wk en mm. Choisir un diamètre ou un espacement impose la nappe :
-          elle est alors revérifiée telle quelle. Scellement droit ls = {mat.ls} Ø.
+          Moments en kN·m/m, sections en cm²/m, σs en MPa (limite {fr(mat.sigmaS, 1)} MPa), wk en mm. En mode « Imposé », la nappe garde exactement les barres choisies :
+          le logiciel ne la renforce pas, il la revérifie (ELU, ELS, armature minimale, espacements, ouverture des fissures) et signale les écarts. Scellement droit ls = {mat.ls} Ø.
         </p>
       </Card>
       <Card title="Effort tranchant">
@@ -332,7 +344,7 @@ export function ChecksPanel({ study, fix }: { study: Study; fix?: FixApi }) {
   const [q, setQ] = useState("");
   const counts = countByStatus(study.checks);
   const list = study.checks.filter((c) => (status === "all" || c.status === status) && (domain === "all" || c.domain === domain)
-    && (!q || `${c.element} ${c.label} ${c.ref}`.toLowerCase().includes(q.toLowerCase())));
+    && (!q || `${c.id} ${c.element} ${c.label} ${c.ref}`.toLowerCase().includes(q.toLowerCase())));
   return (
     <div className="space-y-4">
       {fix && <FixToolbar fix={fix} nonConformes={counts.non_conforme} />}
@@ -366,9 +378,9 @@ export function ChecksPanel({ study, fix }: { study: Study; fix?: FixApi }) {
           </tbody>
         </table>
       </Card>
-      <Card title={`Liste des vérifications (${list.length})`} actions={
+      <Card title={`Liste des vérifications — ${list.length} affichée(s) sur ${study.checks.length}`} actions={
         <div className="flex flex-wrap items-center gap-2">
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher…" className="rounded-md border border-slate-300 px-2 py-1 text-sm" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher une vérification…" className="rounded-md border border-slate-300 px-2 py-1 text-sm" />
           <select value={domain} onChange={(e) => setDomain(e.target.value)} className="rounded-md border border-slate-300 px-2 py-1 text-sm">
             <option value="all">Tous les domaines</option>{DOMAINS.map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
@@ -386,7 +398,7 @@ export function ChecksPanel({ study, fix }: { study: Study; fix?: FixApi }) {
                     <td className="px-2 py-1.5"><StatusBadge status={c.status} /></td>
                     <td className="px-2 py-1.5 text-xs">{c.element}</td>
                     <td className="px-2 py-1.5">
-                      {c.label}{c.combo && <span className="ml-1 font-mono text-[11px] text-slate-400">[{c.combo}]</span>}{c.detail && <div className="text-xs text-slate-500">{c.detail}</div>}
+                      <div className="font-mono text-[10px] text-slate-400">{c.id}</div>{c.label}{c.combo && <span className="ml-1 font-mono text-[11px] text-slate-400">[{c.combo}]</span>}{c.detail && <div className="text-xs text-slate-500">{c.detail}</div>}
                       {fix && (c.status === "non_conforme" || c.status === "non_verifie") && <FixOptions key={`${c.id}-${study.fingerprint}`} fix={fix} check={c} />}
                     </td>
                     <td className="px-2 py-1.5 text-right">{c.value !== undefined ? `${fr(c.value, 3)}` : "—"}</td>
@@ -548,6 +560,16 @@ export function NotePanel({ study }: { study: Study }) {
         tranchant: await svgToPng(envelopeSvg(study.analysis, study.analysis.elu, "V"), 1400),
         convois: [],
       };
+      // Vues 3D (si le navigateur dispose de WebGL ; sinon la note est produite sans elles).
+      try {
+        const cv = study.analysis.traffic.find((x) => x.positions.length)?.def.id ?? "";
+        const base = { concrete: "opaque" as const, fill: false, convoy: "", rebar: false, cut: false, efforts: false };
+        images.maquette = (await renderSceneImage(study, { ...base, convoy: cv }, 1600, 1000)) ?? undefined;
+        images.ferraillage3d = (await renderSceneImage(study, { ...base, concrete: "transparent", rebar: true }, 1600, 1000)) ?? undefined;
+        images.moments3d = (await renderSceneImage(study, { ...base, concrete: "transparent", efforts: true }, 1600, 1000, "face")) ?? undefined;
+      } catch {
+        /* pas de WebGL */
+      }
       for (const t of study.analysis.traffic.filter((x) => x.positions.length)) {
         const svg = convoyFigure(study, t.def.id);
         if (svg) images.convois!.push({ label: t.def.label, img: await svgToPng(svg, 1400) });

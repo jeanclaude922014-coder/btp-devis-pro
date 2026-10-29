@@ -85,3 +85,18 @@ béton armé (poteaux 20 × 20 tous les 1,00 m environ, lisse 20 × 15, h = 1,00
 Les préréglages 2,00 × 2,00 et 3 × 4,00 × 4,00 reprennent les cotes des plans d'origine (ailes à 30 gr,
 radiers de tête 3,40 m et 6,60 m, bêches 25 × 100 et 25 × 130) ; `npm run verif:dalot` vérifie les 8 planches
 et ces cotes.
+
+## Version 4 — apports des vidéos DalotExpert (enchaînement du calcul, plans DXF, rotation 3D)
+
+- **Contrôles internes du modèle** (domaine « Contrôles du modèle et hypothèses », identifiants `CTRL-…`) :
+  poids propre du modèle = γ·A de la section, remblai et chaussée = q × B, équilibre des réactions du sol
+  sous G (résidu ≤ 0,5 %), symétrie des moments d'encastrement, convois effectivement promenés.
+- **Vérifications** : identifiant de chaque contrôle, recherche par identifiant, compteur « affichées sur ».
+- **Dimensionnement** : colonne Mode (Automatique / Imposé) par nappe, boutons « Imposer partout la
+  disposition calculée » et « Tout remettre au choix automatique ».
+- **Maquette 3D** (`scene3d.ts`, partagée avec la note) : ouvrage complet (radiers de tête évasés, bêches,
+  murs en aile et semelles, garde-corps), ferraillage barre par barre du corps **et des têtes**, convoi avec
+  volumes de diffusion jusqu'au feuillet moyen, rotation automatique, vues 3/4, dessus, face, côté.
+- **Note Word** : figures 3D (maquette avec convoi, moments sur la maquette, maquette ferraillée) et
+  chapitre des contrôles internes.
+- **Plans** : chaque repère porte sa désignation « 53HA10 esp=15cm ».

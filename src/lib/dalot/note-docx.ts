@@ -14,7 +14,7 @@ import { FIELD_BY_KEY } from "./fields";
 import { convoyLibrary, diffusionDepth } from "./convoys";
 
 export type NoteImage = { data: Uint8Array; width: number; height: number };
-export type NoteImages = Partial<Record<"section" | "coffrage" | "ferraillage" | "moments" | "tranchant" | "normal", NoteImage>> & {
+export type NoteImages = Partial<Record<"section" | "coffrage" | "ferraillage" | "moments" | "tranchant" | "normal" | "maquette" | "ferraillage3d" | "moments3d", NoteImage>> & {
   convois?: { label: string; img: NoteImage }[];
 };
 
@@ -182,7 +182,8 @@ export async function buildNoteDocx(study: Study, images: NoteImages): Promise<B
       ["Remblai sur dalle / chaussée", `${f(inp.hr)} m / ${f(inp.ech)} m`],
       ["Largeur roulable / chargeable", `${f(inp.Lr)} m / ${f(inp.Lc)} m`],
     ], [0.45, 0.55]),
-    ...image(images.coffrage ?? images.section, 600, "Figure 1 — Coupe transversale de coffrage cotée (m)."));
+    ...image(images.coffrage ?? images.section, 600, "Figure 1 — Coupe transversale de coffrage cotée (m)."),
+    ...image(images.maquette, 600, "Figure 1 bis — Maquette 3D de l'ouvrage complet (corps, têtes, murs en aile) avec le convoi à sa position la plus défavorable et ses volumes de diffusion."));
 
   // 5. Matériaux
   body.push(H1("5. Matériaux"),
@@ -298,7 +299,8 @@ export async function buildNoteDocx(study: Study, images: NoteImages): Promise<B
       }), [0.28, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12]),
     P("Unités : kN·m/m et kN/m. Convention : M > 0 tend la face inférieure de la dalle, la face inférieure du radier et la face droite des piédroits ; N > 0 en traction.", { italic: true, size: 17 }),
     ...image(images.moments, 600, "Figure 2 — Enveloppe des moments fléchissants ELU (kN·m/m), tracée côté fibre tendue."),
-    ...image(images.tranchant, 600, "Figure 3 — Enveloppe des efforts tranchants ELU (kN/m)."));
+    ...image(images.tranchant, 600, "Figure 3 — Enveloppe des efforts tranchants ELU (kN/m)."),
+    ...image(images.moments3d, 600, "Figure 3 bis — Enveloppe des moments ELU tracée sur la maquette 3D (rouge : moments positifs, bleu : moments négatifs)."));
 
   // 17. Réactions du sol
   body.push(H1("15. Réactions du sol"),
@@ -333,7 +335,10 @@ export async function buildNoteDocx(study: Study, images: NoteImages): Promise<B
     H1("21. Contrôle Eurocode 2"),
     FORMULA("MRd = As·fyd·(d − 0,4x), x = As·fyd/(0,8·b·fcd) ; VRd,c = max(CRd,c·k·(100·ρl·fck)^(1/3) ; 0,035·k^1,5·fck^0,5)·b·d", "EC2 6.1 / 6.2.2"),
     FORMULA("wk = sr,max·(εsm − εcm) ; sr,max = 3,4·c + 0,425·k1·k2·Ø/ρp,eff", "EC2 7.3.4"),
-    checksTable(by("Contrôle Eurocode 2")));
+    checksTable(by("Contrôle Eurocode 2")),
+    H2("Contrôles internes du modèle de calcul"),
+    P("Ces contrôles ne justifient pas l'ouvrage : ils établissent que le modèle porte exactement les charges annoncées (équilibre des réactions du sol, poids propre, remblai, symétrie) et que chaque convoi a bien été promené sur la dalle.", { italic: true, size: 18 }),
+    checksTable(by("Contrôles du modèle et hypothèses")));
 
   // 23. Géotechnique
   const gf = geo.factors;
@@ -361,7 +366,8 @@ export async function buildNoteDocx(study: Study, images: NoteImages): Promise<B
   body.push(H1("24. Synthèse du ferraillage"),
     table(["Nappe", "Armatures principales", "Répartition"],
       design.groups.map((g) => [g.label, `HA${g.bars.phi} e = ${f(g.bars.s * 100, 1)} cm (${f(g.bars.As * 1e4)} cm²/m)`, `HA${g.rep.phi} e = ${f(g.rep.s * 100, 1)} cm`]), [0.4, 0.35, 0.25]),
-    ...image(images.ferraillage, 600, "Figure 4 — Ferraillage de la section courante."));
+    ...image(images.ferraillage, 600, "Figure 4 — Ferraillage de la section courante."),
+    ...image(images.ferraillage3d, 600, "Figure 5 — Maquette 3D ferraillée, barre par barre : corps, murs et radiers de tête, bêches, murs en aile et semelles."));
 
   // 26. Métré
   body.push(H1("25. Métré et nomenclature des aciers"),

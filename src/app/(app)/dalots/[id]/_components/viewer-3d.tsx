@@ -3,90 +3,31 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { stripBlocks } from "@/lib/dalot/convoys";
-import { transverseSpread } from "@/lib/dalot/analysis";
-import { bodyBars } from "@/lib/dalot/drawings";
+import { buildScene, cameraFor, governing, sceneToDxf, type CameraPreset, type Scene3DOptions } from "@/lib/dalot/scene3d";
 import type { Study } from "@/lib/dalot/engine";
 import { downloadBlob, slug } from "./download";
 
-type Opts = { concrete: "opaque" | "transparent" | "masque"; fill: boolean; convoy: string; rebar: boolean; cut: boolean; efforts: boolean };
-
-/** Maquette 3D au format DXF (R12) : faces 3DFACE et lignes 3D, un calque par élément. */
-function sceneToDxf(scene: THREE.Scene): string {
-  const out: string[] = ["0", "SECTION", "2", "ENTITIES"];
-  const n = (x: number) => x.toFixed(4);
-  const v = new THREE.Vector3();
-  // Repère DXF : x en travers, y le long de l'ouvrage, z vertical.
-  const P = (p: THREE.Vector3) => [n(p.x), n(p.z), n(p.y)];
-  scene.updateMatrixWorld(true);
-  scene.traverse((obj) => {
-    const layer = obj.userData.layer as string | undefined;
-    if (!layer) return;
-    const geo = (obj as THREE.Mesh).geometry as THREE.BufferGeometry | undefined;
-    const pos = geo?.getAttribute("position");
-    if (!geo || !pos) return;
-    const get = (i: number) => P(v.fromBufferAttribute(pos, i).applyMatrix4(obj.matrixWorld));
-    if ((obj as THREE.LineSegments).isLineSegments) {
-      for (let i = 0; i + 1 < pos.count; i += 2) {
-        const a = get(i), b = get(i + 1);
-        out.push("0", "LINE", "8", layer, "10", a[0], "20", a[1], "30", a[2], "11", b[0], "21", b[1], "31", b[2]);
-      }
-      return;
-    }
-    const idx = geo.getIndex();
-    const tri = idx ? idx.count / 3 : pos.count / 3;
-    for (let k = 0; k < tri; k++) {
-      const ids = [0, 1, 2].map((j) => (idx ? idx.getX(3 * k + j) : 3 * k + j));
-      const [a, b, c] = ids.map(get);
-      out.push("0", "3DFACE", "8", layer,
-        "10", a[0], "20", a[1], "30", a[2], "11", b[0], "21", b[1], "31", b[2],
-        "12", c[0], "22", c[1], "32", c[2], "13", c[0], "23", c[1], "33", c[2]);
-    }
-  });
-  out.push("0", "ENDSEC", "0", "EOF");
-  return out.join("\r\n") + "\r\n";
-}
-
-/** Position défavorable d'un convoi pour le moment maximal en travée de dalle. */
-function governing(study: Study, convoyId: string) {
-  const t = study.analysis.traffic.find((x) => x.def.id === convoyId && x.positions.length);
-  if (!t) return null;
-  let best = -1, val = -Infinity;
-  for (const m of study.analysis.model.members.filter((mm) => mm.kind === "dalle")) {
-    m.nodes.forEach((_, k) => {
-      const q = m.station0 + k;
-      if (t.max[q] > val) { val = t.max[q]; best = q; }
-    });
-  }
-  const pos = t.positions[t.argMax[best]];
-  return pos ? { t, pos, value: val } : null;
-}
+type Opts = Scene3DOptions & { rotate: boolean };
 
 export function Viewer3D({ study }: { study: Study }) {
   const ref = useRef<HTMLDivElement>(null);
-  const camState = useRef<{ p: THREE.Vector3; t: THREE.Vector3 } | null>(null);
+  const camState = useRef<{ p: THREE.Vector3; t: THREE.Vector3; n: number } | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const convoys = study.analysis.traffic.filter((t) => t.positions.length);
-  const [o, setO] = useState<Opts>({ concrete: "opaque", fill: true, convoy: convoys[0]?.def.id ?? "", rebar: false, cut: false, efforts: false });
+  const [o, setO] = useState<Opts>({ concrete: "opaque", fill: true, convoy: convoys[0]?.def.id ?? "", rebar: false, cut: false, efforts: false, rotate: false });
+  const [view, setView] = useState<{ preset: CameraPreset; n: number }>({ preset: "iso", n: 0 });
   const sceneRef = useRef<THREE.Scene | null>(null);
   const gov = useMemo(() => governing(study, o.convoy), [study, o.convoy]);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return undefined;
-    const inp = study.input;
-    const model = study.analysis.model;
-    const B = model.xRight - model.xLeft;
-    const H = inp.er + inp.hInt + inp.es;
-    const L = inp.L;
-    const t = inp.tetes;
-    const W = el.clientWidth || 800, Hh = el.clientHeight || 520;
-    const scene = new THREE.Scene();
+    const { scene, R, center } = buildScene(study, o, gov);
     sceneRef.current = scene;
-    scene.background = new THREE.Color(0xeef2f7);
-    const camera = new THREE.PerspectiveCamera(40, W / Hh, 0.05, 500);
-    const R = Math.max(B, L, H) * 1.9;
-    if (camState.current) camera.position.copy(camState.current.p); else camera.position.set(B / 2 + R * 0.9, H + R * 0.6, L / 2 + R * 0.9);
+    const W = el.clientWidth || 800, Hh = el.clientHeight || 520;
+    const camera = new THREE.PerspectiveCamera(40, W / Hh, 0.05, 1000);
+    const keep = camState.current && view.n === camState.current.n;
+    camera.position.copy(keep ? camState.current!.p : cameraFor(view.preset, center, R));
     const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     renderer.setSize(W, Hh);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -94,169 +35,10 @@ export function Viewer3D({ study }: { study: Study }) {
     el.replaceChildren(renderer.domElement);
     rendererRef.current = renderer;
     const controls = new OrbitControls(camera, renderer.domElement);
-    if (camState.current) controls.target.copy(camState.current.t); else controls.target.set(B / 2, H / 2, L / 2);
+    controls.target.copy(keep ? camState.current!.t : center);
     controls.enableDamping = true;
-    scene.add(new THREE.AmbientLight(0xffffff, 0.65));
-    const sun = new THREE.DirectionalLight(0xffffff, 0.9);
-    sun.position.set(B * 2, H * 6, L * 1.5);
-    scene.add(sun);
-
-    const clip = o.cut ? [new THREE.Plane(new THREE.Vector3(0, 0, -1), L / 2)] : [];
-    const concreteMat = new THREE.MeshStandardMaterial({
-      color: 0xb8c0cc, roughness: 0.85, side: THREE.DoubleSide, clippingPlanes: clip,
-      transparent: o.concrete !== "opaque", opacity: o.concrete === "transparent" ? 0.28 : 1, depthWrite: o.concrete === "opaque",
-    });
-    const addConcrete = (geo: THREE.BufferGeometry, pos?: THREE.Vector3, rotY = 0, layer = "CORPS") => {
-      if (o.concrete === "masque") return;
-      const mesh = new THREE.Mesh(geo, concreteMat);
-      mesh.userData.layer = layer;
-      if (pos) mesh.position.copy(pos);
-      mesh.rotation.y = rotY;
-      scene.add(mesh);
-      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({ color: 0x475569, clippingPlanes: clip }));
-      edges.position.copy(mesh.position);
-      edges.rotation.y = rotY;
-      scene.add(edges);
-    };
-
-    // Corps : section extrudée sur la longueur.
-    const shape = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(B, 0), new THREE.Vector2(B, H), new THREE.Vector2(0, H)]);
-    let x = inp.eExt;
-    inp.openings.forEach((op, k) => {
-      const g = Math.min(inp.gousset, op / 4, inp.hInt / 4);
-      const yb = inp.er, yt = inp.er + inp.hInt, x0 = x, x1 = x + op;
-      const pts = g > 0
-        ? [[x0 + g, yb], [x1 - g, yb], [x1, yb + g], [x1, yt - g], [x1 - g, yt], [x0 + g, yt], [x0, yt - g], [x0, yb + g]]
-        : [[x0, yb], [x1, yb], [x1, yt], [x0, yt]];
-      shape.holes.push(new THREE.Path(pts.map(([a, b]) => new THREE.Vector2(a, b))));
-      x = x1 + (k < inp.openings.length - 1 ? inp.eInt : 0);
-    });
-    addConcrete(new THREE.ExtrudeGeometry(shape, { depth: L, bevelEnabled: false }));
-
-    // Murs de tête, radiers de tête, murs en aile.
-    const hHead = study.heads.headWall.H;
-    for (const z of [-t.murTeteEp / 2, L + t.murTeteEp / 2]) addConcrete(new THREE.BoxGeometry(B, hHead, t.murTeteEp), new THREE.Vector3(B / 2, H + hHead / 2, z), 0, "MUR_TETE");
-    const a = (t.angle * Math.PI) / 180;
-    if (t.radierLong > 0) {
-      const w = B + 2 * t.radierLong * Math.tan(a) * (t.murs ? 1 : 0);
-      for (const z of [-t.radierLong / 2, L + t.radierLong / 2]) addConcrete(new THREE.BoxGeometry(w, inp.er, t.radierLong), new THREE.Vector3(B / 2, inp.er / 2, z), 0, "RADIER_TETE");
-    }
-    if (study.heads.wing) {
-      const w = study.heads.wing;
-      const ws = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(t.long, 0), new THREE.Vector2(t.long, w.Hend), new THREE.Vector2(0, Math.min(w.Htot, H + hHead))]);
-      const geo = new THREE.ExtrudeGeometry(ws, { depth: t.ep, bevelEnabled: false });
-      for (const [sx, xr] of [[-1, 0], [1, B]] as const) for (const [sz, zr] of [[-1, 0], [1, L]] as const) {
-        const dx = sx * Math.sin(a), dz = sz * Math.cos(a);
-        addConcrete(geo, new THREE.Vector3(xr, 0, zr), Math.atan2(-dz, dx), "MURS_AILE");
-      }
-    }
-
-    // Remblai et chaussée.
-    const top = H + inp.hr + inp.ech;
-    if (o.fill) {
-      const fillMat = new THREE.MeshStandardMaterial({ color: 0xc8a165, transparent: true, opacity: 0.18, depthWrite: false, clippingPlanes: clip });
-      const fill = new THREE.Mesh(new THREE.BoxGeometry(B + 6, top, L), fillMat);
-      fill.position.set(B / 2, top / 2, L / 2);
-      scene.add(fill);
-    }
-    const roadW = inp.Lr;
-    const road = new THREE.Mesh(new THREE.BoxGeometry(B + 16, 0.04, roadW), new THREE.MeshStandardMaterial({ color: 0x374151, transparent: true, opacity: 0.85, clippingPlanes: clip }));
-    road.position.set(B / 2, top + 0.02, L / 2);
-    scene.add(road);
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(B + 30, L + 30), new THREE.MeshStandardMaterial({ color: 0x8fb47a }));
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.set(B / 2, -0.01, L / 2);
-    scene.add(ground);
-
-    // Convoi à sa position défavorable et empreintes diffusées sur la dalle.
-    if (gov) {
-      const cfg = gov.t.def.configs[gov.pos.config];
-      const toX = (px: number) => (gov.pos.reversed ? gov.pos.X - px : gov.pos.X + px) - model.xLeft;
-      const z0 = L / 2 - roadW / 2 + 0.6;
-      const wheelMat = new THREE.MeshStandardMaterial({ color: 0xf97316 });
-      for (const p of cfg.patches) {
-        const box = new THREE.Mesh(new THREE.BoxGeometry(p.ax, 0.25, p.ay), wheelMat);
-        box.position.set(toX(p.x), top + 0.15, z0 + p.y);
-        scene.add(box);
-      }
-      const { footprint } = stripBlocks(cfg, study.analysis.D, transverseSpread(inp));
-      const fpMat = new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.25, depthWrite: false, side: THREE.DoubleSide });
-      for (const p of footprint) {
-        const r = new THREE.Mesh(new THREE.PlaneGeometry(p.ax, p.ay), fpMat);
-        r.rotation.x = -Math.PI / 2;
-        r.position.set(toX(p.x), H + 0.02, z0 + p.y);
-        scene.add(r);
-      }
-    }
-
-    // Enveloppe des moments ELU tracée dans la bande de calcul (côté fibre tendue).
-    if (o.efforts) {
-      const an = study.analysis;
-      const env = an.elu;
-      let vmax = 1e-9;
-      for (let k = 0; k < an.quantities.ns; k++) vmax = Math.max(vmax, Math.abs(env.max[k]), Math.abs(env.min[k]));
-      const amp = (Math.min(B, H) * 0.3) / vmax;
-      const zP = o.cut ? L / 2 + 0.02 : -0.06;
-      const yOff = inp.er / 2;
-      for (const [vals, color] of [[env.max, 0xdc2626], [env.min, 0x2563eb]] as const) {
-        const tris: number[] = [], lines: number[] = [];
-        for (const m of model.members) {
-          const a0 = model.nodes[m.nodes[0]], a1 = model.nodes[m.nodes[m.nodes.length - 1]];
-          const ux = (a1.x - a0.x) / m.length, uy = (a1.y - a0.y) / m.length;
-          const nx = -uy, ny = ux;
-          const pt = (k: number) => {
-            const nd = model.nodes[m.nodes[k]];
-            const v = -vals[m.station0 + k] * amp;
-            return { ax: nd.x - model.xLeft, ay: nd.y + yOff, cx: nd.x - model.xLeft + nx * v, cy: nd.y + yOff + ny * v };
-          };
-          for (let k = 0; k < m.nodes.length - 1; k++) {
-            const p0 = pt(k), p1 = pt(k + 1);
-            tris.push(p0.ax, p0.ay, zP, p0.cx, p0.cy, zP, p1.cx, p1.cy, zP, p0.ax, p0.ay, zP, p1.cx, p1.cy, zP, p1.ax, p1.ay, zP);
-            lines.push(p0.cx, p0.cy, zP, p1.cx, p1.cy, zP);
-          }
-        }
-        const g1 = new THREE.BufferGeometry();
-        g1.setAttribute("position", new THREE.Float32BufferAttribute(tris, 3));
-        scene.add(new THREE.Mesh(g1, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false })));
-        const g2 = new THREE.BufferGeometry();
-        g2.setAttribute("position", new THREE.Float32BufferAttribute(lines, 3));
-        const ls = new THREE.LineSegments(g2, new THREE.LineBasicMaterial({ color }));
-        ls.userData.layer = color === 0xdc2626 ? "MOMENTS_MAX" : "MOMENTS_MIN";
-        scene.add(ls);
-      }
-    }
-
-    // Ferraillage du corps.
-    if (o.rebar) {
-      const bars = bodyBars(study);
-      const mainPts: number[] = [], repPts: number[] = [];
-      const c = inp.cover;
-      for (const b of bars) {
-        const g = study.design.groups.find((gg) => gg.id === b.group);
-        if (!g) continue;
-        for (let z = c; z <= L - c + 1e-9; z += g.bars.s) {
-          if (o.cut && z > L / 2) break;
-          for (let k = 0; k < b.pts.length - 1; k++) mainPts.push(b.pts[k][0], b.pts[k][1], z, b.pts[k + 1][0], b.pts[k + 1][1], z);
-        }
-        for (let k = 0; k < b.pts.length - 1; k++) {
-          const [x0, y0] = b.pts[k], [x1, y1] = b.pts[k + 1];
-          const len = Math.hypot(x1 - x0, y1 - y0);
-          for (let u = 0.05; u < len; u += g.rep.s) {
-            const px = x0 + ((x1 - x0) * u) / len, py = y0 + ((y1 - y0) * u) / len;
-            repPts.push(px, py, c, px, py, o.cut ? L / 2 : L - c);
-          }
-        }
-      }
-      const mk = (pts: number[], color: number) => {
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
-        const seg = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color }));
-        seg.userData.layer = color === 0xdc2626 ? "ACIERS" : "REPARTITION";
-        scene.add(seg);
-      };
-      mk(mainPts, 0xdc2626);
-      mk(repPts, 0x2563eb);
-    }
+    controls.autoRotate = o.rotate;
+    controls.autoRotateSpeed = 1.6;
 
     let raf = 0;
     const loop = () => { controls.update(); renderer.render(scene, camera); raf = requestAnimationFrame(loop); };
@@ -267,7 +49,7 @@ export function Viewer3D({ study }: { study: Study }) {
     };
     window.addEventListener("resize", onResize);
     return () => {
-      camState.current = { p: camera.position.clone(), t: controls.target.clone() };
+      camState.current = { p: camera.position.clone(), t: controls.target.clone(), n: view.n };
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
       controls.dispose();
@@ -279,7 +61,7 @@ export function Viewer3D({ study }: { study: Study }) {
       });
       renderer.dispose();
     };
-  }, [study, o, gov]);
+  }, [study, o, gov, view]);
 
   const savePng = () => {
     rendererRef.current?.domElement.toBlob((blob) => {
@@ -303,6 +85,11 @@ export function Viewer3D({ study }: { study: Study }) {
           {convoys.map((c) => <option key={c.def.id} value={c.def.id}>{c.def.label}</option>)}
         </select>
         <button onClick={() => setO({ ...o, efforts: !o.efforts })} className={chip(o.efforts)}>Diagrammes M</button>
+        <button onClick={() => setO({ ...o, rotate: !o.rotate })} className={chip(o.rotate)}>Rotation auto</button>
+        <span className="ml-2 text-xs text-slate-500">Vue</span>
+        {([["iso", "3/4"], ["dessus", "dessus"], ["face", "face"], ["cote", "côté"]] as const).map(([p, l]) => (
+          <button key={p} onClick={() => setView({ preset: p, n: view.n + 1 })} className={chip(false)}>{l}</button>
+        ))}
         <button onClick={() => { if (sceneRef.current) void downloadBlob(new Blob([sceneToDxf(sceneRef.current)], { type: "application/dxf" }), `maquette3d_${slug(study.input.ident.projet)}.dxf`); }}
           className="rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">Maquette DXF 3D</button>
         <button onClick={savePng} className="ml-auto rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">Enregistrer l&apos;image</button>
@@ -311,7 +98,7 @@ export function Viewer3D({ study }: { study: Study }) {
       {gov && (
         <p className="text-xs text-slate-500">
           {gov.t.def.label} ({gov.t.def.configs[gov.pos.config].label}) à la position du moment maximal dans la dalle : essieu de référence à x = {gov.pos.X.toFixed(2).replace(".", ",")} m
-          {gov.pos.reversed ? " (sens inverse)" : ""}, M = {gov.value.toFixed(1).replace(".", ",")} kN·m/m (caractéristique, δ inclus). En orange clair : empreintes diffusées au plan de la dalle.
+          {gov.pos.reversed ? " (sens inverse)" : ""}, M = {gov.value.toFixed(1).replace(".", ",")} kN·m/m (caractéristique, δ inclus). En orange translucide : volumes de diffusion de chaque roue jusqu&apos;au feuillet moyen de la dalle.
           Souris : rotation (clic gauche), déplacement (clic droit), zoom (molette).
         </p>
       )}

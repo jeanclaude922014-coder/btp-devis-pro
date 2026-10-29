@@ -2,6 +2,7 @@
  * Point d'entrée du calcul : données → analyse → ferraillage → vérifications → métré.
  */
 
+import { modelControls } from "./controls";
 import { runAnalysis, type Analysis } from "./analysis";
 import { globalStatus, type Check, type CheckStatus } from "./checks";
 import { designSections, type Design } from "./design";
@@ -43,7 +44,7 @@ export function runStudy(spec: DalotSpec): RunOutcome {
     const heads = designHeads(input, design.mat);
     const quantities = computeQuantities(input, design.mat, design.groups, heads);
     const hydro = hydroStudy(input);
-    const checks = [...hydro.checks, ...design.checks, ...geo.checks, ...heads.checks];
+    const checks = [...hydro.checks, ...design.checks, ...geo.checks, ...heads.checks, ...modelControls(input, analysis)];
     if (input.convoys.length === 0) {
       checks.push({
         id: "C-TRAFIC", domain: "Dimensionnement des sections", element: "Ouvrage", label: "Charges d'exploitation routières",

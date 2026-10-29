@@ -30,6 +30,7 @@ export const DOMAINS = [
   "Géotechnique et stabilité",
   "Ouvrages de tête",
   "Contrôle Eurocode 2",
+  "Contrôles du modèle et hypothèses",
 ] as const;
 
 export function globalStatus(checks: Check[]): CheckStatus {
