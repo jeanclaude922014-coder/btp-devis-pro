@@ -81,7 +81,7 @@ export function NewSeriesForm({ action }: { action: (prev: FormState, fd: FormDa
         {pending ? "Calcul de la série..." : `Générer ${count} étude${count > 1 ? "s" : ""}`}
       </button>
       <p className="text-xs text-slate-500">
-        Chaque ouvrage est calculé avec les hypothèses des notes Bangolo – Bloléquin (FeE500, C25/30, remblai 0,60 m, convois A, Bc, Bt, Br).
+        Chaque ouvrage est calculé avec les hypothèses des notes de calcul types (FeE500, C25/30, remblai 0,60 m, convois A, Bc, Bt, Br).
         L&apos;étude hydraulique est à compléter ouvrage par ouvrage (bassin versant propre à chaque PK).
       </p>
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}

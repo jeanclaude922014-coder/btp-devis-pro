@@ -11,7 +11,7 @@ import { headDimensions } from "@/lib/dalot/head-dims";
 import { studyToXlsx } from "@/lib/dalot/excel";
 import { sheetsToDxf } from "@/lib/dalot/dxf";
 import type { Study } from "@/lib/dalot/engine";
-import { buildNoteDocx, type NoteImages } from "@/lib/dalot/note-docx";
+import { buildNoteDocx, type NoteKind, type NoteImages } from "@/lib/dalot/note-docx";
 import { barsToCsv } from "@/lib/dalot/quantities";
 import { sheetToSvg } from "@/lib/dalot/svg";
 import { downloadBlob, downloadText, slug, svgToPng } from "./download";
@@ -604,10 +604,15 @@ export function NotePanel({ study }: { study: Study }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const defaults = study.defaultsInPlace.length;
-  const generate = async () => {
+  const generate = async (kind: NoteKind = "complete") => {
     setBusy(true);
     setErr("");
     try {
+      if (kind === "hydraulique") {
+        // Note hydraulique : sans figures de structure.
+        downloadBlob(await buildNoteDocx(study, {}, kind), `Note_hydraulique_${slug(study.input.ident.projet)}_${study.fingerprint}.docx`);
+        return;
+      }
       const sheets = buildSheets(study);
       const images: NoteImages = {
         coffrage: await svgToPng(sheetToSvg(sheets.find((s) => s.role === "coffrage") ?? sheets[0], { background: "#ffffff" }), 1600),
@@ -634,8 +639,9 @@ export function NotePanel({ study }: { study: Study }) {
         const svg = convoyFigure(study, t.def.id);
         if (svg) images.convois!.push({ label: t.def.label, img: await svgToPng(svg, 1400) });
       }
-      const blob = await buildNoteDocx(study, images);
-      downloadBlob(blob, `Note_de_calcul_${slug(study.input.ident.projet)}_${study.fingerprint}.docx`);
+      const blob = await buildNoteDocx(study, images, kind);
+      const prefix = kind === "structure" ? "Note_beton_arme" : "Note_de_calcul";
+      downloadBlob(blob, `${prefix}_${slug(study.input.ident.projet)}_${study.fingerprint}.docx`);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -645,6 +651,7 @@ export function NotePanel({ study }: { study: Study }) {
   return (
     <Card title="Note de calcul Word">
       <p className="text-sm text-slate-600">
+        Trois documents : la note béton armé (structure, géotechnique, têtes, métré), la note hydraulique (bassin versant, débit de projet, écoulement, revanche) et la note complète.
         Document Word en Arial, avec en-tête « Auteur : {study.input.ident.auteur} » et pied de page sur chaque page, page de garde avec cartouche de visa, sommaire automatique,
         étude hydrologique et hydraulique, hypothèses, modèle, charges, convois et positions défavorables, combinaisons, sollicitations, dimensionnement,
         vérifications (BAEL, EC2, géotechnique, têtes), synthèse du ferraillage, métré, nomenclature, valeurs par défaut restées en place et conclusion.
@@ -653,7 +660,9 @@ export function NotePanel({ study }: { study: Study }) {
         <p className="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-800">{defaults} valeur(s) par défaut ne sont pas confirmées : elles seront listées dans la note (rubrique « Valeurs par défaut restées en place »).</p>
       )}
       <div className="mt-3 flex items-center gap-3">
-        <button onClick={generate} disabled={busy} className={btnPrimary}>{busy ? "Génération…" : "Générer la note (.docx)"}</button>
+        <button onClick={() => generate("structure")} disabled={busy} className={btnPrimary}>{busy ? "Génération…" : "Note béton armé (.docx)"}</button>
+        <button onClick={() => generate("hydraulique")} disabled={busy} className={btnPrimary}>Note hydraulique (.docx)</button>
+        <button onClick={() => generate("complete")} disabled={busy} className={btn}>Note complète (.docx)</button>
         <span className="text-xs text-slate-500">Empreinte des données : <span className="font-mono">{study.fingerprint}</span></span>
       </div>
       {err && <p className="mt-2 text-sm text-red-600">{err}</p>}

@@ -1,13 +1,13 @@
 /**
  * Dossiers de plans d'exécution reproduisant les plans types reçus (A3 paysage) :
  *
- *  « cafe » — plans Bangolo – Bloléquin (Dalot 2,00 × 2,00, 3,00 × 2,00, 2 × 3,00 × 2,00) :
+ *  « cafe » — modèle type 1 (Dalot 2,00 × 2,00, 3,00 × 2,00, 2 × 3,00 × 2,00) :
  *    1. page de garde ; 2. vue en plan et détail ; 3. coupes A-A, B-B et élévation de la tête ;
  *    4. plan de ferraillage du corps et hypothèses de calcul ; 5. nomenclature du corps ;
  *    6. ferraillage de la tête et détail de l'aile ; 7. ferraillage du mur en aile et section 2-2 ;
  *    8. « grille tête » (nomenclature des têtes). Cartouche en bandeau bas, repères des têtes « 1a, 2a… ».
  *
- *  « paia » — plans PAIA Damé – Massakro (Dalot 3 × 4,00 × 4,00) :
+ *  « paia » — modèle type 2 (Dalot 3 × 4,00 × 4,00) :
  *    1. titre ; 2. ensemble coffrage (coupes AA, BB, vue en plan, détail 1) ; 3. corps d'ouvrage ;
  *    4. nomenclature du corps ; 5-6. garde-corps et nomenclature ; 7. ferraillage des ouvrages de
  *    tête (vue en plan, élévation, détail 1, coupe A-A) ; 8. nomenclature des têtes.
@@ -326,8 +326,8 @@ function barText(b: BarMark) {
 
 /** Repère cerclé relié à la barre, suivi de sa désignation (nombre, diamètre, espacement). */
 function tag(p: Pen, ctx: Ctx, from: Pt, to: Pt, b: BarMark | undefined, mm = 6) {
-  p.callout(from, to, ctx.label(b), mm);
   if (!b) return;
+  p.callout(from, to, ctx.label(b), mm);
   const right = to[0] >= from[0] - 1e-9;
   p.text([to[0] + (right ? 1 : -1) * p.th(mm / 2 + 1), to[1] - p.th(0.8)], 1.9, barText(b), "TEXTE", right ? "left" : "right");
 }
@@ -914,55 +914,89 @@ function vuePlanTete(ctx: Ctx, detail: boolean): View {
   };
 }
 
-/** Détail de l'aile : raccord piédroit / mur en aile en vue en plan, ferraillage. */
+/**
+ * Détail du raccord voile (piédroit) / mur de tête (guide-roue) / mur en aile, en vue en plan, avec le
+ * ferraillage. Repère de la vue en plan de la tête : x en travers (x = 0 au nu extérieur du piédroit
+ * gauche), y le long de l'axe (y = 0 au nu de l'ouvrage, y > 0 vers le radier de tête). Le mur de tête
+ * occupe y ∈ [−ép, 0] et se prolonge jusqu'à x = −(débord + ép. aile / cos α) ; l'aile s'y encastre.
+ */
 function detailAile(ctx: Ctx): View {
   const g = geo(ctx.study);
   const { inp, t } = g;
   const c = inp.cover;
   const e = inp.eExt;
-  const lw = Math.max(1.2, 6 * t.ep), lp = Math.max(0.8, 4 * e);
+  const db = g.d;
+  const em = Math.max(g.ept, GUIDE_ROUE.w);
+  const yw = db + t.ep / Math.cos(g.a);
+  const lw = Math.max(0.9, 4 * t.ep), lp = Math.max(0.6, 2.5 * e), lr = Math.max(0.6, 2 * e);
   const d: Pt = [-Math.sin(g.a), Math.cos(g.a)];
   const nn: Pt = [-Math.cos(g.a), -Math.sin(g.a)];
+  const A: Pt = [-db, 0];
+  const E: Pt = [A[0] + d[0] * lw, A[1] + d[1] * lw];
+  const x0 = Math.min(-yw, E[0] + nn[0] * t.ep) - 0.1;
   return {
-    ext: { x0: d[0] * lw + nn[0] * t.ep - 0.1, y0: -lp, w: -(d[0] * lw + nn[0] * t.ep) + e + 0.2, h: lp + d[1] * lw + 0.1 },
-    pad: { l: 22, r: 22, b: 6, t: 6 },
+    ext: { x0, y0: -em - lp, w: e + lr - x0, h: em + lp + d[1] * lw + 0.1 },
+    pad: { l: 20, r: 26, b: 10, t: 6 },
     draw: (p) => {
-      // Piédroit (x de 0 à e, y < 0) et aile partant du coin extérieur.
-      p.line([0, -lp], [0, 0], "COFFRAGE");
-      p.line([e, -lp], [e, 0], "COFFRAGE");
-      p.line([-p.th(3), -lp], [e + p.th(3), -lp], "AXES");
-      const A: Pt = [e, 0], E: Pt = [e + d[0] * lw, d[1] * lw];
-      const A2: Pt = [A[0] + nn[0] * t.ep, A[1] + nn[1] * t.ep];
+      const at = (s0: number, o: number): Pt => [A[0] + d[0] * s0 + nn[0] * o, A[1] + d[1] * s0 + nn[1] * o];
+      // ── Coffrage ──
+      // Voile (piédroit) coupé, mur de tête prolongé jusqu'à la racine de l'aile, aile.
+      p.line([0, -em - lp], [0, -em], "COFFRAGE");
+      p.line([e, -em - lp], [e, -em], "COFFRAGE");
+      p.line([-p.th(3), -em - lp], [e + p.th(3), -em - lp], "AXES");
+      p.poly([[e + lr, 0], [-yw, 0], [-yw, -em], [e + lr, -em]], "COFFRAGE");
+      p.line([e + lr, p.th(2)], [e + lr, -em - p.th(2)], "AXES");
+      hatch(p, -yw, -em, yw + e + lr, em, 1.6);
+      p.line([-yw, 0], [at(lw, t.ep)[0], at(lw, t.ep)[1]], "COFFRAGE");
       p.line(A, E, "COFFRAGE");
-      p.line(A2, [A2[0] + d[0] * lw, A2[1] + d[1] * lw], "COFFRAGE");
-      p.line([0, 0], A2, "COFFRAGE");
+      p.line(E, at(lw, t.ep), "AXES");
+      // ── Aciers ──
       const pe = ctx.study.design.groups.find((x) => x.id === "pext_ext");
-      // Aciers du piédroit
-      for (const x of [c, e - c]) p.line([x, -lp], [x, 0 - c], "REPARTITION");
-      dots(p, [c + 0.015, -lp + 0.05], [c + 0.015, -c - 0.05], pe?.bars.s ?? 0.15);
-      dots(p, [e - c - 0.015, -lp + 0.05], [e - c - 0.015, -c - 0.05], pe?.bars.s ?? 0.15);
-      // Aciers de l'aile
-      for (const o of [c, t.ep - c]) {
-        const s0: Pt = [A[0] + nn[0] * o, A[1] + nn[1] * o];
-        p.line(s0, [s0[0] + d[0] * (lw - c), s0[1] + d[1] * (lw - c)], "REPARTITION");
-        dots(p, [s0[0] + nn[0] * 0.015 * (o === c ? 1 : -1) + d[0] * 0.1, s0[1] + nn[1] * 0.015 * (o === c ? 1 : -1) + d[1] * 0.1],
-          [s0[0] + d[0] * (lw - 0.1), s0[1] + d[1] * (lw - 0.1)], 0.15);
-      }
-      // Barres en ciseau traversant le raccord
-      const cis = ctx.bar("MUR EN L", "Barres en ciseau");
-      const k1: Pt = [c, -0.5], k2: Pt = [A[0] + nn[0] * c + d[0] * 0.5, A[1] + nn[1] * c + d[1] * 0.5];
-      p.poly([k1, [c, -c], [A2[0] - nn[0] * c, A2[1] - nn[1] * c], [A2[0] - nn[0] * c + d[0] * 0.5, A2[1] - nn[1] * c + d[1] * 0.5]], "ACIERS");
-      p.poly([[e - c, -0.5], [e - c, -c], k2], "ACIERS");
-      if (cis) tag(p, ctx, [c, -0.3], [-p.th(16), -0.3], cis, 6);
-      const wv = ctx.bar("MUR EN L", "Voile — barres verticales côté remblai"), wf = ctx.bar("MUR EN L", "Voile — barres verticales face vue");
-      const wh = ctx.bar("MUR EN L", "Voile — barres horizontales");
-      const at = (s: number, o: number): Pt => [A[0] + d[0] * s + nn[0] * o, A[1] + d[1] * s + nn[1] * o];
-      if (wv) tag(p, ctx, at(lw * 0.7, t.ep - c), [at(lw * 0.7, t.ep)[0] - p.th(16), at(lw * 0.7, t.ep)[1]], wv, 6);
-      if (wf) tag(p, ctx, at(lw * 0.45, c), [at(lw * 0.45, 0)[0] + p.th(18), at(lw * 0.45, 0)[1]], wf, 6);
-      if (wh) tag(p, ctx, at(lw * 0.85, c), [at(lw * 0.85, 0)[0] + p.th(18), at(lw * 0.85, 0)[1] + p.th(5)], wh, 6);
-      const pr = ctx.mark(repMap(ctx.study).get("pext_ext"));
-      tag(p, ctx, [e - c - 0.015, -lp * 0.6], [e + p.th(16), -lp * 0.6], pr, 6);
-      tag(p, ctx, [c + 0.015, -lp * 0.6], [-p.th(16), -lp * 0.6], ctx.mark(repMap(ctx.study).get("pext_int")), 6);
+      const pi = ctx.study.design.groups.find((x) => x.id === "pext_int");
+      const hw = ctx.study.heads.headWall;
+      const wing = g.hg.w;
+      // Voile : barres verticales vues en bout (deux faces) et retours dans le mur de tête.
+      dots(p, [c + 0.015, -em - lp + 0.05], [c + 0.015, -em - c], pe?.bars.s ?? 0.15);
+      dots(p, [e - c - 0.015, -em - lp + 0.05], [e - c - 0.015, -em - c], pi?.bars.s ?? 0.15);
+      p.line([c, -em - lp], [c, -em + c], "REPARTITION");
+      p.line([e - c, -em - lp], [e - c, -em + c], "REPARTITION");
+      // Mur de tête : deux nappes horizontales, prolongées jusqu'à la racine de l'aile.
+      p.line([-yw + c, -c], [e + lr, -c], "ACIERS");
+      p.line([-yw + c, -em + c], [e + lr, -em + c], "ACIERS");
+      dots(p, [-yw + c + 0.03, -c - 0.015], [e + lr - 0.05, -c - 0.015], hw.bars.s);
+      dots(p, [-yw + c + 0.03, -em + c + 0.015], [e + lr - 0.05, -em + c + 0.015], 0.2);
+      // Aile : horizontales des deux faces, ancrées dans le mur de tête par un retour (ls).
+      const ls = (ctx.study.design.mat.ls * 12) / 1000;
+      const fIn0 = at(0, c), fOut0 = at(0, t.ep - c);
+      p.poly([at(lw - c, c), fIn0, [fIn0[0] + Math.min(ls, lr + e), -c - 0.03]], "REPARTITION");
+      p.poly([at(lw - c, t.ep - c), [fOut0[0] + d[0] * 0.05, -em + c + 0.03], [-yw + c + Math.min(ls, lr + e + yw), -em + c + 0.03]], "REPARTITION");
+      dots(p, at(0.12, c + 0.015), at(lw - 0.1, c + 0.015), wing?.rep.s ?? 0.2);
+      dots(p, at(0.12, t.ep - c - 0.015), at(lw - 0.1, t.ep - c - 0.015), wing?.bars.s ?? 0.15);
+      // Barres en ciseau d'angle (rentrant aile / mur de tête).
+      const k1: Pt = at(0.55, c + 0.03);
+      p.poly([k1, at(0, c + 0.03), [A[0] + 0.55, -c - 0.06]], "ACIERS");
+      p.poly([at(0.55, t.ep - c - 0.03), [-yw + c + 0.05, -em + c + 0.06], [-yw + 0.6, -em + c + 0.06]], "ACIERS");
+      // ── Repères ──
+      const B = (el: string, pre: string) => ctx.bar(el, pre);
+      tag(p, ctx, at(lw * 0.7, t.ep - c - 0.015), [at(lw * 0.7, t.ep)[0] - p.th(14), at(lw * 0.7, t.ep)[1]], B("MUR EN L", "Voile — barres verticales côté remblai"), 6);
+      tag(p, ctx, at(lw * 0.45, c + 0.015), [at(lw * 0.45, 0)[0] + p.th(16), at(lw * 0.45, 0)[1]], B("MUR EN L", "Voile — barres verticales face vue"), 6);
+      tag(p, ctx, at(lw * 0.85, c), [at(lw * 0.85, 0)[0] + p.th(16), at(lw * 0.85, 0)[1] + p.th(4)], B("MUR EN L", "Voile — barres horizontales"), 6);
+      tag(p, ctx, at(0.4, c + 0.03), [at(0.4, 0)[0] + p.th(26), at(0.4, 0)[1] - p.th(9)], B("MUR EN L", "Barres en ciseau"), 6);
+      tag(p, ctx, [e + lr * 0.6, -c], [e + lr * 0.6, p.th(10)], B("MUR DE TÊTE", "Répartition"), 6);
+      tag(p, ctx, [e + lr * 0.35, -em + c + 0.015], [e + lr * 0.35 + p.th(6), -em - p.th(9)], B("MUR DE TÊTE", "Face côté remblai"), 6);
+      tag(p, ctx, [c + 0.015, -em - lp * 0.6], [-p.th(16), -em - lp * 0.6], ctx.mark(repMap(ctx.study).get("pext_ext")), 6);
+      tag(p, ctx, [e - c - 0.015, -em - lp * 0.45], [e + p.th(16), -em - lp * 0.45], ctx.mark(repMap(ctx.study).get("pext_int")), 6);
+      // ── Cotes et noms ──
+      p.dimH(0, e, -em - lp, -em - lp - p.th(4));
+      p.dimV(-em, 0, e + lr, e + lr + p.th(4));
+      p.dimH(-yw, 0, -em, -em - p.th(6), cmTxt(yw));
+      const m = at(lw * 0.3, 0);
+      p.line(m, at(lw * 0.3, t.ep), "COTATION");
+      p.text([at(lw * 0.3, t.ep / 2)[0] - p.th(1.5), at(lw * 0.3, t.ep / 2)[1]], 2, cmTxt(t.ep), "COTATION", "right");
+      p.text([e / 2, -em - lp * 0.25], 1.9, "Voile", "TEXTE", "center", 90);
+      p.text([e + lr * 0.5, -em / 2 - p.th(0.7)], 1.9, g.ept > 0 ? "Mur de tête (guide-roue)" : "Guide-roue", "TEXTE", "center");
+      p.text([at(lw * 0.6, t.ep / 2)[0], at(lw * 0.6, t.ep / 2)[1]], 1.9, "Aile", "TEXTE", "center", 90 - (g.a * 180) / Math.PI);
+      p.text([e + lr * 0.55, lw * 0.75], 1.9, "Radier de tête", "TEXTE", "center");
     },
   };
 }
@@ -1403,7 +1437,7 @@ export function buildModelSheets(study: Study, model: Model): Sheet[] {
       list.push({
         id: "ferraillage-tete", title: "Ferraillage de la tête",
         draw: (pg) => {
-          const xd = area.x + area.w * 0.76;
+          const xd = area.x + area.w * 0.68;
           pg.line(xd, 42, xd, 289);
           pg.place({ x: area.x, y: area.y, w: xd - area.x - 2, h: area.h }, vuePlanTete(ctx, wing), { text: `FERRAILLAGE TÊTE ${nm}`, pos: "below" });
           if (wing) pg.place({ x: xd + 2, y: area.y, w: area.x + area.w - xd - 4, h: area.h }, detailAile(ctx), { text: "Détail Aile", pos: "below", size: 3.4 });

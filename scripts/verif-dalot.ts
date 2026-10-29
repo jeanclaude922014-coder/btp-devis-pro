@@ -1,7 +1,7 @@
 /**
  * Contrôle de non-régression du moteur DalotPro : `npm run verif:dalot`.
  * 1. Solveur de portique contre un cas analytique (cadre carré symétrique : M appui = qL²/24).
- * 2. Hydrologie / hydraulique contre les notes de calcul Bangolo – Bloléquin (REV 001).
+ * 2. Hydrologie / hydraulique contre les notes de calcul types (REV 001).
  * 3. Calcul complet des modèles et d'une série 2, 3, 4 cellules × 7 et 8 ml.
  */
 import { defaultSpec, seriesSpec, specFromPreset, toInput } from "../src/lib/dalot/fields";

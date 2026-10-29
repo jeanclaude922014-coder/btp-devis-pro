@@ -69,7 +69,7 @@ export const FIELDS: FieldDef[] = [
   { key: "projet", section: "general", group: "Identification", label: "Intitulé du projet", kind: "text", required: true, default: "Dalot double 2 × (2,00 × 1,50)" },
   { key: "dossier", section: "general", group: "Identification", label: "N° de dossier", kind: "text", default: "DP-001" },
   { key: "ouvrage", section: "general", group: "Identification", label: "Repère de l'ouvrage", kind: "text", default: "OH-01 (PK 0+000)" },
-  { key: "localisation", section: "general", group: "Identification", label: "Localisation", kind: "text", default: "Abidjan, Côte d'Ivoire" },
+  { key: "localisation", section: "general", group: "Identification", label: "Localisation", kind: "text", default: "Côte d'Ivoire" },
   { key: "maitreOuvrage", section: "general", group: "Identification", label: "Maître d'ouvrage", kind: "text", default: "AGEROUTE" },
   { key: "maitreOeuvre", section: "general", group: "Identification", label: "Maître d'œuvre / Contrôle", kind: "text", default: "BNETD" },
   { key: "auteur", section: "general", group: "Identification", label: "Auteur de la note", kind: "text", default: "Moulo Jean Claude" },
@@ -80,9 +80,9 @@ export const FIELDS: FieldDef[] = [
   {
     key: "modelePlans", section: "general", group: "Cartouche des plans", label: "Modèle de plans", kind: "select", default: "cafe",
     options: [
-      { value: "cafe", label: "Modèle Bangolo – Bloléquin (8 planches A3 : garde, coffrage, coupes, ferraillage, nomenclatures, têtes)" },
-      { value: "paia", label: "Modèle PAIA Damé – Massakro (8 planches A3 : coffrage, corps, garde-corps, têtes et nomenclatures)" },
-      { value: "engc", label: "Modèle ENGC / KKP D07 (coffrage, ferraillage, nomenclature A4)" },
+      { value: "cafe", label: "Modèle type 1 — cartouche en bandeau (8 planches A3 : garde, coffrage, coupes, ferraillage, nomenclatures, têtes)" },
+      { value: "paia", label: "Modèle type 2 — cartouche ministère / maître d'œuvre (8 planches A3 : coffrage, corps, garde-corps, têtes et nomenclatures)" },
+      { value: "engc", label: "Modèle type 3 — plan D07 (coffrage, ferraillage, nomenclature A4)" },
     ],
     help: "Reproduit la mise en page, le cartouche et la numérotation des repères des plans types.",
   },
@@ -432,14 +432,14 @@ export function fingerprint(spec: DalotSpec): string {
 
 export type DalotPreset = { id: string; label: string; description: string; values: Record<string, FieldValue> };
 
-/** Hypothèses communes des notes de calcul Bangolo – Bloléquin (Guémon / Cavally, juillet 2026). */
+/** Hypothèses communes des notes de calcul types des dalots ruraux (juillet 2026). */
 const RURAL: Record<string, FieldValue> = {
   fe: "500", fc28: 25, cover: 0.03, hr: 0.6, ech: 0.05, gammaR: 19, gammaCh: 22, Lr: 6.5, Lc: 6.5, L: 7, gousset: 0,
   cv_Mc120: false, cv_Br: true, cv_Bt: true, cv_Bc: true, cv_A: true,
   soilPreset: "laterite_compacte", ks: 10000, qadm: 0.18, phiSol: 30, cSol: 0, gammaSol: 20, talusPhi: 30,
   aileAngle: 30, aileEp: 0.25, radierTeteLong: 1.5, becheProf: 1, becheEp: 0.25,
-  localisation: "Route Bangolo – Bloléquin (Guémon / Cavally)", maitreOuvrage: "Conseil Café-Cacao",
-  itineraire: "Bangolo – Bloléquin", modelePlans: "cafe",
+  localisation: "Côte d'Ivoire", maitreOuvrage: "Conseil Café-Cacao",
+  itineraire: "", modelePlans: "cafe",
   hyActif: true, hyMethode: "rationnelle", hyT: 10, hyMa: 350, hyMb: 0.38, hyK: 70, hyI: 0.6,
 };
 
@@ -449,37 +449,37 @@ export const DALOT_PRESETS: DalotPreset[] = [
     description: "Ouvrage de démonstration sous route revêtue, convois A, Bc, Bt, Br et Mc120.", values: {},
   },
   {
-    id: "r200x200", label: "Dalot 2,00 × 2,00 — route Bangolo – Bloléquin",
+    id: "r200x200", label: "Dalot 2,00 × 2,00 — plan type",
     description: "Note et plan types : voiles 20 cm, dalle et radier 25 cm, L = 7,00 m, ailes 3,81 m à 30 gr, radiers de tête 3,40 m, bêches 25 × 100, FeE500, C25/30, enrobage 3 cm, remblai 0,60 m. BV 1,20 km² → Qp ≈ 9,9 m³/s.",
     values: { ...RURAL, projet: "Dalot 2,00 × 2,00", nCells: 1, opening: 2, hInt: 2, es: 0.25, er: 0.25, eExt: 0.2, eInt: 0.2, aileLong: 3.81, aileAngle: 27, aileEp: 0.2,
       radierTeteLong: 3.4, becheProf: 1, becheEp: 0.25, murTeteEp: 0.25, hyA: 1.2, hyL: 1.7, hyDH: 32, hyC: 0.3 },
   },
   {
-    id: "r300x200", label: "Dalot 3,00 × 2,00 — route Bangolo – Bloléquin",
+    id: "r300x200", label: "Dalot 3,00 × 2,00 — plan type",
     description: "Note et plan types : voiles 25 cm, dalle et radier 30 cm, L = 7,00 m, FeE500, C25/30. BV 2,20 km² → Qp ≈ 17,2 m³/s.",
     values: { ...RURAL, projet: "Dalot 3,00 × 2,00", nCells: 1, opening: 3, hInt: 2, es: 0.3, er: 0.3, eExt: 0.25, eInt: 0.25, aileLong: 3.45, aileEp: 0.2, hyA: 2.2, hyL: 2.6, hyDH: 40, hyC: 0.33, hyI: 0.5 },
   },
   {
-    id: "r2x300x200", label: "Dalot double 2 × 3,00 × 2,00 — route Bangolo – Bloléquin",
+    id: "r2x300x200", label: "Dalot double 2 × 3,00 × 2,00 — plan type",
     description: "Note et plan types (Intercoton) : voiles 25 cm, dalle et radier 30 cm, L = 7,00 m. BV 5,00 km² → Qp ≈ 31,8 m³/s.",
     values: { ...RURAL, projet: "Dalot 2 × 3,00 × 2,00", nCells: 2, opening: 3, hInt: 2, es: 0.3, er: 0.3, eExt: 0.25, eInt: 0.25, aileLong: 3.45, aileEp: 0.2, hyA: 5, hyL: 4.6, hyDH: 55, hyC: 0.33, hyI: 0.4, maitreOuvrage: "Intercoton" },
   },
   {
-    id: "r2x300x300", label: "Dalot double 2 × 3,00 × 3,00 — plan type ENGC",
+    id: "r2x300x300", label: "Dalot double 2 × 3,00 × 3,00 — plan type D07",
     description: "D'après le plan D07 : piédroits 25 cm, dalle et radier 30 cm, L = 7,00 m, murs en aile de 4,00 m à 30°, bêches 20 × 120, guide-roues 25 × 40, chaussée sur la dalle.",
     values: { ...RURAL, projet: "Dalot double 2 × 3,00 × 3,00", nCells: 2, opening: 3, hInt: 3, es: 0.3, er: 0.3, eExt: 0.25, eInt: 0.25, L: 7,
       hr: 0, ech: 0, aileLong: 4, aileEp: 0.2, becheProf: 1.2, becheEp: 0.2, radierTeteLong: 2, guideRoues: true, hyActif: false,
       maitreOuvrage: "", localisation: "Côte d'Ivoire", numPlan: "D07", modelePlans: "engc" },
   },
   {
-    id: "r3x400x400", label: "Dalot triple 3 × 4,00 × 4,00, L = 8,50 m — Damé – Massakro",
+    id: "r3x400x400", label: "Dalot triple 3 × 4,00 × 4,00, L = 8,50 m — plan type",
     description: "D'après le plan PAIA : piédroits 35 cm, dalle et radier 40 cm, L = 8,50 m, murs en aile de 7,41 m à 30 gr (6,60 m en plan), radiers de tête 6,60 m, bêches 25 × 130, garde-corps ; chaussée sur la dalle.",
     values: { ...RURAL, projet: "Dalot 3 × 4,00 × 4,00", nCells: 3, opening: 4, hInt: 4, es: 0.4, er: 0.4, eExt: 0.35, eInt: 0.35, L: 8.5,
       hr: 0, ech: 0, aileLong: 7.41, aileAngle: 27, aileEp: 0.3, becheProf: 1.3, becheEp: 0.25, radierTeteLong: 6.6, hyActif: false,
-      maitreOuvrage: "Ministère de l'Agriculture", localisation: "Damé – Massakro (Agnibilékro), PK 6+400", pk: "PK 6+400", numPlan: "D01",
+      maitreOuvrage: "Ministère de l'Agriculture", localisation: "Côte d'Ivoire", pk: "PK 6+400", numPlan: "D01",
       modelePlans: "paia", gardeCorps: true, guideRoues: false, ministere: "Ministère de l'Agriculture", maitreOeuvre: "PAIA",
       marche: "Travaux de reprofilage lourd et traitement de points critiques sur 102,21 km de piste — Lot 1",
-      itineraire: "Damé – Massakro", departement: "Agnibilékro" },
+      itineraire: "", departement: "" },
   },
 ];
 

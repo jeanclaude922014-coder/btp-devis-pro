@@ -386,7 +386,7 @@ function Home({ items, store, onOpen, onCreate, onRemove }: {
           <button onClick={createSeries} disabled={busy || count === 0 || count > 40 || !seriesName.trim()} className="w-full rounded-md bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60">
             {busy ? "Calcul de la série…" : count > 40 ? "40 ouvrages au maximum par série" : `Générer ${count} étude${count > 1 ? "s" : ""}`}
           </button>
-          <p className="text-xs text-slate-500">Hypothèses des notes Bangolo – Bloléquin (FeE500, C25/30, remblai 0,60 m, convois A, Bc, Bt, Br). L&apos;étude hydraulique se complète ouvrage par ouvrage.</p>
+          <p className="text-xs text-slate-500">Hypothèses des notes de calcul types (FeE500, C25/30, remblai 0,60 m, convois A, Bc, Bt, Br). L&apos;étude hydraulique se complète ouvrage par ouvrage.</p>
         </section>
       </div>
 

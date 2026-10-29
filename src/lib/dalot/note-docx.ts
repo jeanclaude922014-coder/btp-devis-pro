@@ -8,7 +8,7 @@ import {
   AlignmentType, BorderStyle, Document, Footer, Header, HeadingLevel, ImageRun, Packer, PageBreak, PageNumber,
   Paragraph, ShadingType, Table, TableCell, TableOfContents, TableRow, TextRun, WidthType,
 } from "docx";
-import { STATUS_LABELS, countByStatus, type Check } from "./checks";
+import { STATUS_LABELS, countByStatus, globalStatus, type Check } from "./checks";
 import type { Study } from "./engine";
 import { FIELD_BY_KEY } from "./fields";
 import { convoyLibrary, diffusionDepth } from "./convoys";
@@ -86,23 +86,30 @@ function checksTable(checks: Check[]) {
   );
 }
 
-export async function buildNoteDocx(study: Study, images: NoteImages): Promise<Blob> {
+/** Note complète, note béton armé (structure seule) ou note hydraulique seule. */
+export type NoteKind = "complete" | "structure" | "hydraulique";
+
+const HYDRO = "Hydrologie et hydraulique";
+
+export async function buildNoteDocx(study: Study, images: NoteImages, kind: NoteKind = "complete"): Promise<Blob> {
+  if (kind === "hydraulique") return packNote(study, hydroBody(study), "Note hydraulique");
   const { input: inp, analysis: an, design, geo, heads, quantities: qt } = study;
   const id = inp.ident;
   const mat = design.mat;
   const today = new Date().toLocaleDateString("fr-FR");
-  const counts = countByStatus(study.checks);
+  const checksK = kind === "structure" ? study.checks.filter((c) => c.domain !== HYDRO) : study.checks;
+  const counts = countByStatus(checksK);
   const B = an.model.xRight - an.model.xLeft;
   const Hout = inp.er + inp.hInt + inp.es;
   const ns = an.quantities.ns;
-  const statusText = STATUS_LABELS[study.status];
+  const statusText = STATUS_LABELS[globalStatus(checksK)];
   const body: (Paragraph | Table | TableOfContents)[] = [];
 
   // ── Page de garde ──
   body.push(
     P(" ", { spacingAfter: 1200 }),
     P("NOTE DE CALCUL", { bold: true, size: 48, align: AlignmentType.CENTER, color: "000000" }),
-    P("Dalot cadre en béton armé", { size: 30, align: AlignmentType.CENTER, color: "334155" }),
+    P(kind === "structure" ? "Dalot cadre — étude béton armé" : "Dalot cadre en béton armé", { size: 30, align: AlignmentType.CENTER, color: "334155" }),
     P(" ", { spacingAfter: 400 }),
     P(id.projet, { bold: true, size: 32, align: AlignmentType.CENTER }),
     P(`${id.ouvrage} — ${id.localisation}`, { size: 24, align: AlignmentType.CENTER }),
@@ -125,12 +132,13 @@ export async function buildNoteDocx(study: Study, images: NoteImages): Promise<B
   // 1. Objet
   body.push(H1("1. Objet de la note"),
     P(`La présente note justifie le dalot cadre « ${id.ouvrage} » du projet « ${id.projet} » (${id.localisation}). Elle couvre la modélisation de l'ouvrage, les charges permanentes et routières, les combinaisons d'actions, les sollicitations, le dimensionnement du béton armé face par face, les vérifications de résistance, de service et géotechniques, les ouvrages de tête, la synthèse du ferraillage et le métré.`),
-    P("Chaque vérification porte un statut : Conforme, Non conforme, Non vérifié (donnée absente : la vérification reste ouverte) ou Non applicable (avec la raison). Le statut global reflète exactement ce qui a été démontré."));
+    P("Chaque vérification porte un statut : Conforme, Non conforme, Non vérifié (donnée absente : la vérification reste ouverte) ou Non applicable (avec la raison). Le statut global reflète exactement ce qui a été démontré."),
+    ...(kind === "structure" ? [P("L'étude hydrologique et hydraulique (débit de projet, écoulement dans l'ouvrage) fait l'objet d'une note séparée ; la présente note traite le béton armé, la géotechnique et les ouvrages de tête.", { italic: true })] : []));
 
   // 1 bis. Hydrologie et hydraulique
   const hyd = study.hydro;
   const hy = inp.hydro;
-  if (hyd) {
+  if (hyd && kind === "complete") {
     body.push(H1("Étude hydrologique et hydraulique"),
       ...(hyd.method === "rationnelle" ? [
         H2("Débit de crue de projet"),
@@ -462,21 +470,34 @@ export async function buildNoteDocx(study: Study, images: NoteImages): Promise<B
     ...(defs.length ? [table(["Donnée", "Valeur retenue"], defs.map((d) => [d.label, `${formatValue(study.values[d.key])} ${d.unit ?? ""}`]), [0.7, 0.3])] : []));
 
   // 28. Conclusion
-  const nc = study.checks.filter((c) => c.status === "non_conforme");
-  const nv = study.checks.filter((c) => c.status === "non_verifie");
+  const nc = checksK.filter((c) => c.status === "non_conforme");
+  const nv = checksK.filter((c) => c.status === "non_verifie");
   body.push(H1("27. Conclusion"),
-    P(`Sur ${study.checks.length} vérifications : ${counts.conforme} conformes, ${counts.non_conforme} non conformes, ${counts.non_verifie} non vérifiées et ${counts.non_applicable} non applicables (avec leur justification). Statut global : ${statusText}.`, { bold: true }),
+    P(`Sur ${checksK.length} vérifications : ${counts.conforme} conformes, ${counts.non_conforme} non conformes, ${counts.non_verifie} non vérifiées et ${counts.non_applicable} non applicables (avec leur justification). Statut global : ${statusText}.`, { bold: true }),
     ...(nc.length ? [P("Vérifications non conformes à traiter :"), ...nc.map((c) => BULLET(`${c.element} — ${c.label} (${f(c.value, 3)} pour ${f(c.limit, 3)} ${c.unit ?? ""})`))] : []),
     ...(nv.length ? [P("Vérifications restées ouvertes :"), ...nv.map((c) => BULLET(`${c.element} — ${c.label}${c.detail ? ` : ${c.detail}` : ""}`))] : []),
     ...(nc.length === 0 && nv.length === 0 ? [P("L'ouvrage est justifié sous les hypothèses de la présente note.")] : []),
     P(" "),
     P("Avertissement : ce document est produit par un outil d'aide au calcul. Les résultats, la note et les plans doivent être vérifiés, interprétés et validés par un ingénieur qualifié, qui en reste responsable.", { italic: true, size: 17, color: "64748B" }));
 
+  return packNote(study, body, kind === "structure" ? "Note de calcul béton armé" : "Note de calcul");
+}
+
+function formatValue(v: unknown) {
+  if (typeof v === "number") return f(v, Math.abs(v) >= 100 ? 0 : 2);
+  if (typeof v === "boolean") return v ? "oui" : "non";
+  return v === null || v === undefined || v === "" ? "—" : String(v);
+}
+
+/** En-tête « Auteur », pied de page, styles et assemblage du document Word. */
+function packNote(study: Study, body: (Paragraph | Table | TableOfContents)[], docTitle: string): Promise<Blob> {
+  const id = study.input.ident;
+  const today = new Date().toLocaleDateString("fr-FR");
   const header = new Header({
     children: [new Paragraph({
       border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "000000", space: 4 } },
       children: [
-        new TextRun({ text: `Note de calcul — ${id.projet} — ${id.ouvrage}`, size: 16, font: FONT, color: "000000", bold: true }),
+        new TextRun({ text: `${docTitle} — ${id.projet} — ${id.ouvrage}`, size: 16, font: FONT, color: "000000", bold: true }),
         new TextRun({ text: `\tAuteur : ${id.auteur}`, size: 16, font: FONT, color: "475569" }),
       ],
       tabStops: [{ type: "right", position: 9638 }],
@@ -494,7 +515,7 @@ export async function buildNoteDocx(study: Study, images: NoteImages): Promise<B
 
   const doc = new Document({
     creator: id.auteur,
-    title: `Note de calcul — ${id.projet}`,
+    title: `${docTitle} — ${id.projet}`,
     description: "Note de calcul de dalot cadre (BAEL 91 mod. 99, Fascicule 61 titre II, contrôle EC2)",
     features: { updateFields: true },
     styles: {
@@ -514,8 +535,82 @@ export async function buildNoteDocx(study: Study, images: NoteImages): Promise<B
   return Packer.toBlob(doc);
 }
 
-function formatValue(v: unknown) {
-  if (typeof v === "number") return f(v, Math.abs(v) >= 100 ? 0 : 2);
-  if (typeof v === "boolean") return v ? "oui" : "non";
-  return v === null || v === undefined || v === "" ? "—" : String(v);
+/** Note hydraulique autonome : bassin versant, débit de projet, écoulement dans l'ouvrage, vérifications. */
+function hydroBody(study: Study): (Paragraph | Table | TableOfContents)[] {
+  const inp = study.input;
+  const id = inp.ident;
+  const hy = inp.hydro;
+  const hyd = study.hydro;
+  const today = new Date().toLocaleDateString("fr-FR");
+  const checks = study.checks.filter((c) => c.domain === HYDRO);
+  const k = countByStatus(checks);
+  const body: (Paragraph | Table | TableOfContents)[] = [];
+  const n = inp.openings.length;
+  const bTot = inp.openings.reduce((acc, o) => acc + o, 0);
+  body.push(
+    P(" ", { spacingAfter: 1200 }),
+    P("NOTE HYDRAULIQUE", { bold: true, size: 48, align: AlignmentType.CENTER, color: "000000" }),
+    P("Étude hydrologique et hydraulique du dalot", { size: 30, align: AlignmentType.CENTER, color: "334155" }),
+    P(" ", { spacingAfter: 400 }),
+    P(id.projet, { bold: true, size: 32, align: AlignmentType.CENTER }),
+    P(`${id.ouvrage} — ${id.localisation}`, { size: 24, align: AlignmentType.CENTER }),
+    P(`${n} cellule${n > 1 ? "s" : ""} ${inp.openings.map((o) => f(o)).join(" + ")} × ${f(inp.hInt)} m`, { size: 22, align: AlignmentType.CENTER, color: "475569" }),
+    P(" ", { spacingAfter: 600 }),
+    table(["Rubrique", "Valeur"], [
+      ["Maître d'ouvrage", id.maitreOuvrage], ["Maître d'œuvre / Contrôle", id.maitreOeuvre], ["Dossier", id.dossier],
+      ["Auteur", id.auteur], ["Date", today], ["Indice", id.indice || "A"], ["Empreinte des données", study.fingerprint],
+      ["Statut hydraulique", `${STATUS_LABELS[globalStatus(checks)]} (${k.conforme} conformes, ${k.non_conforme} non conformes, ${k.non_verifie} non vérifiées)`],
+    ], [0.35, 0.65]),
+    P(" ", { spacingAfter: 300 }),
+    table(["Visa", "Nom", "Date", "Signature"], [["Établi par", id.auteur, today, ""], ["Vérifié par", "", "", ""], ["Approuvé par", "", "", ""]], [0.2, 0.35, 0.2, 0.25]),
+    new Paragraph({ children: [new PageBreak()] }),
+    H1("1. Objet de la note"),
+    P(`La présente note établit le débit de projet du dalot « ${id.ouvrage} » du projet « ${id.projet} » et vérifie que sa section d'écoulement (${n} cellule${n > 1 ? "s" : ""} de ${inp.openings.map((o) => f(o)).join(" + ")} m × ${f(inp.hInt)} m) l'évacue avec une revanche suffisante. Le dimensionnement béton armé fait l'objet d'une note séparée.`),
+    H1("2. Références"),
+    BULLET("Guide SETRA « Ouvrages hydrauliques de rétablissement des écoulements naturels »."),
+    BULLET("Méthode rationnelle ; temps de concentration de Kirpich ; courbes intensité-durée-fréquence de Montana."),
+    BULLET("Formule de Manning-Strickler pour l'écoulement uniforme à surface libre."),
+  );
+  if (!hy.actif || !hyd) {
+    body.push(H1("3. Étude hydraulique"), P("L'étude hydraulique est désactivée dans les données : la section d'écoulement n'est pas justifiée par la présente note.", { bold: true }));
+    return body;
+  }
+  if (hyd.method === "rationnelle") {
+    body.push(
+      H1("3. Bassin versant"),
+      table(["Paramètre", "Symbole", "Valeur"], [
+        ["Superficie du bassin versant", "A", `${f(hy.A)} km²`], ["Longueur du plus long talweg", "L", `${f(hy.L)} km`],
+        ["Dénivelée", "ΔH", `${f(hy.dH, 1)} m`], ["Coefficient de ruissellement", "C", f(hy.C)], ["Période de retour", "T", `${f(hy.T, 0)} ans`],
+        ["Coefficients de Montana", "a ; b", `${f(hy.montanaA, 0)} ; ${f(hy.montanaB)}`],
+      ], [0.5, 0.15, 0.35]),
+      H1("4. Débit de projet"),
+      FORMULA(`Temps de concentration (Kirpich) : tc = 0,945·(L³/ΔH)^0,385 = 0,945 × (${f(hy.L)}³ / ${f(hy.dH, 1)})^0,385 = ${f(hyd.tcH, 3)} h = ${f(hyd.tcMin, 1)} min`),
+      FORMULA(`Intensité de pluie (Montana) : I = a / t^b = ${f(hy.montanaA, 0)} / ${f(hyd.tcMin, 1)}^${f(hy.montanaB)} = ${f(hyd.I, 1)} mm/h`),
+      FORMULA(`Débit de pointe (méthode rationnelle) : Qp = C·I·A / 3,6 = ${f(hy.C)} × ${f(hyd.I, 1)} × ${f(hy.A)} / 3,6 = ${f(hyd.Qp)} m³/s`),
+    );
+  } else {
+    body.push(H1("3. Débit de projet"), P(`Débit de projet issu d'une étude hydrologique externe : Qp = ${f(hyd.Qp)} m³/s.`));
+  }
+  const b = Math.min(...inp.openings);
+  const Ir = hy.pente / 100;
+  body.push(
+    H1(hyd.method === "rationnelle" ? "5. Écoulement dans l'ouvrage" : "4. Écoulement dans l'ouvrage"),
+    FORMULA(`Débit par cellule (au prorata des ouvertures) : Qc = Qp × b / Σb = ${f(hyd.Qp)} × ${f(b)} / ${f(bTot)} = ${f(hyd.Qcell)} m³/s`),
+    FORMULA(`Manning-Strickler : Q = K·S·R^(2/3)·√I, K = ${f(hy.K, 0)} m^(1/3)/s, I = ${f(hy.pente)} % = ${f(Ir, 4)} m/m`, "Manning-Strickler"),
+    FORMULA(`Tirant d'eau normal (résolution par dichotomie) : h = ${f(hyd.h, 3)} m`),
+    FORMULA(`Section mouillée : S = b·h = ${f(b)} × ${f(hyd.h, 3)} = ${f(hyd.S, 3)} m² ; périmètre mouillé : P = b + 2h = ${f(hyd.P, 3)} m`),
+    FORMULA(`Rayon hydraulique : R = S / P = ${f(hyd.S, 3)} / ${f(hyd.P, 3)} = ${f(hyd.R, 3)} m`),
+    FORMULA(`Contrôle : Q = ${f(hy.K, 0)} × ${f(hyd.S, 3)} × ${f(hyd.R, 3)}^(2/3) × √${f(Ir, 4)} = ${f(hy.K * hyd.S * Math.pow(hyd.R, 2 / 3) * Math.sqrt(Ir), 3)} m³/s ≈ Qc`),
+    FORMULA(`Vitesse moyenne : V = Qc / S = ${f(hyd.Qcell)} / ${f(hyd.S, 3)} = ${f(hyd.V)} m/s`),
+    FORMULA(`Nombre de Froude : Fr = V / √(g·h) = ${f(hyd.V)} / √(9,81 × ${f(hyd.h, 3)}) = ${f(hyd.Fr)} (${hyd.Fr > 1 ? "régime torrentiel" : "régime fluvial"})`),
+    FORMULA(`Revanche sous la dalle : r = h intérieure − h = ${f(inp.hInt)} − ${f(hyd.h, 3)} = ${f(hyd.revanche, 3)} m (${f(hyd.revanchePct, 0)} % de la hauteur libre)`),
+    H1(hyd.method === "rationnelle" ? "6. Vérifications hydrauliques" : "5. Vérifications hydrauliques"),
+    checksTable(checks),
+    H1(hyd.method === "rationnelle" ? "7. Conclusion" : "6. Conclusion"),
+    P(k.non_conforme === 0
+      ? `La section de ${n} × ${f(b)} × ${f(inp.hInt)} m évacue le débit de projet de ${f(hyd.Qp)} m³/s à surface libre, avec une revanche de ${f(hyd.revanche)} m.`
+      : `La section ne satisfait pas toutes les vérifications hydrauliques (${k.non_conforme} non conforme(s)) : augmenter l'ouverture, le nombre de cellules ou la hauteur, ou prévoir une protection à la sortie.`, { bold: true }),
+    P("Avertissement : ce document est produit par un outil d'aide au calcul ; il doit être vérifié et validé par un ingénieur qualifié.", { italic: true, size: 17, color: "64748B" }),
+  );
+  return body;
 }
