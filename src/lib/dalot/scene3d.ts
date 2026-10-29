@@ -171,12 +171,12 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
   const murT = hHead > 0.3;
   // Mur de tête (ou guide-roue) dans la longueur de l'ouvrage, prolongé jusqu'aux racines des ailes
   // (épaisseur de l'aile mesurée en travers) : les ailes viennent s'y encastrer.
-  const yWing = t.murs ? t.ep / Math.cos(a) : 0;
+  const yWing = 0; // les ailes prolongent les voiles : le mur de tête reste sur la largeur de l'ouvrage
   const xMt0 = -t.debord - yWing, wMt = B + 2 * (t.debord + yWing);
   const gcBase = H + (murT ? hHead : t.guideRoues ? GUIDE_ROUE.h : 0);
   // Les ailes montent jusqu'au sommet du mur de tête / guide-roue : pas de marche au raccord.
   // L'aile s'arrête au raccord avec la dalle supérieure (le mur de tête / guide-roue repose sur sa racine).
-  const wingRoot = study.heads.wing?.Htot ?? H;
+  const wingRoot = study.heads.wing ? Math.max(study.heads.wing.Htot, gcBase) : H;
   const gcZ = (z0: number, s: number) => (murT ? z0 - (s * t.murTeteEp) / 2 : t.guideRoues ? z0 - (s * GUIDE_ROUE.w) / 2 : z0 - (s * GARDE_CORPS.post) / 2);
   const ends = [{ z0: 0, s: -1 }, { z0: L, s: 1 }] as const;
   for (const { z0, s } of ends) {
@@ -211,14 +211,36 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
       grp.position.set(xr, 0, zr);
       grp.rotation.y = Math.atan2(-dz, dx);
       // Repère local : z vers le remblai (extérieur), pour que le voile et la semelle restent hors du radier de tête.
-      if (sx === sz) grp.scale.z = -1;
+      if (sx !== sz) grp.scale.z = -1;
       scene.add(grp);
       wingGroups.push({ grp });
       addConcrete(geo, undefined, "MURS_AILE", grp);
       // Semelle sous le radier : patin côté ouvrage, talon côté remblai.
-      const zf = t.ep + t.patin - t.semelle; // semelle côté ouvrage, sous le radier de tête (section 2-2 des plans types)
+      const zf = -t.patin; // semelle côté ouvrage, sous le radier de tête (section 2-2 des plans types)
       // Semelle enterrée (sous le terrain naturel) : elle ne doit pas apparaître posée à côté du radier.
       addConcrete(new THREE.BoxGeometry(t.long, t.semEp, t.semelle), V(t.long / 2, -t.semEp / 2 - 0.03, zf + t.semelle / 2), "SEMELLES", grp);
+    }
+  }
+
+  // ── Pli voile / aile : prisme triangulaire entre le bout du voile, la racine de l'aile et sa face intérieure ──
+  if (wing && t.murs && t.debord === 0) {
+    scene.updateMatrixWorld(true);
+    let gi = 0;
+    for (const [sx, xr] of [[-1, 0], [1, B]] as const) for (const zr of [0, L]) {
+      const grp = wingGroups[gi++]?.grp;
+      if (!grp) continue;
+      const Ri = grp.localToWorld(V(0, 0, t.ep));
+      const pts = [[xr, zr], [Ri.x, Ri.z], [xr - sx * inp.eExt, zr]];
+      const pos: number[] = [];
+      const y0 = 0, y1 = wingRoot;
+      const tri = (a: number[], b: number[], c: number[]) => pos.push(...a, ...b, ...c);
+      const P = pts.map(([x, z]) => [[x, y0, z], [x, y1, z]]);
+      tri(P[0][0], P[1][0], P[2][0]); tri(P[0][1], P[2][1], P[1][1]);
+      for (let k = 0; k < 3; k++) { const a0 = P[k], b0 = P[(k + 1) % 3]; tri(a0[0], b0[0], b0[1]); tri(a0[0], b0[1], a0[1]); }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+      geo.computeVertexNormals();
+      addConcrete(geo, undefined, "MURS_AILE");
     }
   }
 
@@ -450,7 +472,7 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
       if (wing && t.murs) {
         const hRoot = wingRoot;
         const topAt = (u: number) => hRoot + ((wing.Hend - hRoot) * u) / t.long;
-        const zf = t.ep + t.patin - t.semelle; // semelle côté ouvrage, sous le radier de tête (section 2-2 des plans types)
+        const zf = -t.patin; // semelle côté ouvrage, sous le radier de tête (section 2-2 des plans types)
         for (const { grp } of wingGroups) {
           const wb = new Bars();
           for (const zz of [c, t.ep - c]) {

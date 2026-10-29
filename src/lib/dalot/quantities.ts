@@ -159,8 +159,8 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
 
   // ── OUVRAGE DE TÊTE (deux extrémités) ──
   const hw = heads.headWall;
-  // Mur de tête prolongé jusqu'aux racines des ailes (épaisseur de l'aile mesurée en travers).
-  const Bmt = B + 2 * (t.debord + (t.murs ? t.ep / Math.cos((t.angle * Math.PI) / 180) : 0));
+  // Mur de tête sur la largeur de l'ouvrage (plus le débord du radier) : les ailes prolongent les voiles.
+  const Bmt = B + 2 * t.debord;
   const tanA = Math.tan((t.angle * Math.PI) / 180);
   // Radier de tête trapézoïdal : petite base B + 2·débord, grande base + 2·L·tan(angle) ; Wrt = largeur moyenne.
   const Wrt = B + 2 * t.debord + (t.murs ? t.radierLong * tanA : 0);

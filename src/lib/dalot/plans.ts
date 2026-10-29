@@ -144,7 +144,7 @@ function sheetCoffrage(study: Study, origin: Pt, num: string): Sheet {
       const xe = side < 0 ? 0 : L;
       if (hHead > 0) {
         // Mur de tête dans la longueur de l'ouvrage, prolongé jusqu'aux racines des ailes.
-        const yw = t.debord + (t.murs ? t.ep / Math.cos(hg.a) : 0);
+        const yw = t.debord;
         p.rect(side < 0 ? 0 : L - t.murTeteEp, -yw, t.murTeteEp, B + 2 * yw, "COFFRAGE");
       }
       if (t.radierLong > 0) {
@@ -156,8 +156,11 @@ function sheetCoffrage(study: Study, origin: Pt, num: string): Sheet {
           const sy = edge === 0 ? -1 : 1;
           const ex = xe + side * hg.along, ey = edge + sy * hg.across;
           p.line([xe, edge], [ex, ey], "COFFRAGE");
-          p.line([xe, edge + sy * t.ep], [ex, ey + sy * t.ep], "COFFRAGE");
-          p.line([ex, ey], [ex, ey + sy * t.ep], "COFFRAGE");
+          // Aile dans le prolongement du voile : épaisseur vers l'intérieur.
+          const ox = side * Math.sin(hg.a) * t.ep, oy = -sy * Math.cos(hg.a) * t.ep;
+          p.line([xe + ox, edge + oy], [ex + ox, ey + oy], "COFFRAGE");
+          p.line([ex, ey], [ex + ox, ey + oy], "COFFRAGE");
+          if (!t.debord) p.line([xe + ox, edge + oy], [xe, edge - sy * inp.eExt], "COFFRAGE");
           bub(p, [(xe + ex) / 2 + side * 0.15, (edge + ey) / 2 + sy * 0.45], t.ep);
           p.text([xe + side * 0.5, edge + sy * 0.15], 2, `${Math.round(t.angle)}°`, "COTATION", "center");
         }
@@ -210,8 +213,8 @@ function sheetCoffrage(study: Study, origin: Pt, num: string): Sheet {
       p.rect(xe - Math.min(0.25, t.murTeteEp), Hout, Math.min(0.25, t.murTeteEp), hHead, "COFFRAGE");
     }
     if (t.murs) {
-      p.line([xb, Hout], [Math.max(0, xb - hg.along), inp.er + hg.Hend], "COFFRAGE");
-      p.line([xe, Hout], [Math.min(Lt, xe + hg.along), inp.er + hg.Hend], "COFFRAGE");
+      p.line([xb, yTop], [Math.max(0, xb - hg.along), inp.er + hg.Hend], "COFFRAGE");
+      p.line([xe, yTop], [Math.min(Lt, xe + hg.along), inp.er + hg.Hend], "COFFRAGE");
       p.line([xb, inp.er], [xb, yTop], "COFFRAGE");
       p.line([xe, inp.er], [xe, yTop], "COFFRAGE");
       bub(p, [xb - hg.along * 0.45, inp.er + hg.Hend * 0.6], t.ep);

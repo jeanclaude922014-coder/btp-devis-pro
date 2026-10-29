@@ -83,9 +83,9 @@ export function designHeads(inp: DalotInput, mat: Materials): HeadsResult {
 
   let wing: WingResult | null = null;
   if (t.murs) {
-    // L'aile s'arrête au raccord avec la dalle supérieure : hauteur à l'enracinement = hauteur extérieure
-    // du cadre (le remblai au-dessus de la dalle est retenu par le mur de tête).
-    const Htot = Hext;
+    // L'aile s'accroche au sommet du guide-roue (ou du mur de tête) posé sur l'about de la dalle supérieure,
+    // comme sur les plans types : hauteur à l'enracinement = cadre + mur de tête ou guide-roue.
+    const Htot = Hext + (hHead > 0.3 ? hHead : t.guideRoues ? 0.4 : 0);
     const Hend = Math.max(0.6, Htot - (t.long * Math.cos(rad(t.angle))) / inp.talus.pente);
     // Ferraillage du voile au tiers de sa longueur : près de l'enracinement, le voile est tenu par
     // le mur de tête et le corps (fonctionnement en dalle sur deux côtés). La stabilité, elle,

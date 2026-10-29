@@ -13,8 +13,9 @@ export function headDimensions(inp: DalotInput) {
   const n = inp.openings.length;
   const B = 2 * inp.eExt + inp.openings.reduce((s, o) => s + o, 0) + (n - 1) * inp.eInt;
   const Hext = inp.er + inp.hInt + inp.es;
-  // L'aile s'arrête au raccord avec la dalle supérieure.
-  const Htot = Hext;
+  // L'aile s'accroche au sommet du guide-roue (ou du mur de tête) sur l'about de la dalle supérieure.
+  const hHead = inp.hr + inp.ech + t.revanche;
+  const Htot = Hext + (hHead > 0.3 ? hHead : t.guideRoues ? 0.4 : 0);
   const m = inp.talus.pente;
   const a = (t.angle * Math.PI) / 180;
   const cos = Math.cos(a), tan = Math.tan(a);
