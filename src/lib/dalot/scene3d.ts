@@ -174,6 +174,8 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
   const yWing = t.murs ? t.ep / Math.cos(a) : 0;
   const xMt0 = -t.debord - yWing, wMt = B + 2 * (t.debord + yWing);
   const gcBase = H + (murT ? hHead : t.guideRoues ? GUIDE_ROUE.h : 0);
+  // Les ailes montent jusqu'au sommet du mur de tête / guide-roue : pas de marche au raccord.
+  const wingRoot = Math.max(study.heads.wing?.Htot ?? 0, gcBase);
   const gcZ = (z0: number, s: number) => (murT ? z0 - (s * t.murTeteEp) / 2 : t.guideRoues ? z0 - (s * GUIDE_ROUE.w) / 2 : z0 - (s * GARDE_CORPS.post) / 2);
   const ends = [{ z0: 0, s: -1 }, { z0: L, s: 1 }] as const;
   for (const { z0, s } of ends) {
@@ -199,7 +201,7 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
   const wing = study.heads.wing;
   const wingGroups: { grp: THREE.Group }[] = [];
   if (wing && t.murs) {
-    const hRoot = Math.min(wing.Htot, H + hHead);
+    const hRoot = wingRoot;
     const ws = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(t.long, 0), new THREE.Vector2(t.long, wing.Hend), new THREE.Vector2(0, hRoot)]);
     const geo = new THREE.ExtrudeGeometry(ws, { depth: t.ep, bevelEnabled: false });
     for (const [sx, xr] of [[-1, -t.debord], [1, B + t.debord]] as const) for (const [sz, zr] of [[-1, 0], [1, L]] as const) {
@@ -222,7 +224,7 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
   // ── Étiquettes de géométrie ──
   scene.updateMatrixWorld(true);
   if (wing && t.murs && wingGroups.length) {
-    const hRoot = Math.min(wing.Htot, H + hHead);
+    const hRoot = wingRoot;
     for (const { grp } of [wingGroups[0], wingGroups[3] ?? wingGroups[0]]) {
       labels.push({ p: grp.localToWorld(V(t.long * 0.5, (hRoot + wing.Hend) / 2 + 0.3, t.ep / 2)), text: `Aile ${angle(t.angle)}, L = ${fr(t.long)} m`, kind: "geo" });
     }
@@ -445,7 +447,7 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
       }
       // Murs en aile : barres verticales et horizontales sur les deux faces, cadres de semelle.
       if (wing && t.murs) {
-        const hRoot = Math.min(wing.Htot, H + hHead);
+        const hRoot = wingRoot;
         const topAt = (u: number) => hRoot + ((wing.Hend - hRoot) * u) / t.long;
         const zf = t.ep + t.patin - t.semelle; // semelle côté ouvrage, sous le radier de tête (section 2-2 des plans types)
         for (const { grp } of wingGroups) {

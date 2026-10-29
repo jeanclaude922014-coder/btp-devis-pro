@@ -217,7 +217,7 @@ export const FIELDS: FieldDef[] = [
   { key: "radierDebord", section: "tetes", group: "Radiers de tête et bêches", label: "Débord latéral du radier de tête au droit de l'ouvrage (chaque côté)", unit: "m", kind: "number", default: 0, min: 0, max: 3, step: 0.05, help: "Petite base du radier de tête = largeur de l'ouvrage + 2 × débord. Grande base = petite base + 2 × longueur × tan(angle des ailes)." },
   { key: "becheProf", section: "tetes", group: "Radiers de tête et bêches", label: "Profondeur des bêches parafouilles", unit: "m", kind: "number", default: 0.8, min: 0, max: 3, step: 0.05 },
   { key: "becheEp", section: "tetes", group: "Radiers de tête et bêches", label: "Épaisseur des bêches", unit: "m", kind: "number", default: 0.25, min: 0.15, max: 0.6, step: 0.01 },
-  { key: "guideRoues", section: "tetes", group: "Équipements", label: "Guide-roues sur murs de tête", kind: "bool", default: true },
+  { key: "guideRoues", section: "tetes", group: "Équipements", label: "Guide-roues sur murs de tête", kind: "bool", default: true, help: "Toujours présent quand il y a des murs en aile : il assure le raccord entre les voiles et les ailes." },
   { key: "gardeCorps", section: "tetes", group: "Équipements", label: "Garde-corps en béton armé (poteaux et lisse)", kind: "bool", default: false, help: "Garde-corps de 1,00 m sur les deux rives de la dalle : poteaux 20 × 20 tous les 1,00 m environ, lisse 20 × 15." },
 
   // ── Talus du remblai ──────────────────────────────────────
@@ -404,7 +404,8 @@ export function toInput(spec: DalotSpec): DalotInput {
       semelle: num(v.aileSemelle, 2.4), semEp: num(v.aileSemEp, 0.3), patin: num(v.aileTalon, 0.4), beche: num(v.aileBeche, 0),
       murTeteEp: num(v.murTeteEp, 0.2), revanche: num(v.murTeteRevanche, 0.2),
       radierLong: num(v.radierTeteLong, 1.5), debord: Math.max(0, num(v.radierDebord, 0)), becheProf: num(v.becheProf, 0.8), becheEp: num(v.becheEp, 0.25),
-      guideRoues: v.guideRoues === true, gardeCorps: v.gardeCorps === true,
+      // Avec des murs en aile, un guide-roue (ou le mur de tête) est toujours présent : il fait le raccord voile / aile.
+      guideRoues: v.guideRoues === true || v.teteMurs === true, gardeCorps: v.gardeCorps === true,
     },
     talus: { actif: v.talusActif === true, pente: num(v.talusPente, 1.5), phi: num(v.talusPhi, 30), c: num(v.talusC, 0) },
     hydro: {
