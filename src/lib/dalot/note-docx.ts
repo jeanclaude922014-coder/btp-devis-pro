@@ -12,6 +12,7 @@ import { STATUS_LABELS, countByStatus, type Check } from "./checks";
 import type { Study } from "./engine";
 import { FIELD_BY_KEY } from "./fields";
 import { convoyLibrary, diffusionDepth } from "./convoys";
+import { headDimensions } from "./head-dims";
 
 export type NoteImage = { data: Uint8Array; width: number; height: number };
 export type NoteImages = Partial<Record<"section" | "coffrage" | "ferraillage" | "moments" | "tranchant" | "normal" | "maquette" | "ferraillage3d" | "moments3d" | "tranchant3d" | "passagePlus" | "passageMoins", NoteImage>> & {
@@ -357,7 +358,16 @@ export async function buildNoteDocx(study: Study, images: NoteImages): Promise<B
 
   // 24. Têtes
   const w = heads.wing, hw = heads.headWall;
+  const dm = headDimensions(inp);
   body.push(H1("23. Ouvrages de tête"),
+    table(["Dimension", "Valeur"], [
+      ["Ailes : longueur / épaisseur / angle sur l'axe", inp.tetes.murs ? `${f(inp.tetes.long)} m / ${f(inp.tetes.ep)} m / ${f(inp.tetes.angle, 1)}°` : "sans"],
+      ["Hauteur des ailes à la racine / en extrémité", inp.tetes.murs ? `${f(dm.Htot)} m / ${f(dm.Hend)} m` : "—"],
+      ["Projection des ailes le long de l'axe / en travers", `${f(dm.along)} m / ${f(dm.across)} m`],
+      ["Radier de tête : longueur", `${f(inp.tetes.radierLong)} m`],
+      ["Radier de tête : petite base (B + 2·débord) / grande base", `${f(dm.pb)} m / ${f(dm.gb)} m`],
+      ["Longueur d'aile recommandée (H − 0,60)·m / cos α", inp.tetes.murs ? `${f(dm.longRec)} m` : "—"],
+    ], [0.6, 0.4]),
     FORMULA(`Ka = tan²(45° − φ/2) = ${f(hw.Ka, 3)} (φ = ${f(inp.talus.phi, 0)}°)`, "Rankine"),
     FORMULA(`Mur de tête (h = ${f(hw.H)} m, e = ${f(hw.e)} m) : Mu = 1,35·Ka·γ·h³/6 + 1,5·Ka·q·h²/2 = ${f(hw.M, 1)} kN·m/m → HA${hw.bars.phi} e = ${f(hw.bars.s * 100, 1)} cm`),
     ...(w ? [

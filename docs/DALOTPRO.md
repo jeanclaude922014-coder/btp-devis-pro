@@ -123,3 +123,17 @@ et ces cotes.
 - **Réglage des têtes par boutons** (rubrique Ouvrages de tête) : longueur, épaisseur et angle des ailes
   (degrés / 30 gr), longueur du radier de tête, petite base (nouveau champ « débord latéral ») et grande base
   (par l'angle), alignement du radier sur l'extrémité des ailes ; schéma coté en direct.
+
+## Version 7 — corrections des têtes, nouvelle section, export Excel
+
+- **Petite base** : saisie validée (OK / Entrée), minimum = largeur extérieure de l'ouvrage, message si la valeur
+  est refusée ; boutons −0,10 / +0,10 / +0,50 / « = largeur ouvrage ».
+- **Dimensions calculées à partir du projet** (`head-dims.ts`) : B, hauteur à retenir, hauteurs des ailes,
+  projections, petite et grande bases, surface du radier de tête, longueur d'aile recommandée
+  (H − 0,60)·m / cos α ; bouton « Appliquer » ; reprises dans les résultats des têtes et la note.
+- **3D** : ailes orientées vers le remblai (plus d'empiètement sur le radier), semelles enterrées,
+  **garde-corps posé sur le guide-roue** (3D et plans).
+- **Nouvelle section de dalot** : saisie directe (cellules, ouverture, hauteur, épaisseurs, longueur, remblai)
+  depuis l'accueil ou depuis une étude (mêmes données de projet), têtes calculées automatiquement.
+- **Export Excel** (`excel.ts`, `xlsx.ts`) : 7 feuilles avec formules (données, charges, flexion BAEL,
+  nomenclature, métré, hydraulique, vérifications) et écart avec le logiciel.

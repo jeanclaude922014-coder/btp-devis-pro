@@ -7,6 +7,8 @@ import type { GroupId } from "@/lib/dalot/design";
 import { convoyFigure, envelopeSvg, passageSvg, type Quantity } from "@/lib/dalot/diagrams";
 import { buildSheets } from "@/lib/dalot/drawings";
 import { renderSceneImage } from "@/lib/dalot/scene3d";
+import { headDimensions } from "@/lib/dalot/head-dims";
+import { studyToXlsx } from "@/lib/dalot/excel";
 import { sheetsToDxf } from "@/lib/dalot/dxf";
 import type { Study } from "@/lib/dalot/engine";
 import { buildNoteDocx, type NoteImages } from "@/lib/dalot/note-docx";
@@ -441,8 +443,22 @@ export function ChecksPanel({ study, fix }: { study: Study; fix?: FixApi }) {
 
 export function HeadsPanel({ study }: { study: Study }) {
   const w = study.heads.wing, hw = study.heads.headWall;
+  const dm = headDimensions(study.input);
+  const t = study.input.tetes;
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <Card title="Dimensions des ouvrages de tête">
+        <dl className="grid grid-cols-2 gap-y-1 text-sm">
+          <dt className="text-slate-500">Ailes : longueur / épaisseur / angle</dt><dd className="text-right">{t.murs ? `${fr(t.long)} / ${fr(t.ep)} m / ${fr(t.angle, 1)}°` : "sans"}</dd>
+          <dt className="text-slate-500">Hauteur des ailes racine / extrémité</dt><dd className="text-right">{t.murs ? `${fr(dm.Htot)} / ${fr(dm.Hend)} m` : "—"}</dd>
+          <dt className="text-slate-500">Projection le long de l&apos;axe / en travers</dt><dd className="text-right">{fr(dm.along)} / {fr(dm.across)} m</dd>
+          <dt className="text-slate-500">Radier de tête : longueur</dt><dd className="text-right">{fr(t.radierLong)} m</dd>
+          <dt className="text-slate-500">Petite base / grande base</dt><dd className="text-right font-semibold">{fr(dm.pb)} / {fr(dm.gb)} m</dd>
+          <dt className="text-slate-500">Surface d&apos;un radier de tête</dt><dd className="text-right">{fr(dm.surfaceRadier)} m²</dd>
+          <dt className="text-slate-500">Longueur d&apos;aile recommandée (talus {fr(dm.m, 1)}/1)</dt><dd className="text-right">{t.murs ? `${fr(dm.longRec)} m` : "—"}</dd>
+          <dt className="text-slate-500">Emprise totale (long × larg)</dt><dd className="text-right">{fr(dm.emprise.long)} × {fr(dm.emprise.larg)} m</dd>
+        </dl>
+      </Card>
       <Card title="Mur de tête">
         <dl className="grid grid-cols-2 gap-y-1 text-sm">
           <dt className="text-slate-500">Hauteur retenue / épaisseur</dt><dd className="text-right">{fr(hw.H)} / {fr(hw.e)} m</dd>
@@ -517,6 +533,7 @@ export function QuantitiesPanel({ study, projects, onQuote, quoting }: {
   const q = study.quantities;
   return (
     <div className="space-y-4">
+      <ExcelCard study={study} />
       <Card title="Métré" actions={
         !onQuote ? undefined : projects.length > 0 ? (
           <div className="flex items-center gap-2">
@@ -554,6 +571,30 @@ export function QuantitiesPanel({ study, projects, onQuote, quoting }: {
         </div>
       </Card>
     </div>
+  );
+}
+
+// ── Export Excel de vérification ───────────────────────────
+
+export function ExcelCard({ study }: { study: Study }) {
+  const [err, setErr] = useState("");
+  const go = () => {
+    try {
+      const data = studyToXlsx(study);
+      void downloadBlob(new Blob([data as BlobPart], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `Verification_${slug(study.input.ident.projet)}_${study.fingerprint}.xlsx`);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  };
+  return (
+    <Card title="Export Excel de vérification (avec formules)" actions={<button onClick={go} className={btnPrimary}>Télécharger le classeur Excel</button>}>
+      <p className="text-sm text-slate-600">
+        Classeur .xlsx de 7 feuilles : données (cellules jaunes), charges permanentes et poussées, flexion BAEL nappe par nappe (μ, α, z, As, As min, section choisie),
+        nomenclature (longueurs, kg/m = 0,00617·Ø², masses, récapitulatif par diamètre), métré et ratio, hydrologie (Kirpich, Montana, méthode rationnelle,
+        Manning-Strickler, Froude) et liste des vérifications. Chaque résultat est une formule Excel, à côté de la valeur du logiciel et de l&apos;écart.
+      </p>
+      {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
+    </Card>
   );
 }
 

@@ -8,6 +8,9 @@ import { defaultSpec, seriesSpec, specFromPreset, toInput } from "../src/lib/dal
 import { addMemberLoad, addTopLoad, buildFrame, emptyLoad, solve } from "../src/lib/dalot/frame";
 import { runStudy } from "../src/lib/dalot/engine";
 import { buildSheets } from "../src/lib/dalot/plans";
+import { studyToXlsx } from "../src/lib/dalot/excel";
+import { sectionSpec } from "../src/lib/dalot/fields";
+import { headDimensions } from "../src/lib/dalot/head-dims";
 
 let failed = 0;
 const check = (label: string, got: number, want: number, tol: number) => {
@@ -68,6 +71,25 @@ for (const [id, model, ids] of [
   const okCotes = cotes.every((c) => txt.includes(c));
   if (!okIds || !okCotes) { failed++; console.log(`ÉCHEC  modèle ${model} (${id}) : ${sheets.map((s) => s.id).join(", ")}`); }
   else console.log(`OK   modèle ${model} (${id}) : ${sheets.length} planches, cotes ${cotes.join(" / ")} présentes`);
+}
+
+// 5. Export Excel, nouvelle section et dimensions des têtes calculées.
+{
+  const res = runStudy(specFromPreset("r200x200"));
+  if (!res.ok) { failed++; console.log("ÉCHEC  r200x200 : calcul impossible"); }
+  else {
+    const x = studyToXlsx(res.study);
+    if (x[0] !== 0x50 || x[1] !== 0x4b || x.length < 5000) { failed++; console.log("ÉCHEC  export Excel"); }
+    else console.log(`OK   export Excel : ${(x.length / 1024).toFixed(0)} Ko`);
+  }
+  const sp = sectionSpec(null, { projet: "", nCells: 3, opening: 3, hInt: 2.5, es: 0.3, er: 0.3, eExt: 0.25, eInt: 0.25, L: 8, hr: 0.6 }, true);
+  const rs = runStudy(sp);
+  if (!rs.ok) { failed++; console.log("ÉCHEC  nouvelle section : calcul impossible"); }
+  else {
+    const dm = headDimensions(rs.study.input);
+    check("nouvelle section 3 × 3,00 × 2,50 : largeur B", dm.B, 10, 1e-9);
+    check("nouvelle section : hauteur d'aile en extrémité (talus 3/2)", dm.Hend, 0.6, 0.02);
+  }
 }
 
 if (failed) { console.log(`\n${failed} contrôle(s) en échec`); process.exit(1); }

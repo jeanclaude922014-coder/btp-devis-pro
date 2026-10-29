@@ -45,6 +45,9 @@ const COMMERCIAL = 12;
 /** Garde-corps en béton armé : poteaux carrés et lisse, sur les deux rives de la dalle. */
 export const GARDE_CORPS = { h: 1.0, post: 0.2, lisseW: 0.2, lisseH: 0.15, sMax: 1.0, ancrage: 0.35 };
 
+/** Guide-roues sur les rives de la dalle (le garde-corps, s'il existe, est posé dessus). */
+export const GUIDE_ROUE = { w: 0.25, h: 0.4 };
+
 /** Abscisses (axe des poteaux) des poteaux de garde-corps sur la largeur B de l'ouvrage. */
 export function gardeCorpsPosts(B: number) {
   const g = GARDE_CORPS;
@@ -133,7 +136,7 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
   // ── GUIDE-ROUES ── (deux, sur les bords libres de la dalle)
   const t = inp.tetes;
   if (t.guideRoues) {
-    const gw = 0.25, gh = 0.4;
+    const gw = GUIDE_ROUE.w, gh = GUIDE_ROUE.h;
     add(CORPS, "GUIDE-ROUES", "Cadres ouverts ancrés dans la dalle", { phi: 8, s: 0.2 }, "U", [gh - c + 0.19, gw - 2 * c, gh - c + 0.19], 2 * nAcross(B - 2 * c, 0.2), { nElem: 2 });
     add(CORPS, "GUIDE-ROUES", "Filants", { phi: 10, s: 0.2 }, "droite", [B - 2 * c], 2 * 4, { nElem: 2 });
   }

@@ -21,7 +21,7 @@ import { barMass } from "./ba";
 import { bodyBars, cellOutline, cmTxt, fmt, geometry, Pen, repMap, type Layer, type Pt, type Sheet } from "./drawings";
 import type { Study } from "./engine";
 import { fitView, headGeom, sketch, type Pad, type Region } from "./plans";
-import { BAR_PARTS, GARDE_CORPS, gardeCorpsPosts, type BarMark, type BarPart } from "./quantities";
+import { BAR_PARTS, GARDE_CORPS, GUIDE_ROUE, gardeCorpsPosts, type BarMark, type BarPart } from "./quantities";
 import * as THREE from "three";
 import { buildScene, governing, type Scene3DOptions } from "./scene3d";
 
@@ -527,7 +527,8 @@ function coupeLong(study: Study): View {
 function coupeTrans(study: Study): View {
   const g = geo(study);
   const { inp, B, Hout, cells, gc, t } = g;
-  const hTop = gc ? GARDE_CORPS.h : t.guideRoues ? 0.4 : 0;
+  const gr = t.guideRoues ? GUIDE_ROUE.h : 0;
+  const hTop = gr + (gc ? GARDE_CORPS.h : 0);
   return {
     ext: { x0: 0, y0: -0.1, w: B, h: Hout + hTop + 0.1 },
     pad: { l: 26, r: 10, b: 14, t: 22 },
@@ -537,13 +538,13 @@ function coupeTrans(study: Study): View {
       p.rect(-0.05, -0.1, B + 0.1, 0.1, "TERRAIN");
       hatch(p, -0.05, -0.1, B + 0.1, 0.1, 0.8);
       leader(p, [B * 0.5, -0.05], [B * 0.3, -p.th(9)], "Béton de propreté, 10 cm", 2.4);
+      if (t.guideRoues) p.rect(0, Hout, B, gr, "AXES");
       if (gc) {
+        // Garde-corps posé sur le guide-roue.
         const G = GARDE_CORPS;
-        for (const x of gardeCorpsPosts(B)) p.rect(x - G.post / 2, Hout, G.post, G.h - G.lisseH, "COFFRAGE");
-        p.rect(0, Hout + G.h - G.lisseH, B, G.lisseH, "COFFRAGE");
-        p.text([B + p.th(2), Hout + G.h / 2], 2.2, "Garde-corps", "TEXTE");
-      } else if (t.guideRoues) {
-        p.rect(0, Hout, B, 0.4, "AXES");
+        for (const x of gardeCorpsPosts(B)) p.rect(x - G.post / 2, Hout + gr, G.post, G.h - G.lisseH, "COFFRAGE");
+        p.rect(0, Hout + gr + G.h - G.lisseH, B, G.lisseH, "COFFRAGE");
+        p.text([B + p.th(2), Hout + gr + G.h / 2], 2.2, "Garde-corps sur guide-roue", "TEXTE");
       }
       p.chainH([0, ...cells.flatMap((c) => [c.x0, c.x1]), B], Hout + hTop, Hout + hTop + p.th(8), false);
       p.dimH(0, B, Hout + hTop, Hout + hTop + p.th(14));
@@ -1021,40 +1022,42 @@ function section22(ctx: Ctx): View | null {
 
 function elevationGC(ctx: Ctx): View {
   const g = geo(ctx.study);
-  const { inp, B, Hout, cells } = g;
+  const { inp, B, Hout, cells, t } = g;
+  const Hb = Hout + (t.guideRoues ? GUIDE_ROUE.h : 0);
   const G = GARDE_CORPS;
   const c = inp.cover;
   const posts = gardeCorpsPosts(B);
   const yb = Hout - inp.es - 0.6;
   return {
-    ext: { x0: 0, y0: yb, w: B, h: Hout + G.h - yb },
+    ext: { x0: 0, y0: yb, w: B, h: Hb + G.h - yb },
     pad: { l: 22, r: 10, b: 30, t: 22 },
     draw: (p) => {
       p.rect(0, Hout - inp.es, B, inp.es, "COFFRAGE");
       for (const x of [0, ...cells.flatMap((cl) => [cl.x0, cl.x1]), B]) p.line([x, yb], [x, Hout - inp.es], "COFFRAGE");
       p.line([-p.th(3), yb], [B + p.th(3), yb], "AXES");
+      if (t.guideRoues) { p.rect(0, Hout, B, GUIDE_ROUE.h, "COFFRAGE"); p.text([B + p.th(2), Hout + GUIDE_ROUE.h / 2], 2, `Guide-roue ${cmTxt(GUIDE_ROUE.w)} × ${cmTxt(GUIDE_ROUE.h)}`, "TEXTE"); }
       for (const x of posts) {
-        p.rect(x - G.post / 2, Hout, G.post, G.h - G.lisseH, "COFFRAGE");
-        for (const s of [-1, 1]) p.poly([[x + s * (G.post / 2 - c), Hout - G.ancrage + 0.1], [x + s * (G.post / 2 - c), Hout + G.h - c]], "ACIERS");
-        for (let y = Hout + 0.05; y <= Hout + G.h - G.lisseH; y += 0.15) p.line([x - G.post / 2 + c, y], [x + G.post / 2 - c, y], "REPARTITION");
+        p.rect(x - G.post / 2, Hb, G.post, G.h - G.lisseH, "COFFRAGE");
+        for (const s of [-1, 1]) p.poly([[x + s * (G.post / 2 - c), Hb - G.ancrage + 0.1], [x + s * (G.post / 2 - c), Hb + G.h - c]], "ACIERS");
+        for (let y = Hb + 0.05; y <= Hb + G.h - G.lisseH; y += 0.15) p.line([x - G.post / 2 + c, y], [x + G.post / 2 - c, y], "REPARTITION");
       }
-      const yl = Hout + G.h - G.lisseH;
+      const yl = Hb + G.h - G.lisseH;
       p.rect(0, yl, B, G.lisseH, "COFFRAGE");
-      p.line([c, Hout + G.h - c], [B - c, Hout + G.h - c], "ACIERS");
+      p.line([c, Hb + G.h - c], [B - c, Hb + G.h - c], "ACIERS");
       p.line([c, yl + c], [B - c, yl + c], "ACIERS");
-      for (let x = c; x <= B - c + 1e-9; x += 0.2) p.line([x, yl + c], [x, Hout + G.h - c], "REPARTITION");
+      for (let x = c; x <= B - c + 1e-9; x += 0.2) p.line([x, yl + c], [x, Hb + G.h - c], "REPARTITION");
       const L = (el: string, pre: string) => ctx.bar(el, pre);
       const x1 = posts[1] ?? posts[0];
-      tag(p, ctx, [x1 - G.post / 2 + c, Hout + 0.4], [x1 - G.post / 2 + c - p.th(3), Hout + G.h + p.th(14)], L("POTEAUX", "Barres verticales"), 6);
-      tag(p, ctx, [x1, Hout + 0.2], [x1 + p.th(10), Hout + G.h + p.th(14)], L("POTEAUX", "Cadres"), 6);
-      tag(p, ctx, [B * 0.5, Hout + G.h - c], [B * 0.5, Hout + G.h + p.th(14)], L("LISSE", "Filants"), 6);
-      tag(p, ctx, [B * 0.5 + 0.3, yl + G.lisseH / 2], [B * 0.5 + 0.3 + p.th(10), Hout + G.h + p.th(14)], L("LISSE", "Cadres"), 6);
+      tag(p, ctx, [x1 - G.post / 2 + c, Hb + 0.4], [x1 - G.post / 2 + c - p.th(3), Hb + G.h + p.th(14)], L("POTEAUX", "Barres verticales"), 6);
+      tag(p, ctx, [x1, Hb + 0.2], [x1 + p.th(10), Hb + G.h + p.th(14)], L("POTEAUX", "Cadres"), 6);
+      tag(p, ctx, [B * 0.5, Hb + G.h - c], [B * 0.5, Hb + G.h + p.th(14)], L("LISSE", "Filants"), 6);
+      tag(p, ctx, [B * 0.5 + 0.3, yl + G.lisseH / 2], [B * 0.5 + 0.3 + p.th(10), Hb + G.h + p.th(14)], L("LISSE", "Cadres"), 6);
       const xm = (posts[0] + (posts[1] ?? B)) / 2;
       cutMark(p, [xm, yl + G.lisseH + p.th(3)], [0, -1], "1");
-      cutMark(p, [posts[0] + 0.05, Hout + 0.3], [-1, 0], "2");
+      cutMark(p, [posts[0] + 0.05, Hb + 0.3], [-1, 0], "2");
       p.chainH([0, ...cells.flatMap((cl) => [cl.x0, cl.x1]), B], yb, yb - p.th(10), false);
       p.dimH(0, B, yb, yb - p.th(18));
-      p.dimV(Hout, Hout + G.h, 0, -p.th(8));
+      p.dimV(Hb, Hb + G.h, 0, -p.th(8));
     },
   };
 }

@@ -10,7 +10,7 @@ import { transverseSpread } from "./analysis";
 import { stripBlocks } from "./convoys";
 import { bodyBars } from "./drawings";
 import type { Study } from "./engine";
-import { GARDE_CORPS, gardeCorpsPosts } from "./quantities";
+import { GARDE_CORPS, GUIDE_ROUE, gardeCorpsPosts } from "./quantities";
 
 export type Scene3DOptions = {
   concrete: "opaque" | "transparent" | "masque";
@@ -168,7 +168,9 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
   const hHead = hw.H;
   const ends = [{ z0: 0, s: -1 }, { z0: L, s: 1 }] as const;
   for (const { z0, s } of ends) {
-    if (hHead > 0) addConcrete(new THREE.BoxGeometry(B, hHead, t.murTeteEp), V(B / 2, H + hHead / 2, z0 + s * t.murTeteEp / 2), "MUR_TETE");
+    if (hHead > 0.3) addConcrete(new THREE.BoxGeometry(B, hHead, t.murTeteEp), V(B / 2, H + hHead / 2, z0 + s * t.murTeteEp / 2), "MUR_TETE");
+    // Guide-roue sur la rive de la dalle (support du garde-corps).
+    if (t.guideRoues) addConcrete(new THREE.BoxGeometry(B, GUIDE_ROUE.h, GUIDE_ROUE.w), V(B / 2, H + GUIDE_ROUE.h / 2, z0 - s * GUIDE_ROUE.w / 2), "GUIDE_ROUES");
     if (t.radierLong > 0) {
       const dB = t.debord;
       const w = B + 2 * dB + 2 * t.radierLong * tanA;
@@ -196,11 +198,15 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
       const grp = new THREE.Group();
       grp.position.set(xr, 0, zr);
       grp.rotation.y = Math.atan2(-dz, dx);
+      // Repère local : z vers le remblai (extérieur), pour que le voile et la semelle restent hors du radier de tête.
+      if (sx === sz) grp.scale.z = -1;
       scene.add(grp);
       wingGroups.push({ grp });
       addConcrete(geo, undefined, "MURS_AILE", grp);
-      const zf = t.ep / 2 - t.semelle / 2;
-      addConcrete(new THREE.BoxGeometry(t.long, t.semEp, t.semelle), V(t.long / 2, -t.semEp / 2, zf + t.semelle / 2), "SEMELLES", grp);
+      // Semelle sous le radier : patin côté ouvrage, talon côté remblai.
+      const zf = -t.patin;
+      // Semelle enterrée (sous le terrain naturel) : elle ne doit pas apparaître posée à côté du radier.
+      addConcrete(new THREE.BoxGeometry(t.long, t.semEp, t.semelle), V(t.long / 2, -t.semEp / 2 - 0.03, zf + t.semelle / 2), "SEMELLES", grp);
     }
   }
 
@@ -222,9 +228,11 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
   // ── Garde-corps ──
   if (t.gardeCorps) {
     const G = GARDE_CORPS;
-    for (const z of [G.post / 2, L - G.post / 2]) {
-      for (const px of gardeCorpsPosts(B)) addConcrete(new THREE.BoxGeometry(G.post, G.h - G.lisseH, G.post), V(px, H + (G.h - G.lisseH) / 2, z), "GARDE_CORPS");
-      addConcrete(new THREE.BoxGeometry(B, G.lisseH, G.lisseW), V(B / 2, H + G.h - G.lisseH / 2, z), "GARDE_CORPS");
+    const y0 = H + (t.guideRoues ? GUIDE_ROUE.h : 0);
+    const zr = t.guideRoues ? GUIDE_ROUE.w / 2 : G.post / 2;
+    for (const z of [zr, L - zr]) {
+      for (const px of gardeCorpsPosts(B)) addConcrete(new THREE.BoxGeometry(G.post, G.h - G.lisseH, G.post), V(px, y0 + (G.h - G.lisseH) / 2, z), "GARDE_CORPS");
+      addConcrete(new THREE.BoxGeometry(B, G.lisseH, G.lisseW), V(B / 2, y0 + G.h - G.lisseH / 2, z), "GARDE_CORPS");
     }
   }
 
@@ -396,7 +404,7 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
     if (!o.cut) {
       for (const { z0, s } of ends) {
         // Mur de tête : barres verticales en attente dans la dalle, filants horizontaux.
-        if (hHead > 0) {
+        if (hHead > 0.3) {
           for (const zf of [c, t.murTeteEp - c]) {
             const z = z0 + s * zf;
             for (let px = c; px <= B - c + 1e-9; px += hw.bars.s) bars.seg(V(px, H - inp.es + c, z), V(px, H + hHead - c, z));
@@ -431,7 +439,7 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
       if (wing && t.murs) {
         const hRoot = Math.min(wing.Htot, H + hHead);
         const topAt = (u: number) => hRoot + ((wing.Hend - hRoot) * u) / t.long;
-        const zf = t.ep / 2 - t.semelle / 2;
+        const zf = -t.patin;
         for (const { grp } of wingGroups) {
           const wb = new Bars();
           for (const zz of [c, t.ep - c]) {
@@ -451,18 +459,20 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
       // Garde-corps : 4 barres par poteau, 4 filants de lisse.
       if (t.gardeCorps) {
         const G = GARDE_CORPS;
-        for (const zc of [G.post / 2, L - G.post / 2]) {
+        const yg = H + (t.guideRoues ? GUIDE_ROUE.h : 0);
+        const zr = t.guideRoues ? GUIDE_ROUE.w / 2 : G.post / 2;
+        for (const zc of [zr, L - zr]) {
           for (const px of gardeCorpsPosts(B)) {
             for (const [dx, dz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
               const xx = px + dx * (G.post / 2 - c), zz = zc + dz * (G.post / 2 - c);
-              bars.seg(V(xx, H - G.ancrage, zz), V(xx, H + G.h - c, zz));
+              bars.seg(V(xx, yg - G.ancrage, zz), V(xx, yg + G.h - c, zz));
             }
-            for (let py = H + 0.05; py <= H + G.h - G.lisseH; py += 0.15) {
+            for (let py = yg + 0.05; py <= yg + G.h - G.lisseH; py += 0.15) {
               const r = G.post / 2 - c;
               bars.poly([V(px - r, py, zc - r), V(px + r, py, zc - r), V(px + r, py, zc + r), V(px - r, py, zc + r), V(px - r, py, zc - r)], false);
             }
           }
-          for (const py of [H + G.h - G.lisseH + c, H + G.h - c]) for (const dz of [-1, 1]) bars.seg(V(c, py, zc + dz * (G.lisseW / 2 - c)), V(B - c, py, zc + dz * (G.lisseW / 2 - c)));
+          for (const py of [yg + G.h - G.lisseH + c, yg + G.h - c]) for (const dz of [-1, 1]) bars.seg(V(c, py, zc + dz * (G.lisseW / 2 - c)), V(B - c, py, zc + dz * (G.lisseW / 2 - c)));
         }
       }
     }

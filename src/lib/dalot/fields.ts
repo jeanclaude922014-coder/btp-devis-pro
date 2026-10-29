@@ -7,6 +7,8 @@
  * dans la note de calcul.
  */
 
+import { headDimensions as headDimensionsOf } from "./head-dims";
+
 export type FieldValue = number | string | boolean | null;
 
 export type SectionId =
@@ -512,5 +514,32 @@ export function specFromPreset(presetId: string, name?: string): DalotSpec {
   const preset = DALOT_PRESETS.find((p) => p.id === presetId);
   if (preset) Object.assign(spec.values, preset.values);
   if (name) spec.values.projet = name;
+  return spec;
+}
+
+export type SectionDims = {
+  projet: string; nCells: number; opening: number; hInt: number;
+  es: number; er: number; eExt: number; eInt: number; L: number; hr: number;
+};
+
+/**
+ * Nouvelle section de dalot à partir des dimensions saisies : sur la base d'une étude existante (mêmes
+ * données de projet, sol, matériaux, cartouche) ou des valeurs types ivoiriennes. Les dimensions
+ * saisies sont confirmées ; les ouvrages de tête peuvent être recalculés (ailes, radier de tête).
+ */
+export function sectionSpec(base: DalotSpec | null, d: SectionDims, autoHeads: boolean): DalotSpec {
+  const spec: DalotSpec = base ? normalizeSpec(JSON.parse(JSON.stringify(base))) : defaultSpec();
+  if (!base) Object.assign(spec.values, RURAL, { hyActif: false });
+  const vals: Record<string, FieldValue> = {
+    nCells: d.nCells, opening: d.opening, openings: "", hInt: d.hInt, es: d.es, er: d.er, eExt: d.eExt, eInt: d.eInt, L: d.L, hr: d.hr,
+    projet: d.projet.trim() || `Dalot ${d.nCells > 1 ? `${d.nCells} × ` : ""}${fr(d.opening)} × ${fr(d.hInt)} — L = ${fr(d.L)} m`,
+  };
+  Object.assign(spec.values, vals);
+  spec.defaulted = spec.defaulted.filter((k) => !(k in vals));
+  if (autoHeads && spec.values.teteMurs === true) {
+    const dm = headDimensionsOf(toInput(spec));
+    spec.values.aileLong = Math.ceil(dm.longRec / 0.05) * 0.05;
+    spec.values.radierTeteLong = Math.ceil(dm.alongRec / 0.05) * 0.05;
+  }
   return spec;
 }

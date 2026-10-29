@@ -13,7 +13,7 @@ import { FIELD_BY_KEY, normalizeSpec, type DalotSpec, type FieldValue } from "@/
 import { FieldsPanel, GeometryAside, HeadsAside, HydroAside, sectionState, type SpecApi } from "./data-panels";
 import { downloadText, slug } from "./download";
 import {
-  ChecksPanel, CombosPanel, DesignPanel, EffortsPanel, HeadsPanel, NotePanel, PlansPanel, QuantitiesPanel, StatusBadge, SynthesePanel,
+  ChecksPanel, CombosPanel, DesignPanel, EffortsPanel, ExcelCard, HeadsPanel, NotePanel, PlansPanel, QuantitiesPanel, StatusBadge, SynthesePanel,
 } from "./result-panels";
 import { NAV, type NavItem } from "./nav";
 import { Viewer3D } from "./viewer-3d";
@@ -228,7 +228,7 @@ export function DalotWorkspace({ id, seriesName, initialSpec, projects }: {
               {panel === "vue3d" && <Viewer3D study={study} />}
               {panel === "plans" && <PlansPanel study={study} />}
               {panel === "nomenclature" && <QuantitiesPanel study={study} projects={projects} onQuote={onQuote} quoting={quoting} />}
-              {panel === "note" && <NotePanel study={study} />}
+              {panel === "note" && <div className="space-y-4"><NotePanel study={study} /><ExcelCard study={study} /></div>}
             </>
           )}
           <p className="mt-8 text-center text-[11px] text-slate-400">

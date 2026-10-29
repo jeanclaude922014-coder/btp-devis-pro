@@ -11,13 +11,13 @@ import type { CheckStatus } from "@/lib/dalot/checks";
 import type { GroupId } from "@/lib/dalot/design";
 import { optimizeThicknesses, runStudy, type RunOutcome } from "@/lib/dalot/engine";
 import {
-  DALOT_PRESETS, normalizeSpec, seriesSpec, SERIES_TYPES, specFromPreset, type DalotSpec, type FieldValue,
+  DALOT_PRESETS, normalizeSpec, sectionSpec, seriesSpec, SERIES_TYPES, specFromPreset, type DalotSpec, type FieldValue, type SectionDims,
 } from "@/lib/dalot/fields";
 import { FieldsPanel, GeometryAside, HeadsAside, HydroAside, sectionState, type SpecApi } from "@/app/(app)/dalots/[id]/_components/data-panels";
 import { downloadText, setSaver, slug } from "@/app/(app)/dalots/[id]/_components/download";
 import { NAV, type NavItem } from "@/app/(app)/dalots/[id]/_components/nav";
 import {
-  ChecksPanel, CombosPanel, DesignPanel, EffortsPanel, HeadsPanel, NotePanel, PlansPanel, QuantitiesPanel, StatusBadge, SynthesePanel,
+  ChecksPanel, CombosPanel, DesignPanel, EffortsPanel, ExcelCard, HeadsPanel, NotePanel, PlansPanel, QuantitiesPanel, StatusBadge, SynthesePanel,
 } from "@/app/(app)/dalots/[id]/_components/result-panels";
 import { Viewer3D } from "@/app/(app)/dalots/[id]/_components/viewer-3d";
 import { newId, openStore, type Store, type StudyItem } from "./store";
@@ -113,6 +113,12 @@ function App() {
       ) : open ? (
         <Workspace key={open.id} item={open} onBack={() => setOpenId(null)} onSave={upsert}
           onDelete={async () => { await remove([open.id]); setOpenId(null); }}
+          onNewSection={async (d, auto) => {
+            const spec = sectionSpec(open.spec, d, auto);
+            const it = { ...open, id: newId(), name: String(spec.values.projet), spec, updatedAt: Date.now() };
+            await upsert(it);
+            setOpenId(it.id);
+          }}
           onDuplicate={async () => {
             const spec = normalizeSpec(JSON.parse(JSON.stringify(open.spec)));
             spec.values.projet = `${spec.values.projet} (copie)`;
@@ -166,6 +172,67 @@ function DownloadHelp({ onClose }: { onClose: () => void }) {
 }
 
 // ── Accueil : études, modèles, séries ─────────────────────────
+
+/** Saisie directe d'une section de dalot (cellules, ouverture, hauteur, épaisseurs, longueur, remblai). */
+function NewSectionForm({ initial, onSubmit, onCancel, title }: {
+  initial: SectionDims; onSubmit: (d: SectionDims, autoHeads: boolean) => void; onCancel?: () => void; title: string;
+}) {
+  const [d, setD] = useState<SectionDims>(initial);
+  const [txt, setTxt] = useState<Record<string, string>>({});
+  const [auto, setAuto] = useState(true);
+  const num = (k: keyof SectionDims) => txt[k] ?? String(d[k]).replace(".", ",");
+  const setNum = (k: keyof SectionDims, raw: string) => {
+    setTxt((t) => ({ ...t, [k]: raw }));
+    const x = Number(raw.replace(",", "."));
+    if (Number.isFinite(x)) setD((o) => ({ ...o, [k]: x }));
+  };
+  const F: { k: keyof SectionDims; label: string; unit: string; min: number; max: number }[] = [
+    { k: "nCells", label: "Nombre de cellules", unit: "u", min: 1, max: 8 },
+    { k: "opening", label: "Ouverture d'une cellule", unit: "m", min: 0.5, max: 8 },
+    { k: "hInt", label: "Hauteur intérieure", unit: "m", min: 0.5, max: 8 },
+    { k: "es", label: "Épaisseur de la dalle", unit: "m", min: 0.15, max: 1.2 },
+    { k: "er", label: "Épaisseur du radier", unit: "m", min: 0.15, max: 1.2 },
+    { k: "eExt", label: "Piédroits extérieurs", unit: "m", min: 0.15, max: 1 },
+    { k: "eInt", label: "Piédroits intermédiaires", unit: "m", min: 0.15, max: 1 },
+    { k: "L", label: "Longueur de l'ouvrage", unit: "m", min: 2, max: 60 },
+    { k: "hr", label: "Remblai sur la dalle", unit: "m", min: 0, max: 15 },
+  ];
+  const bad = F.filter((f) => !(Number(d[f.k]) >= f.min && Number(d[f.k]) <= f.max) || (f.k === "nCells" && !Number.isInteger(d.nCells)));
+  const B = 2 * d.eExt + d.nCells * d.opening + (d.nCells - 1) * d.eInt;
+  return (
+    <div className="space-y-3">
+      <h2 className="font-semibold text-slate-900">{title}</h2>
+      <div>
+        <label htmlFor="ns-nom" className="mb-1 block text-xs font-medium text-slate-600">Intitulé (facultatif)</label>
+        <input id="ns-nom" value={d.projet} onChange={(e) => setD({ ...d, projet: e.target.value })} placeholder="ex. Dalot 2 × 2,50 × 2,00 PK 4+200" className={`${input} w-full`} />
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {F.map((f) => {
+          const err = bad.includes(f);
+          return (
+            <div key={f.k}>
+              <label className="mb-0.5 block text-[11px] font-medium text-slate-600">{f.label} ({f.unit})</label>
+              <input value={num(f.k)} inputMode="decimal" onChange={(e) => setNum(f.k, e.target.value)} disabled={f.k === "eInt" && d.nCells === 1}
+                className={`${input} w-full py-1 ${err ? "border-red-400 bg-red-50" : ""}`} />
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-xs text-slate-500">Largeur extérieure B = {Number.isFinite(B) ? B.toFixed(2).replace(".", ",") : "—"} m · hauteur extérieure H = {(d.er + d.hInt + d.es).toFixed(2).replace(".", ",")} m</p>
+      <label className="flex items-center gap-2 text-xs text-slate-700">
+        <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} className="h-4 w-4 accent-blue-700" />
+        Calculer les ouvrages de tête (longueur des ailes, radier de tête, petite et grande bases) à partir de ces dimensions
+      </label>
+      {bad.length > 0 && <p className="text-xs text-red-600">À corriger : {bad.map((f) => `${f.label} (${f.min}–${f.max} ${f.unit})`).join(", ")}.</p>}
+      <div className="flex gap-2">
+        <button disabled={bad.length > 0} onClick={() => onSubmit(d, auto)} className="flex-1 rounded-md bg-blue-800 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-900 disabled:opacity-50">+ Créer cette section de dalot</button>
+        {onCancel && <button onClick={onCancel} className="rounded-md border border-slate-300 px-4 py-2 text-sm">Annuler</button>}
+      </div>
+    </div>
+  );
+}
+
+const DEFAULT_SECTION: SectionDims = { projet: "", nCells: 2, opening: 2.5, hInt: 2, es: 0.3, er: 0.3, eExt: 0.25, eInt: 0.25, L: 8, hr: 0.6 };
 
 function Home({ items, store, onOpen, onCreate, onRemove }: {
   items: StudyItem[]; store: Store; onOpen: (id: string) => void;
@@ -279,6 +346,15 @@ function Home({ items, store, onOpen, onCreate, onRemove }: {
           <button onClick={createOne} className="w-full rounded-md bg-blue-800 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-900">+ Nouvelle étude de dalot</button>
         </section>
 
+        <section className="rounded-xl border border-blue-200 bg-white p-5">
+          <NewSectionForm title="Nouvelle section de dalot (dimensions à saisir)" initial={DEFAULT_SECTION} onSubmit={async (d, auto) => {
+            const spec = sectionSpec(null, d, auto);
+            const item = { id: newId(), name: String(spec.values.projet), seriesName: null, status: statusOf(spec), spec, updatedAt: Date.now() };
+            await onCreate([item]);
+            onOpen(item.id);
+          }} />
+        </section>
+
         <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5">
           <div>
             <h2 className="font-semibold text-slate-900">Générateur de série</h2>
@@ -388,8 +464,9 @@ function Home({ items, store, onOpen, onCreate, onRemove }: {
 
 // ── Espace de travail d'une étude ─────────────────────────────
 
-function Workspace({ item, onBack, onSave, onDelete, onDuplicate }: {
+function Workspace({ item, onBack, onSave, onDelete, onDuplicate, onNewSection }: {
   item: StudyItem; onBack: () => void; onSave: (it: StudyItem) => Promise<void>; onDelete: () => Promise<void>; onDuplicate: () => Promise<void>;
+  onNewSection: (d: SectionDims, autoHeads: boolean) => Promise<void>;
 }) {
   const [spec, setSpec] = useState<DalotSpec>(item.spec);
   const [computed, setComputed] = useState<{ spec: DalotSpec; outcome: RunOutcome } | null>(null);
@@ -400,6 +477,7 @@ function Workspace({ item, onBack, onSave, onDelete, onDuplicate }: {
   const [optimizing, setOptimizing] = useState(false);
   const [proposal, setProposal] = useState<{ proposal: { key: string; label: string; from: number; to: number }[]; status: CheckStatus } | null>(null);
   const [confirm, setConfirm] = useState<"delete" | "import" | null>(null);
+  const [newSec, setNewSec] = useState(false);
   const [pending, setPending] = useState<DalotSpec | null>(null);
   const [importErr, setImportErr] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -500,6 +578,7 @@ function Workspace({ item, onBack, onSave, onDelete, onDuplicate }: {
             <button onClick={onDuplicate} className="flex-1 rounded border border-slate-700 px-2 py-1 hover:bg-slate-800">Dupliquer</button>
             <button onClick={() => setConfirm("delete")} className="flex-1 rounded border border-red-900 px-2 py-1 text-red-300 hover:bg-red-950">Supprimer</button>
           </div>
+          <button onClick={() => setNewSec(true)} className="w-full rounded bg-orange-600 px-2 py-1.5 font-semibold text-white hover:bg-orange-700">+ Nouvelle section de dalot</button>
         </div>
       </aside>
       <input ref={fileRef} id="import-json" type="file" accept=".json,application/json" className="hidden" onChange={async (e) => {
@@ -525,11 +604,24 @@ function Workspace({ item, onBack, onSave, onDelete, onDuplicate }: {
             <button onClick={() => downloadText(JSON.stringify(spec, null, 2), `${slug(String(spec.values.projet))}.dalot.json`, "application/json")} className={btn}>Exporter</button>
             <button onClick={() => fileRef.current?.click()} className={btn}>Importer</button>
             <button onClick={onDuplicate} className={btn}>Dupliquer</button>
+            <button onClick={() => setNewSec(true)} className={btn}>+ Nouvelle section</button>
             <button onClick={() => setConfirm("delete")} className={`${btn} text-red-700`}>Supprimer</button>
           </div>
         </header>
 
         <main className="min-w-0 flex-1 py-6" style={{ paddingLeft: "max(16px, env(safe-area-inset-left, 0px))", paddingRight: "max(16px, env(safe-area-inset-right, 0px))" }}>
+          {newSec && (
+            <div className="mb-4 rounded-xl border border-orange-300 bg-white p-4 shadow-sm">
+              <NewSectionForm title="Nouvelle section de dalot — mêmes données de projet (sol, matériaux, convois, cartouche)"
+                initial={{
+                  projet: "", nCells: Number(spec.values.nCells) || 1, opening: Number(spec.values.opening) || 2, hInt: Number(spec.values.hInt) || 2,
+                  es: Number(spec.values.es) || 0.3, er: Number(spec.values.er) || 0.3, eExt: Number(spec.values.eExt) || 0.25, eInt: Number(spec.values.eInt) || 0.25,
+                  L: Number(spec.values.L) || 8, hr: Number(spec.values.hr) || 0,
+                }}
+                onCancel={() => setNewSec(false)}
+                onSubmit={async (d, auto) => { setNewSec(false); await onNewSection(d, auto); }} />
+            </div>
+          )}
           {confirm === "delete" && (
             <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
               Supprimer définitivement « {String(spec.values.projet)} » ? Cette action est irréversible.
@@ -573,7 +665,7 @@ function Workspace({ item, onBack, onSave, onDelete, onDuplicate }: {
               {panel === "vue3d" && <Viewer3D study={study} />}
               {panel === "plans" && <PlansPanel study={study} />}
               {panel === "nomenclature" && <QuantitiesPanel study={study} projects={[]} quoting={false} />}
-              {panel === "note" && <NotePanel study={study} />}
+              {panel === "note" && <div className="space-y-4"><NotePanel study={study} /><ExcelCard study={study} /></div>}
             </>
           )}
           <p className="mt-8 text-center text-[11px] text-slate-400">
