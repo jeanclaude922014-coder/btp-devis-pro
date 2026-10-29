@@ -75,9 +75,11 @@ export type OptimizeProposal = { key: string; label: string; from: number; to: n
  * pas réel et ré-épaissi si besoin.
  */
 export function optimizeThicknesses(spec: DalotSpec): { proposal: OptimizeProposal; status: CheckStatus } | null {
+  // Radier lié à la dalle : une seule épaisseur à optimiser.
+  const linked = spec.values.radierEgalDalle !== false;
   const keys: { key: string; label: string }[] = [
-    { key: "es", label: "Épaisseur de la dalle" },
-    { key: "er", label: "Épaisseur du radier" },
+    { key: "es", label: linked ? "Épaisseur de la dalle et du radier" : "Épaisseur de la dalle" },
+    ...(linked ? [] : [{ key: "er", label: "Épaisseur du radier" }]),
     { key: "eExt", label: "Piédroits extérieurs" },
   ];
   const multi = Number(spec.values.nCells) > 1;
@@ -95,7 +97,7 @@ export function optimizeThicknesses(spec: DalotSpec): { proposal: OptimizePropos
     for (const c of fails) {
       const e = c.element;
       if (e.startsWith("Dalle")) out.add("es");
-      else if (e.startsWith("Radier") || e.startsWith("Sol") || e.startsWith("Interface")) out.add("er");
+      else if (e.startsWith("Radier") || e.startsWith("Sol") || e.startsWith("Interface")) out.add(linked ? "es" : "er");
       else if (e.includes("intermédiaire") && multi) out.add("eInt");
       else if (e.includes("extérieur") || e.startsWith("Piédroit")) out.add("eExt");
       else out.add("es");

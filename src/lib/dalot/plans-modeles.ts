@@ -1010,15 +1010,17 @@ function elevationAile(ctx: Ctx): View | null {
   const c = inp.cover;
   const lg = t.long;
   const se = t.semEp;
-  const top = (x: number) => w.Htot + ((w.Hend - w.Htot) * x) / lg;
+  // Hauteurs du voile au-dessus du radier (Htot et Hend sont comptés depuis la sous-face du radier).
+  const wT = Math.max(0.3, w.Htot - se), wE = Math.max(0.3, w.Hend - se);
+  const top = (x: number) => wT + ((wE - wT) * x) / lg;
   return {
-    ext: { x0: -0.3, y0: -se, w: lg + 0.3, h: w.Htot + se },
+    ext: { x0: -0.3, y0: -se, w: lg + 0.3, h: wT + se },
     pad: { l: 34, r: 26, b: 22, t: 22 },
     draw: (p) => {
       // Piédroit du corps à la racine, mur, semelle
-      p.rect(-0.3, -se, 0.3, w.Htot + se, "COFFRAGE");
+      p.rect(-0.3, -se, 0.3, wT + se, "COFFRAGE");
       p.line([-0.3, -se], [-0.3 - p.th(4), -se], "AXES");
-      p.poly([[0, 0], [lg, 0], [lg, w.Hend], [0, w.Htot]], "COFFRAGE", true);
+      p.poly([[0, 0], [lg, 0], [lg, wE], [0, wT]], "COFFRAGE", true);
       p.rect(0, -se, lg, se, "COFFRAGE");
       hatch(p, 0, -se, lg, se, 2.2);
       const wv = ctx.bar("MUR EN L", "Voile — barres verticales côté remblai");
@@ -1029,19 +1031,19 @@ function elevationAile(ctx: Ctx): View | null {
       const sc = ctx.bar("MUR EN L", "Semelle — cadres");
       const sf = ctx.bar("MUR EN L", "Semelle — filants");
       for (let x = c; x <= lg - c + 1e-9; x += w.bars.s) p.line([x, -se + c], [x, top(x) - c], "ACIERS");
-      for (let y = c; y <= w.Htot - c + 1e-9; y += w.rep.s) {
-        const xMax = y <= w.Hend ? lg - c : (lg * (w.Htot - y)) / (w.Htot - w.Hend) - c;
+      for (let y = c; y <= wT - c + 1e-9; y += w.rep.s) {
+        const xMax = y <= wE ? lg - c : (lg * (wT - y)) / (wT - wE) - c;
         if (xMax > c) p.line([c, y], [xMax, y], "REPARTITION");
       }
-      p.line([c, w.Htot - c], [lg - c, w.Hend - c], "ACIERS");
+      p.line([c, wT - c], [lg - c, wE - c], "ACIERS");
       p.line([c, -c], [lg - c, -c], "REPARTITION");
       p.line([c, -se + c], [lg - c, -se + c], "REPARTITION");
-      for (let y = c; y <= Math.min(w.Htot, 1.5); y += 0.25) p.line([-0.3 + c, y], [0.6, y + 0.12], "ACIERS");
-      if (wv) tag(p, ctx, [lg * 0.35, top(lg * 0.35) * 0.6], [lg * 0.35, w.Htot + p.th(14)], wv, 6);
-      if (wf) tag(p, ctx, [lg * 0.55, top(lg * 0.55) * 0.5], [lg * 0.55, w.Htot + p.th(14)], wf, 6);
-      if (wh) tag(p, ctx, [c + 0.1, w.Htot * 0.55], [-0.3 - p.th(16), w.Htot * 0.55], wh, 6);
+      for (let y = c; y <= Math.min(wT, 1.5); y += 0.25) p.line([-0.3 + c, y], [0.6, y + 0.12], "ACIERS");
+      if (wv) tag(p, ctx, [lg * 0.35, top(lg * 0.35) * 0.6], [lg * 0.35, wT + p.th(14)], wv, 6);
+      if (wf) tag(p, ctx, [lg * 0.55, top(lg * 0.55) * 0.5], [lg * 0.55, wT + p.th(14)], wf, 6);
+      if (wh) tag(p, ctx, [c + 0.1, wT * 0.55], [-0.3 - p.th(16), wT * 0.55], wh, 6);
       if (cis) tag(p, ctx, [0.3, 0.4], [-0.3 - p.th(16), 0.4], cis, 6);
-      if (cou) tag(p, ctx, [lg * 0.2, top(lg * 0.2) - c], [lg * 0.2 - p.th(4), w.Htot + p.th(14)], cou, 6);
+      if (cou) tag(p, ctx, [lg * 0.2, top(lg * 0.2) - c], [lg * 0.2 - p.th(4), wT + p.th(14)], cou, 6);
       if (sc) tag(p, ctx, [lg * 0.7, -se / 2], [lg * 0.7, -se - p.th(12)], sc, 6);
       if (sf) tag(p, ctx, [lg * 0.85, -c], [lg + p.th(14), -se * 0.2], sf, 6);
       // Repère de coupe 2-2
@@ -1050,9 +1052,9 @@ function elevationAile(ctx: Ctx): View | null {
       cutMark(p, [xs, top(xs) + p.th(6)], [-1, 0], "2");
       cutMark(p, [xs, -se - p.th(6)], [-1, 0], "2");
       p.dimH(0, lg, -se, -se - p.th(18));
-      p.dimV(0, w.Hend, lg, lg + p.th(6));
+      p.dimV(0, wE, lg, lg + p.th(6));
       p.dimV(-se, 0, lg, lg + p.th(6));
-      p.dimV(0, w.Htot, -0.3, -0.3 - p.th(26));
+      p.dimV(0, wT, -0.3, -0.3 - p.th(26));
     },
   };
 }
@@ -1064,10 +1066,12 @@ function section22(ctx: Ctx): View | null {
   const w = hg.w;
   if (!w || !t.murs) return null;
   const c = inp.cover;
-  const H = w.Htot - (w.Htot - w.Hend) * 0.45;
   // Semelle côté ouvrage (sous le radier de tête), débord côté remblai = patin, comme la section 2-2 des plans types.
   const xa = t.ep + t.patin - t.semelle, xb = t.ep + t.patin;
   const se = t.semEp;
+  // Hauteurs du voile au-dessus du radier (Htot et Hend sont comptés depuis la sous-face du radier).
+  const wT = Math.max(0.3, w.Htot - se), wE = Math.max(0.3, w.Hend - se);
+  const H = wT - (wT - wE) * 0.45;
   return {
     ext: { x0: xa, y0: -se, w: t.semelle, h: H + se },
     pad: { l: 26, r: 26, b: 22, t: 16 },

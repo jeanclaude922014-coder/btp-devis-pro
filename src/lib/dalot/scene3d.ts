@@ -217,8 +217,10 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
       addConcrete(geo, undefined, "MURS_AILE", grp);
       // Semelle sous le radier : patin côté ouvrage, talon côté remblai.
       const zf = -t.patin; // semelle côté ouvrage, sous le radier de tête (section 2-2 des plans types)
-      // Semelle enterrée (sous le terrain naturel) : elle ne doit pas apparaître posée à côté du radier.
-      addConcrete(new THREE.BoxGeometry(t.long, t.semEp, t.semelle), V(t.long / 2, -t.semEp / 2 - 0.03, zf + t.semelle / 2), "SEMELLES", grp);
+      // Semelle = radier de tête sous l'aile (même épaisseur que le radier du corps).
+      // Seule la partie propre à l'aile (talon côté remblai + pied du voile) : le reste se confond avec le radier de tête.
+      const wOwn = Math.min(t.semelle, t.patin + t.ep);
+      addConcrete(new THREE.BoxGeometry(t.long, t.semEp, wOwn), V(t.long / 2, t.semEp / 2, zf + wOwn / 2), "SEMELLES", grp);
     }
   }
 
@@ -476,16 +478,16 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
         for (const { grp } of wingGroups) {
           const wb = new Bars();
           for (const zz of [c, t.ep - c]) {
-            for (let u = c; u <= t.long - c + 1e-9; u += wing.bars.s) wb.seg(V(u, -t.semEp + c, zz), V(u, topAt(u) - c, zz));
+            for (let u = c; u <= t.long - c + 1e-9; u += wing.bars.s) wb.seg(V(u, c, zz), V(u, topAt(u) - c, zz));
             for (let v = c; v <= hRoot - c + 1e-9; v += wing.rep.s) {
               const uMax = v <= wing.Hend ? t.long - c : (t.long * (hRoot - v)) / (hRoot - wing.Hend) - c;
               if (uMax > c) wb.seg(V(c, v, zz), V(uMax, v, zz), false);
             }
           }
           for (let u = c; u <= t.long - c + 1e-9; u += wing.footBars.s) {
-            wb.poly([V(u, -c, zf + c), V(u, -t.semEp + c, zf + c), V(u, -t.semEp + c, zf + t.semelle - c), V(u, -c, zf + t.semelle - c), V(u, -c, zf + c)]);
+            wb.poly([V(u, t.semEp - c, zf + c), V(u, c, zf + c), V(u, c, zf + t.semelle - c), V(u, t.semEp - c, zf + t.semelle - c), V(u, t.semEp - c, zf + c)]);
           }
-          for (let w = zf + c; w <= zf + t.semelle - c + 1e-9; w += 0.2) for (const py of [-c, -t.semEp + c]) wb.seg(V(c, py, w), V(t.long - c, py, w), false);
+          for (let w = zf + c; w <= zf + t.semelle - c + 1e-9; w += 0.2) for (const py of [t.semEp - c, c]) wb.seg(V(c, py, w), V(t.long - c, py, w), false);
           wb.addTo(grp, clip);
         }
       }

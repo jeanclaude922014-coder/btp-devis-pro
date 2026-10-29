@@ -92,16 +92,20 @@ export function designHeads(inp: DalotInput, mat: Materials): HeadsResult {
     // reste vérifiée à l'enracinement, à la hauteur maximale.
     const Hd = Htot - (Htot - Hend) / 3;
     const base = { ...cantilever("Mur en aile (tiers de la longueur)", Hd, t.ep, Ka, inp.gammaR, inp.qRemblai, mat), H: Htot };
-    // Stabilité du mur en aile au droit de l'enracinement (sécuritaire), par mètre.
-    const Bf = t.semelle, hs = t.semEp, toe = t.patin;
-    const heel = Math.max(0, Bf - toe - t.ep);
-    const Ht = Htot + hs;
+    // Stabilité du mur en aile au droit de l'enracinement (sécuritaire), par mètre. Comme sur la
+    // section 2-2 des plans types, la semelle est le radier de tête (épaisseur er du radier du corps) :
+    // elle s'étend côté ouvrage (patin intérieur) et déborde un peu côté remblai (talon = « patin » saisi).
+    // Renversement autour de l'arête intérieure ; Htot est compté depuis la sous-face du radier.
+    const Bf = t.semelle, hs = t.semEp, heel = Math.max(0, t.patin);
+    const toe = Math.max(0, Bf - heel - t.ep);
+    const Ht = Htot;
+    const Hw = Math.max(0, Htot - hs);
     const Pa = 0.5 * Ka * inp.gammaR * Ht ** 2;
     const Pq = Ka * inp.qRemblai * Ht;
     const Mo = (Pa * Ht) / 3 + (Pq * Ht) / 2;
-    const Wst = inp.gammaBA * t.ep * Htot, xst = toe + t.ep / 2;
+    const Wst = inp.gammaBA * t.ep * Hw, xst = toe + t.ep / 2;
     const Wf = inp.gammaBA * Bf * hs, xf = Bf / 2;
-    const Ws = inp.gammaR * Htot * heel, xs = toe + t.ep + heel / 2;
+    const Ws = inp.gammaR * Hw * heel, xs = toe + t.ep + heel / 2;
     const N = Wst + Wf + Ws;
     const Mr = Wst * xst + Wf * xf + Ws * xs;
     const FSr = Mr / Mo;

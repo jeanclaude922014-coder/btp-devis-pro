@@ -206,7 +206,8 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
   const vBody = (B * Hout - cells + 4 * n * (inp.gousset ** 2 / 2)) * L;
   const vHead = 2 * Bmt * hw.H * t.murTeteEp + (t.guideRoues && !(hw.H > 0.3) ? 2 * Bmt * t.grL * t.grH : 0);
   const Havg = heads.wing ? (heads.wing.Htot + heads.wing.Hend) / 2 : 0;
-  const vWing = heads.wing ? 4 * t.long * (Havg * t.ep + t.semelle * t.semEp) : 0;
+  // Voile au-dessus du radier ; semelle comptée sur le talon et l'épaisseur du voile (le reste est le radier de tête).
+  const vWing = heads.wing ? 4 * t.long * (Math.max(0, Havg - t.semEp) * t.ep + Math.min(t.semelle, t.patin + t.ep) * t.semEp) : 0;
   const vRad = 2 * Wrt * t.radierLong * inp.er;
   const vBeche = 2 * Wrt * t.becheProf * t.becheEp;
   const concrete = vBody + vHead + vWing + vRad + vBeche + vGc;

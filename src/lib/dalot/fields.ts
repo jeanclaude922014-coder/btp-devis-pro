@@ -118,7 +118,8 @@ export const FIELDS: FieldDef[] = [
   { key: "openings", section: "geometrie", group: "Cellules", label: "Ouvertures si les cellules diffèrent", unit: "m", kind: "text", default: "", help: "Une valeur par cellule, séparées par « ; » (ex. 2 ; 2,5 ; 2). Laisser vide si identiques." },
   { key: "hInt", section: "geometrie", group: "Cellules", label: "Hauteur libre intérieure", unit: "m", kind: "number", default: 1.5, required: true, min: 0.5, max: 5, step: 0.05 },
   { key: "es", section: "geometrie", group: "Épaisseurs", label: "Épaisseur de la dalle supérieure", unit: "m", kind: "number", default: 0.3, required: true, min: 0.15, max: 1, step: 0.01 },
-  { key: "er", section: "geometrie", group: "Épaisseurs", label: "Épaisseur du radier", unit: "m", kind: "number", default: 0.25, required: true, min: 0.15, max: 1, step: 0.01 },
+  { key: "radierEgalDalle", section: "geometrie", group: "Épaisseurs", label: "Radier de même épaisseur que la dalle", kind: "bool", default: true, help: "Coché : le radier du corps (et le radier de tête sous les ailes) prend l'épaisseur de la dalle supérieure." },
+  { key: "er", section: "geometrie", group: "Épaisseurs", label: "Épaisseur du radier", unit: "m", kind: "number", default: 0.3, required: true, min: 0.15, max: 1, step: 0.01, visibleIf: (v) => v.radierEgalDalle === false },
   { key: "eExt", section: "geometrie", group: "Épaisseurs", label: "Épaisseur des piédroits extérieurs", unit: "m", kind: "number", default: 0.25, required: true, min: 0.15, max: 1, step: 0.01 },
   { key: "eInt", section: "geometrie", group: "Épaisseurs", label: "Épaisseur des piédroits intermédiaires", unit: "m", kind: "number", default: 0.25, required: true, min: 0.15, max: 1, step: 0.01, visibleIf: (v) => Number(v.nCells) > 1 },
   { key: "gousset", section: "geometrie", group: "Épaisseurs", label: "Goussets (côté)", unit: "m", kind: "number", default: 0.1, min: 0, max: 0.4, step: 0.05, help: "Goussets intérieurs à 45°. Pris en compte dans les plans et le métré (sécuritaire : négligés dans le modèle)." },
@@ -207,9 +208,8 @@ export const FIELDS: FieldDef[] = [
   { key: "aileAngle", section: "tetes", group: "Murs en aile", label: "Angle des murs en aile / axe de l'ouvrage", unit: "°", kind: "number", default: 30, min: 0, max: 90, visibleIf: yes("teteMurs") },
   { key: "aileLong", section: "tetes", group: "Murs en aile", label: "Longueur d'un mur en aile", unit: "m", kind: "number", default: 2.5, min: 0.5, max: 10, step: 0.1, visibleIf: yes("teteMurs") },
   { key: "aileEp", section: "tetes", group: "Murs en aile", label: "Épaisseur du voile", unit: "m", kind: "number", default: 0.25, min: 0.15, max: 0.6, step: 0.01, visibleIf: yes("teteMurs") },
-  { key: "aileSemelle", section: "tetes", group: "Murs en aile", label: "Largeur de la semelle", unit: "m", kind: "number", default: 2.4, min: 0.5, max: 5, step: 0.05, visibleIf: yes("teteMurs") },
-  { key: "aileSemEp", section: "tetes", group: "Murs en aile", label: "Épaisseur de la semelle", unit: "m", kind: "number", default: 0.3, min: 0.2, max: 1, step: 0.05, visibleIf: yes("teteMurs") },
-  { key: "aileTalon", section: "tetes", group: "Murs en aile", label: "Débord avant de la semelle (patin)", unit: "m", kind: "number", default: 0.4, min: 0, max: 2, step: 0.05, visibleIf: yes("teteMurs") },
+  { key: "aileSemelle", section: "tetes", group: "Murs en aile", label: "Largeur de la semelle (radier de tête sous l'aile, épaisseur = radier du corps)", unit: "m", kind: "number", default: 2.4, min: 0.5, max: 5, step: 0.05, visibleIf: yes("teteMurs") },
+  { key: "aileTalon", section: "tetes", group: "Murs en aile", label: "Débord de la semelle côté remblai (talon)", unit: "m", kind: "number", default: 0.4, min: 0, max: 2, step: 0.05, visibleIf: yes("teteMurs") },
   { key: "aileBeche", section: "tetes", group: "Murs en aile", label: "Bêche d'ancrage sous semelle (hauteur)", unit: "m", kind: "number", default: 0.4, min: 0, max: 1.5, step: 0.05, visibleIf: yes("teteMurs"), help: "Mobilise la butée devant la semelle (prise à 50 %). 0 = pas de bêche." },
   { key: "murTeteEp", section: "tetes", group: "Mur de tête", label: "Épaisseur du mur de tête", unit: "m", kind: "number", default: 0.2, min: 0.15, max: 0.5, step: 0.01 },
   { key: "murTeteRevanche", section: "tetes", group: "Mur de tête", label: "Revanche au-dessus de la chaussée", unit: "m", kind: "number", default: 0.2, min: 0, max: 1, step: 0.05 },
@@ -377,7 +377,7 @@ export function toInput(spec: DalotSpec): DalotInput {
     },
     openings,
     hInt: num(v.hInt, 1.5),
-    es: num(v.es, 0.3), er: num(v.er, 0.25), eExt: num(v.eExt, 0.25), eInt: num(v.eInt, 0.25),
+    es: num(v.es, 0.3), er: v.radierEgalDalle === false ? num(v.er, 0.25) : num(v.es, 0.3), eExt: num(v.eExt, 0.25), eInt: num(v.eInt, 0.25),
     gousset: num(v.gousset, 0),
     L: num(v.L, 8),
     hr: num(v.hr, 1), ech: num(v.ech, 0), gammaR: num(v.gammaR, 20), gammaCh: num(v.gammaCh, 24),
@@ -403,7 +403,7 @@ export function toInput(spec: DalotSpec): DalotInput {
     tanDiff: num(v.tanDiff, 1), pas: Math.max(0.05, num(v.pas, 0.1)),
     tetes: {
       murs: v.teteMurs === true, angle: num(v.aileAngle, 30), long: num(v.aileLong, 2.5), ep: num(v.aileEp, 0.25),
-      semelle: num(v.aileSemelle, 2.4), semEp: num(v.aileSemEp, 0.3), patin: num(v.aileTalon, 0.4), beche: num(v.aileBeche, 0),
+      semelle: num(v.aileSemelle, 2.4), semEp: v.radierEgalDalle === false ? num(v.er, 0.25) : num(v.es, 0.3), patin: num(v.aileTalon, 0.4), beche: num(v.aileBeche, 0),
       murTeteEp: num(v.murTeteEp, 0.2), revanche: num(v.murTeteRevanche, 0.2),
       radierLong: num(v.radierTeteLong, 1.5), debord: Math.max(0, num(v.radierDebord, 0)), becheProf: num(v.becheProf, 0.8), becheEp: num(v.becheEp, 0.25),
       // Avec des murs en aile, un guide-roue (ou le mur de tête) est toujours présent : il fait le raccord voile / aile.
@@ -538,8 +538,8 @@ export function sectionSpec(base: DalotSpec | null, d: SectionDims, autoHeads: b
     nCells: d.nCells, opening: d.opening, openings: "", hInt: d.hInt, es: d.es, er: d.er, eExt: d.eExt, eInt: d.eInt, L: d.L, hr: d.hr,
     projet: d.projet.trim() || `Dalot ${d.nCells > 1 ? `${d.nCells} × ` : ""}${fr(d.opening)} × ${fr(d.hInt)} — L = ${fr(d.L)} m`,
   };
-  Object.assign(spec.values, vals);
-  spec.defaulted = spec.defaulted.filter((k) => !(k in vals));
+  Object.assign(spec.values, vals, { radierEgalDalle: Math.abs(d.er - d.es) < 1e-9 });
+  spec.defaulted = spec.defaulted.filter((k) => !(k in vals) && k !== "radierEgalDalle");
   if (autoHeads && spec.values.teteMurs === true) {
     const dm = headDimensionsOf(toInput(spec));
     spec.values.aileLong = Math.ceil(dm.longRec / 0.05) * 0.05;
