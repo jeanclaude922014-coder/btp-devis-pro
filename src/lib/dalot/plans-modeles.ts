@@ -526,8 +526,10 @@ function coupeLong(study: Study): View {
 /** Coupe transversale B-B (avec garde-corps éventuels). */
 function coupeTrans(study: Study): View {
   const g = geo(study);
-  const { inp, B, Hout, cells, gc, t } = g;
-  const gr = t.guideRoues ? GUIDE_ROUE.h : 0;
+  const { inp, B, Hout, cells, gc } = g;
+  // Support du garde-corps : couronnement du mur de tête (s'il existe) ou guide-roue en rive.
+  const gr = g.hg.hHead;
+  const murT = study.heads.headWall.H > 0.3;
   const hTop = gr + (gc ? GARDE_CORPS.h : 0);
   return {
     ext: { x0: 0, y0: -0.1, w: B, h: Hout + hTop + 0.1 },
@@ -538,13 +540,13 @@ function coupeTrans(study: Study): View {
       p.rect(-0.05, -0.1, B + 0.1, 0.1, "TERRAIN");
       hatch(p, -0.05, -0.1, B + 0.1, 0.1, 0.8);
       leader(p, [B * 0.5, -0.05], [B * 0.3, -p.th(9)], "Béton de propreté, 10 cm", 2.4);
-      if (t.guideRoues) p.rect(0, Hout, B, gr, "AXES");
+      if (gr > 0) p.rect(0, Hout, B, gr, "AXES");
       if (gc) {
         // Garde-corps posé sur le guide-roue.
         const G = GARDE_CORPS;
         for (const x of gardeCorpsPosts(B)) p.rect(x - G.post / 2, Hout + gr, G.post, G.h - G.lisseH, "COFFRAGE");
         p.rect(0, Hout + gr + G.h - G.lisseH, B, G.lisseH, "COFFRAGE");
-        p.text([B + p.th(2), Hout + gr + G.h / 2], 2.2, "Garde-corps sur guide-roue", "TEXTE");
+        p.text([B + p.th(2), Hout + gr + G.h / 2], 2.2, murT ? "Garde-corps sur mur de tête (guide-roue)" : gr > 0 ? "Garde-corps sur guide-roue" : "Garde-corps", "TEXTE");
       }
       p.chainH([0, ...cells.flatMap((c) => [c.x0, c.x1]), B], Hout + hTop, Hout + hTop + p.th(8), false);
       p.dimH(0, B, Hout + hTop, Hout + hTop + p.th(14));
@@ -984,7 +986,8 @@ function section22(ctx: Ctx): View | null {
   if (!w || !t.murs) return null;
   const c = inp.cover;
   const H = w.Htot - (w.Htot - w.Hend) * 0.45;
-  const xa = -t.patin, xb = t.semelle - t.patin;
+  // Semelle côté ouvrage (sous le radier de tête), débord côté remblai = patin, comme la section 2-2 des plans types.
+  const xa = t.ep + t.patin - t.semelle, xb = t.ep + t.patin;
   const se = t.semEp;
   return {
     ext: { x0: xa, y0: -se, w: t.semelle, h: H + se },
@@ -1023,7 +1026,9 @@ function section22(ctx: Ctx): View | null {
 function elevationGC(ctx: Ctx): View {
   const g = geo(ctx.study);
   const { inp, B, Hout, cells, t } = g;
-  const Hb = Hout + (t.guideRoues ? GUIDE_ROUE.h : 0);
+  const gr = g.hg.hHead;
+  const murT = ctx.study.heads.headWall.H > 0.3;
+  const Hb = Hout + gr;
   const G = GARDE_CORPS;
   const c = inp.cover;
   const posts = gardeCorpsPosts(B);
@@ -1035,7 +1040,10 @@ function elevationGC(ctx: Ctx): View {
       p.rect(0, Hout - inp.es, B, inp.es, "COFFRAGE");
       for (const x of [0, ...cells.flatMap((cl) => [cl.x0, cl.x1]), B]) p.line([x, yb], [x, Hout - inp.es], "COFFRAGE");
       p.line([-p.th(3), yb], [B + p.th(3), yb], "AXES");
-      if (t.guideRoues) { p.rect(0, Hout, B, GUIDE_ROUE.h, "COFFRAGE"); p.text([B + p.th(2), Hout + GUIDE_ROUE.h / 2], 2, `Guide-roue ${cmTxt(GUIDE_ROUE.w)} × ${cmTxt(GUIDE_ROUE.h)}`, "TEXTE"); }
+      if (gr > 0) {
+        p.rect(0, Hout, B, gr, "COFFRAGE");
+        p.text([B + p.th(2), Hout + gr / 2], 2, murT ? `Mur de tête ép. ${cmTxt(t.murTeteEp)} (guide-roue)` : `Guide-roue ${cmTxt(GUIDE_ROUE.w)} × ${cmTxt(GUIDE_ROUE.h)}`, "TEXTE");
+      }
       for (const x of posts) {
         p.rect(x - G.post / 2, Hb, G.post, G.h - G.lisseH, "COFFRAGE");
         for (const s of [-1, 1]) p.poly([[x + s * (G.post / 2 - c), Hb - G.ancrage + 0.1], [x + s * (G.post / 2 - c), Hb + G.h - c]], "ACIERS");

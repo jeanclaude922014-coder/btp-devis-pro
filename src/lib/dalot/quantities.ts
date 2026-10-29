@@ -135,7 +135,8 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
 
   // ── GUIDE-ROUES ── (deux, sur les bords libres de la dalle)
   const t = inp.tetes;
-  if (t.guideRoues) {
+  // Avec un mur de tête (remblai sur la dalle), le guide-roue est son couronnement : pas d'élément distinct.
+  if (t.guideRoues && !(heads.headWall.H > 0.3)) {
     const gw = GUIDE_ROUE.w, gh = GUIDE_ROUE.h;
     add(CORPS, "GUIDE-ROUES", "Cadres ouverts ancrés dans la dalle", { phi: 8, s: 0.2 }, "U", [gh - c + 0.19, gw - 2 * c, gh - c + 0.19], 2 * nAcross(B - 2 * c, 0.2), { nElem: 2 });
     add(CORPS, "GUIDE-ROUES", "Filants", { phi: 10, s: 0.2 }, "droite", [B - 2 * c], 2 * 4, { nElem: 2 });
@@ -201,7 +202,7 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
   // ── Volumes, surfaces ──
   const cells = inp.openings.reduce((s, o) => s + o * inp.hInt, 0);
   const vBody = (B * Hout - cells + 4 * n * (inp.gousset ** 2 / 2)) * L;
-  const vHead = 2 * B * hw.H * t.murTeteEp + (t.guideRoues ? 2 * B * 0.25 * 0.25 : 0);
+  const vHead = 2 * B * hw.H * t.murTeteEp + (t.guideRoues && !(hw.H > 0.3) ? 2 * B * GUIDE_ROUE.w * GUIDE_ROUE.h : 0);
   const Havg = heads.wing ? (heads.wing.Htot + heads.wing.Hend) / 2 : 0;
   const vWing = heads.wing ? 4 * t.long * (Havg * t.ep + t.semelle * t.semEp) : 0;
   const vRad = 2 * Wrt * t.radierLong * inp.er;
