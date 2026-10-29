@@ -433,33 +433,72 @@ function vuePlan(study: Study, detail: boolean): View {
   };
 }
 
-/** Détail du raccord piédroit / mur de tête / mur en aile, en vue en plan. */
+/**
+ * Détail du raccord piédroit / mur de tête (guide-roue) / mur en aile, en vue en plan, à l'angle aval :
+ * origine à l'angle extérieur de l'ouvrage, x le long de l'axe (x < 0 dans l'ouvrage), y en travers
+ * (y < 0 côté remblai). Le mur de tête est dans la longueur de l'ouvrage et prolongé de ép./cos α
+ * (plus le débord du radier) : la face extérieure de l'aile aboutit exactement à son extrémité.
+ */
 function detailRaccord(study: Study): View {
   const g = geo(study);
-  const { t, ept } = g;
+  const { t, ept, d } = g;
   const e = g.inp.eExt;
-  const R = Math.max(0.7, 3 * Math.max(e, t.ep, ept || 0.2));
+  const ew = ept || GUIDE_ROUE.w;
+  const yw = d + (t.murs ? t.ep / Math.cos(g.a) : 0);
+  const R = Math.max(0.8, 2.6 * Math.max(e, t.ep, ew, yw));
+  // Segment limité au disque de rayon R (le détail est cerclé).
+  const clip = (a: Pt, b: Pt): [Pt, Pt] | null => {
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    const A = dx * dx + dy * dy, Bq = 2 * (a[0] * dx + a[1] * dy), C = a[0] * a[0] + a[1] * a[1] - R * R;
+    const disc = Bq * Bq - 4 * A * C;
+    if (A === 0 || disc <= 0) return null;
+    const s0 = Math.max(0, (-Bq - Math.sqrt(disc)) / (2 * A)), s1 = Math.min(1, (-Bq + Math.sqrt(disc)) / (2 * A));
+    if (s1 <= s0) return null;
+    return [[a[0] + dx * s0, a[1] + dy * s0], [a[0] + dx * s1, a[1] + dy * s1]];
+  };
   return {
     ext: { x0: -R, y0: -R, w: 2 * R, h: 2 * R },
     pad: { l: 4, r: 4, b: 4, t: 4 },
     draw: (p) => {
+      const L = (a: Pt, b: Pt, layer: "COFFRAGE" | "AXES" = "COFFRAGE") => { const c = clip(a, b); if (c) p.line(c[0], c[1], layer); };
       p.circle([0, 0], R, "COFFRAGE", true);
-      // Piédroit (le long de l'ouvrage, x < 0), mur de tête (bande verticale), mur en aile.
-      p.line([-R * 0.98, 0], [0, 0], "COFFRAGE");
-      p.line([-R * 0.95, -e], [-(ept || 0), -e], "AXES");
-      if (ept > 0) p.line([-ept, -e], [-ept, -R * 0.95], "AXES");
-      p.line([0, 0], [0, -R * 0.98], "COFFRAGE");
+      // Piédroit extérieur (face extérieure vue, face intérieure cachée sous la dalle).
+      L([-2 * R, 0], [-ew, 0]);
+      L([-2 * R, e], [-ew, e], "AXES");
+      // Mur de tête / guide-roue : bande x ∈ [−ép, 0], prolongée jusqu'à y = −(débord + ép. aile / cos α).
+      L([-ew, -yw], [-ew, 2 * R]);
+      L([0, -yw], [0, 2 * R]);
+      L([-ew, -yw], [0, -yw]);
+      hatch(p, -ew, -Math.min(yw, R * 0.9), ew, Math.min(yw, R * 0.9) + Math.min(R * 0.5, 0.6), 1.2);
       if (t.murs) {
-        const d: Pt = [Math.cos(g.a), Math.sin(g.a)];
-        const nn: Pt = [-Math.sin(g.a), Math.cos(g.a)];
-        p.line([0, 0], [d[0] * R * 0.97, d[1] * R * 0.97], "COFFRAGE");
-        p.line([nn[0] * t.ep, nn[1] * t.ep], [nn[0] * t.ep + d[0] * R * 0.85, nn[1] * t.ep + d[1] * R * 0.85], "COFFRAGE");
-        p.text([d[0] * R * 0.55 - nn[0] * p.th(3), d[1] * R * 0.55 - nn[1] * p.th(3)], 2.6, angTxt(t.angle), "COTATION", "center");
-        p.text([d[0] * R * 0.6 + nn[0] * (t.ep / 2) , d[1] * R * 0.6 + nn[1] * (t.ep / 2) - p.th(1)], 2.4, cmTxt(t.ep), "COTATION", "center", (g.a * 180) / Math.PI);
-        p.line([0, 0], [R * 0.7, 0], "AXES");
+        const dw: Pt = [Math.cos(g.a), -Math.sin(g.a)];
+        // Face intérieure (côté ouvrage) depuis l'angle du radier, face extérieure depuis l'extrémité du mur de tête.
+        const A: Pt = [0, -d];
+        const A2: Pt = [0, -yw];
+        L(A, [A[0] + dw[0] * 2 * R, A[1] + dw[1] * 2 * R]);
+        L(A2, [A2[0] + dw[0] * 2 * R, A2[1] + dw[1] * 2 * R]);
+        // Repère d'angle : axe de l'ouvrage prolongé et arc.
+        L([0, -d], [R, -d], "AXES");
+        const ra = R * 0.45;
+        const arc: Pt[] = [];
+        for (let k = 0; k <= 12; k++) { const th = (-g.a * k) / 12; arc.push([ra * Math.cos(th), -d + ra * Math.sin(th)]); }
+        p.poly(arc, "COTATION");
+        p.text([ra * 1.05 * Math.cos(-g.a / 2) + p.th(1), -d + ra * Math.sin(-g.a / 2)], 2.4, angTxt(t.angle), "COTATION", "left");
+        // Épaisseur de l'aile, cotée perpendiculairement.
+        const m: Pt = [R * 0.55 * dw[0], -d + R * 0.55 * dw[1]];
+        const nn: Pt = [-Math.sin(g.a), -Math.cos(g.a)];
+        p.line(m, [m[0] + nn[0] * t.ep, m[1] + nn[1] * t.ep], "COTATION");
+        p.text([m[0] + nn[0] * (t.ep / 2) + p.th(2), m[1] + nn[1] * (t.ep / 2)], 2.2, cmTxt(t.ep), "COTATION", "left");
+        p.text([R * 0.62 * dw[0] + nn[0] * (t.ep + p.th(3)), -d + R * 0.62 * dw[1] + nn[1] * (t.ep + p.th(3))], 2, "Mur en aile", "TEXTE", "center", (-g.a * 180) / Math.PI);
+        // Prolongement du mur de tête jusqu'à la racine de l'aile.
+        p.dimV(-yw, -d, -ew, -ew - p.th(5), cmTxt(yw - d));
       }
-      p.dimV(-e, 0, -R * 0.6, -R * 0.6 - p.th(4));
-      if (ept > 0) p.dimH(-ept, 0, -R * 0.55, -R * 0.55);
+      if (d > 0) p.dimV(-d, 0, 0, p.th(4));
+      p.dimV(0, e, -R * 0.55, -R * 0.55 - p.th(4));
+      p.dimH(-ew, 0, R * 0.5, R * 0.5 + p.th(3));
+      p.text([-R * 0.6, -p.th(3)], 2, "Piédroit", "TEXTE", "center");
+      p.text([-ew / 2 - p.th(1.5), R * 0.25], 2, ept > 0 ? "Mur de tête (guide-roue)" : "Guide-roue", "TEXTE", "center", 90);
+      p.text([R * 0.45, R * 0.25], 2, "Radier de tête", "TEXTE", "center");
     },
   };
 }
