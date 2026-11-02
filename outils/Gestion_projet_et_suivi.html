@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="author" content="Moulo Jean Claude">
+<style>body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Gestion projet et suivi</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Mise en page : en-tête + filtre chantier, bandeau d'indicateurs, tableau en 3 colonnes (À faire / En cours / Terminé), puis charge des ressources. Même encre « plan » bleu nuit + accent latérite que DQE Lots & Suivi. */
+:root{
+  --bg:#f6f4f1; --surface:#ffffff; --surface-2:#efebe6; --line:#ddd6cd; --line-2:#c9bfb2;
+  --ink:#1b2433; --ink-2:#4a5262; --muted:#7a7f89;
+  --accent:#b4532a; --accent-ink:#ffffff; --accent-soft:#f6e3d8;
+  --navy:#1d3557; --navy-soft:#e3e9f2;
+  --good:#2f7d4f; --good-soft:#e2f1e7; --bad:#b42318; --bad-soft:#fbe5e2; --warn:#8a5a00; --warn-soft:#fdf1d6;
+  --col-todo:#e9e4dd; --col-doing:#dfe7f3; --col-done:#dcefe3;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  --r:8px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12161d; --surface:#1a2029; --surface-2:#222a35; --line:#2e3744; --line-2:#3d4857;
+  --ink:#e9e6e1; --ink-2:#b9bcc3; --muted:#8d929b;
+  --accent:#e0794a; --accent-ink:#1a0e08; --accent-soft:#3a2418;
+  --navy:#9fb8dc; --navy-soft:#1f2a3a;
+  --good:#5fbf86; --good-soft:#17301f; --bad:#f07b6b; --bad-soft:#3a1b18; --warn:#e7b85c; --warn-soft:#33270f;
+  --col-todo:#262b33; --col-doing:#1d2838; --col-done:#1a2c22; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12161d; --surface:#1a2029; --surface-2:#222a35; --line:#2e3744; --line-2:#3d4857;
+  --ink:#e9e6e1; --ink-2:#b9bcc3; --muted:#8d929b;
+  --accent:#e0794a; --accent-ink:#1a0e08; --accent-soft:#3a2418;
+  --navy:#9fb8dc; --navy-soft:#1f2a3a;
+  --good:#5fbf86; --good-soft:#17301f; --bad:#f07b6b; --bad-soft:#3a1b18; --warn:#e7b85c; --warn-soft:#33270f;
+  --col-todo:#262b33; --col-doing:#1d2838; --col-done:#1a2c22; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+.wrap{max-width:1360px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px;display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+.wrap>*{min-width:0}
+h1,h2,h3{font-family:var(--f-display);letter-spacing:.01em;text-wrap:balance;margin:0;color:var(--ink)}
+h1{font-size:30px;font-weight:700;line-height:1.05} h2{font-size:20px;font-weight:600}
+.eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.muted{color:var(--muted)} .small{font-size:12px}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn{border:1px solid var(--line-2);background:var(--surface);border-radius:6px;padding:7px 12px;font-size:13px;color:var(--ink)}
+.btn:hover{background:var(--surface-2)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.warn{border-color:var(--bad);background:var(--bad-soft);color:var(--bad)}
+.btn.sm{padding:3px 8px;font-size:12px}
+.field{display:grid;gap:4px;font-size:12px;color:var(--muted);min-width:0}
+.field input,.field select,.field textarea{border:1px solid var(--line-2);background:var(--surface);border-radius:6px;padding:7px 9px;font-size:14px;color:var(--ink);min-width:0;width:100%}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+.top{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between}
+.top .lead{max-width:64ch;color:var(--ink-2);margin:6px 0 0}
+.top .ctl{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.banner{border-left:4px solid var(--accent);background:var(--accent-soft);border-radius:6px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.status{font-size:12px;color:var(--muted)} .status b{color:var(--ink-2)}
+/* Indicateurs */
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:900px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px;display:grid;gap:2px;align-content:start}
+.kpi .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.kpi .v{font-family:var(--f-display);font-size:26px;font-weight:600;line-height:1.1}
+.kpi .s{font-size:12px;color:var(--muted)}
+.kpi.bad .v{color:var(--bad)} .kpi.good .v{color:var(--good)}
+.meter{height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden;margin:4px 0 2px}
+.meter i{display:block;height:100%;background:var(--good)}
+/* Tableau */
+.board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start}
+@media (max-width:900px){.board{grid-template-columns:1fr}}
+.col{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);min-height:160px;display:flex;flex-direction:column;min-width:0}
+.col.over{outline:2px dashed var(--accent);outline-offset:-2px}
+.col header{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-radius:var(--r) var(--r) 0 0}
+.col[data-col="a_faire"] header{background:var(--col-todo)} .col[data-col="en_cours"] header{background:var(--col-doing)} .col[data-col="termine"] header{background:var(--col-done)}
+.col header h2{font-size:17px;text-transform:uppercase;letter-spacing:.04em}
+.count{font-family:var(--f-mono);font-size:12px;background:var(--surface);border-radius:999px;padding:1px 8px}
+.list{display:grid;gap:8px;padding:8px}
+.empty{border:1px dashed var(--line-2);border-radius:6px;padding:14px;text-align:center;font-size:12px;color:var(--muted)}
+.card{border:1px solid var(--line);border-left:4px solid var(--navy);border-radius:6px;background:var(--surface);padding:10px;display:grid;gap:5px;cursor:grab;min-width:0}
+.card.p-haute{border-left-color:var(--bad)} .card.p-basse{border-left-color:var(--line-2)}
+.card.drag{opacity:.45}
+.card .hd{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:start}
+.card h3{font-family:var(--f-body);font-size:14px;font-weight:600;line-height:1.3;overflow-wrap:anywhere}
+.badge{white-space:nowrap;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:500}
+.b-retard{background:var(--bad-soft);color:var(--bad)} .b-proche{background:var(--warn-soft);color:var(--warn)} .b-ok{background:var(--surface-2);color:var(--ink-2)}
+.b-tenu{background:var(--good-soft);color:var(--good)} .b-depasse{background:var(--warn-soft);color:var(--warn)} .b-aucune{background:transparent;color:var(--muted)}
+.meta{font-size:12px;color:var(--muted);overflow-wrap:anywhere} .meta b{color:var(--ink-2);font-weight:600}
+.prog{display:grid;grid-template-columns:minmax(0,1fr) 42px;gap:8px;align-items:center}
+.prog input{width:100%;accent-color:var(--good)}
+.prog span{font-family:var(--f-mono);font-size:12px;text-align:right}
+.acts{display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:6px}
+.acts div{display:flex;gap:4px;flex-wrap:wrap}
+.lnk{border:0;background:transparent;color:var(--muted);font-size:12px;padding:3px 6px;border-radius:4px}
+.lnk:hover{background:var(--surface-2);color:var(--ink)} .lnk.warn{background:var(--bad-soft);color:var(--bad)}
+.mv{border:1px solid var(--line-2);background:var(--surface);border-radius:4px;font-size:12px;padding:2px 8px}
+.mv.fw{background:var(--navy-soft);border-color:var(--navy);color:var(--navy);font-weight:600}
+/* Formulaires */
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (max-width:560px){.grid2{grid-template-columns:1fr}}
+.span2{grid-column:1/-1}
+.bottom{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:16px;align-items:start}
+@media (max-width:900px){.bottom{grid-template-columns:1fr}}
+.stack{display:grid;gap:16px;min-width:0}
+details.panel>summary{cursor:pointer;font-family:var(--f-display);font-size:19px;font-weight:600;list-style:none}
+details.panel>summary::-webkit-details-marker{display:none}
+details.panel>summary::before{content:"+ ";color:var(--accent)}
+details.panel[open]>summary::before{content:"– "}
+.err{color:var(--bad);font-size:13px} .ok{color:var(--good);font-size:13px}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-weight:600;color:var(--muted);font-size:12px;padding:6px;border-bottom:1px solid var(--line)}
+.tbl td{padding:6px;border-bottom:1px solid var(--line)}
+.r{text-align:right}
+.scroll{overflow-x:auto}
+.drop{border:2px dashed var(--line-2);border-radius:6px;padding:12px;text-align:center;cursor:pointer;font-size:13px;color:var(--ink-2)}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line-2);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+.foot{font-size:12px;color:var(--muted);text-align:center}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Chantiers · avancement · délais · ressources</div>
+      <h1>Gestion projet et suivi</h1>
+      <p class="lead">Un tableau par chantier : faites glisser chaque tâche de « À faire » à « En cours » puis « Terminé », réglez son avancement, et voyez d'un coup d'œil les retards et les équipes engagées.</p>
+    </div>
+    <div class="ctl">
+      <label class="field" for="chantier">Chantier<select id="chantier"></select></label>
+      <button type="button" class="btn" id="newChantier">+ Chantier</button>
+    </div>
+  </header>
+  <div id="banner"></div>
+  <div class="status" id="st"></div>
+  <section class="kpis" id="kpis"></section>
+  <section class="board" id="board"></section>
+  <div class="bottom">
+    <div class="stack">
+      <details class="panel" id="newPanel">
+        <summary>Nouvelle tâche</summary>
+        <form id="taskForm" class="grid2" style="margin-top:12px" novalidate></form>
+      </details>
+      <section class="panel">
+        <h2>Tâches depuis un DQE</h2>
+        <p class="muted small" style="margin:2px 0 10px">Déposez le DQE (Excel ou PDF) : une tâche « À faire » est créée pour chaque lot reconnu, dans le chantier choisi.</p>
+        <label class="drop" id="dqeDrop" for="dqeFile">Déposer un DQE ici, ou cliquer pour le choisir</label>
+        <input type="file" id="dqeFile" accept=".xlsx,.xlsm,.xls,.csv,.pdf" hidden>
+        <p id="dqeMsg" class="small" style="margin:8px 0 0"></p>
+      </section>
+      <section class="panel">
+        <h2>Exports</h2>
+        <p class="muted small" style="margin:2px 0 10px">Le tableau du chantier affiché, pour Excel ou pour l'ouvrir hors ligne.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn" id="csv">Exporter vers Excel (.csv)</button>
+          <button type="button" class="btn" id="html">Télécharger la page (.html)</button>
+        </div>
+      </section>
+    </div>
+    <section class="panel">
+      <h2>Charge des ressources</h2>
+      <p class="muted small" style="margin:2px 0 8px">Tâches non terminées par équipe ou intervenant.</p>
+      <div class="scroll" id="res"></div>
+    </section>
+  </div>
+  <p class="foot">Auteur : Moulo Jean Claude · Technicien génie civil BTP, Abidjan</p>
+</div>
+
+<script>var DQE=(()=>{var O=Object.defineProperty;var ie=Object.getOwnPropertyDescriptor;var se=Object.getOwnPropertyNames;var oe=Object.prototype.hasOwnProperty;var ae=(t,e)=>{for(var n in e)O(t,n,{get:e[n],enumerable:!0})},le=(t,e,n,r)=>{if(e&&typeof e=="object"||typeof e=="function")for(let i of se(e))!oe.call(t,i)&&i!==n&&O(t,i,{get:()=>e[i],enumerable:!(r=ie(e,i))||r.enumerable});return t};var ue=t=>le(O({},"__esModule",{value:!0}),t);var Ee={};ae(Ee,{CATEGORIES:()=>D,categoryByKey:()=>v,describeAll:()=>ee,parseDqe:()=>W,toNumber:()=>$});var D=[{key:"generalites",label:"Installation de chantier \u2013 g\xE9n\xE9ralit\xE9s",order:0,keywords:["installation","repli","amenee","implantation","panneau de chantier","generalite","etudes","plan d'execution","constat","dossier","signalisation"],note:"Installation, implantation contradictoire et repli : \xE0 faire constater par PV ; pr\xE9voir le panneau de chantier et les plans d'ex\xE9cution avant d\xE9marrage."},{key:"terrassement",label:"Terrassement",order:1,keywords:["terrassement","debroussaill","decapage","fouille","deblai","remblai","nivellement","compactage","evacuation des terres","plateforme","laterite","fouilles"],note:"Sol lat\xE9ritique : purger les poches argileuses, remblais en couches de 20 cm compact\xE9es \xE0 95 % de l'OPM (Proctor modifi\xE9) avant dallage ; essais de plaque ou densit\xE9 in situ recommand\xE9s."},{key:"gros_oeuvre",label:"Gros \u0153uvre \u2013 b\xE9ton arm\xE9 et ma\xE7onnerie",order:2,keywords:["gros oeuvre","gros-oeuvre","beton","semelle","fondation","poteau","poutre","chainage","linteau","dalle","dallage","agglo","maconnerie","enduit","coffrage","acier","armature","ha ","ferraillage","voile","longrine","radier","claustra","hourdis","polyane"],note:"B\xE9ton arm\xE9 \xE0 justifier selon BAEL 91 mod. 99 / EC2 : dosage \u2265 350 kg/m\xB3 pour les \xE9l\xE9ments porteurs, enrobage \u2265 3 cm \xE0 l'ext\xE9rieur, cure humide d'au moins 7 jours (climat tropical chaud) et vibration syst\xE9matique ; pr\xE9voir \xE9prouvettes de contr\xF4le (fc28)."},{key:"etancheite",label:"\xC9tanch\xE9it\xE9",order:3,keywords:["etancheite","etanche","bitum","paxalumin","multicouche","relev\xE9","releve","forme de pente"],note:"Forme de pente \u2265 1,5 % vers les EP, relev\xE9s \u2265 15 cm ; protection anti-UV indispensable sous fort ensoleillement."},{key:"charpente_couverture",label:"Charpente \u2013 couverture",order:4,keywords:["charpente","couverture","tole","bac alu","aluzinc","faitiere","panne","chevron","ferme","liteau","gouttiere","rive","toiture","tuile"],note:"Bois trait\xE9s insecticide-fongicide (termites), ancrage des fermes dans le cha\xEEnage contre les vents de tornade ; recouvrement des t\xF4les conforme au fabricant."},{key:"menuiserie_bois",label:"Menuiserie bois",order:5,keywords:["menuiserie bois","porte isoplane","porte en bois","bois rouge","placard","isoplane","quincaillerie","serrure ","paumelle"],note:"Bois sec (humidit\xE9 \u2264 18 %) et trait\xE9 ; prot\xE9ger les menuiseries des remont\xE9es d'humidit\xE9."},{key:"menuiserie_metallique",label:"Menuiserie m\xE9tallique \u2013 serrurerie",order:6,keywords:["metallique","serrurerie","grille","garde-corps","garde corps","portail","naco","persienne","barreaudage","ferronnerie"],note:"Profil\xE9s trait\xE9s antirouille (2 couches) avant pose ; scellements au mortier dos\xE9 \xE0 350 kg/m\xB3."},{key:"menuiserie_alu",label:"Menuiserie aluminium \u2013 vitrerie",order:7,keywords:["aluminium","alu ","vitrage","vitrerie","vitre","verre","baie","coulissant"],note:"Joints d'\xE9tanch\xE9it\xE9 p\xE9riph\xE9riques et rejingots pour les pluies battantes."},{key:"plomberie",label:"Plomberie \u2013 sanitaires",order:8,keywords:["plomberie","sanitaire","wc","lavabo","evier","robinet","pvc","tuyau","sodeci","douche","siphon","chasse","urinoir","lave-mains","lave mains","pression","pehd","cuve","chateau d'eau"],note:"Essais d'\xE9tanch\xE9it\xE9 sous pression avant fermeture des saign\xE9es ; branchement SODECI \xE0 coordonner t\xF4t."},{key:"assainissement",label:"Assainissement \u2013 VRD",order:9,keywords:["assainissement","regard","fosse","puisard","puits perdu","caniveau","dalot","buse","drain","eaux usees","eaux pluviales","septique","latrine","vrd","voirie","bordure","pave"],note:"Puisards et puits perdus : v\xE9rifier la perm\xE9abilit\xE9 du sol lat\xE9ritique ; implanter \xE0 distance r\xE9glementaire des points d'eau."},{key:"electricite",label:"\xC9lectricit\xE9",order:10,keywords:["electricite","electrique","cable","fil h07","tableau","disjoncteur","interrupteur","prise","pc ","reglette","luminaire","lampe","hublot","mise a la terre","securel","cie","icd","gaine","eclairage","ventilateur","brasseur"],note:"Installation conforme NF C 15-100 ; mise \xE0 la terre < 100 \u03A9 et attestation SECUREL avant mise sous tension CIE."},{key:"revetements",label:"Rev\xEAtements durs \u2013 carrelage",order:11,keywords:["revetement","carreau","carrelage","faience","gres","plinthe","chape","granito","marbre"],note:"Pose sur chape ou dallage sec ; joints de fractionnement tous les 40 m\xB2 environ (dilatation thermique)."},{key:"faux_plafond",label:"Faux plafonds",order:12,keywords:["faux plafond","faux-plafond","plafond","contreplaque","staff","dalles de plafond","lambris"],note:"Ossature trait\xE9e et ventilation des combles pour limiter la chaleur sous toiture."},{key:"peinture",label:"Peinture \u2013 vernis",order:13,keywords:["peinture","vinylique","glycero","vernis","brossage","egrainage","enduit de lissage","badigeon","antirouille","impression"],note:"Enduits secs (\u2248 28 jours) avant peinture ; peintures ext\xE9rieures adapt\xE9es aux UV et \xE0 l'humidit\xE9."},{key:"equipements",label:"\xC9quipements \u2013 divers",order:14,keywords:["equipement","mobilier","climatis","split","forage","pompe","solaire","panneau","extincteur"],note:"V\xE9rifier les fiches techniques et garanties fournisseurs avant commande."}],j={key:"divers",label:"Divers",order:99,keywords:[],note:"Lot sans corps d'\xE9tat reconnu : v\xE9rifier le rattachement des articles."};function v(t){var e;return(e=D.find(n=>n.key===t))!=null?e:j}function S(t){return` ${t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/œ/g,"oe").replace(/[’']/g,"'").replace(/\s+/g," ")} `}function U(t,e,n){var i;let r=S(t);for(let o of D)for(let u of o.keywords)r.includes(u)&&n.set(o.key,((i=n.get(o.key))!=null?i:0)+e*(u.length>6?2:1))}function C(t,e){let n=new Map;U(t,10,n);for(let o of e)U(o,1,n);let r=j.key,i=0;for(let[o,u]of n)u>i&&(r=o,i=u);return r}function H(t){return C("",[t])}function $(t){var o,u;if(t==null)return null;if(typeof t=="number")return Number.isFinite(t)?t:null;let e=String(t).replace(/[   \s]/g,"").replace(/(f\.?cfa|fcfa|xof|cfa|f)$/i,"").trim();if(!e||!/^-?[\d.,]+$/.test(e)||!/\d/.test(e))return null;let n=((o=e.match(/\./g))!=null?o:[]).length,r=((u=e.match(/,/g))!=null?u:[]).length;n&&r?e.lastIndexOf(",")>e.lastIndexOf(".")?e=e.replace(/\./g,"").replace(",","."):e=e.replace(/,/g,""):r>1?e=e.replace(/,/g,""):r===1?e=e.replace(",","."):n>1&&(e=e.replace(/\./g,""));let i=Number(e);return Number.isFinite(i)?i:null}function L(t){return t==null?"":String(t).replace(/[  ]/g," ").replace(/\s+/g," ").trim()}var ce=/^(m[²2³3]?|ml|m\.?l\.?|u|un|unit[ée]s?|u\.|ens|ensemble|ff|fft|forfait|f\.f\.?|kg|t|tonnes?|l|litres?|pm|p\.m\.?|pce|pi[èe]ces?|nb|nbre|no|j|jours?|h|heures?|km|ha|lot|pt|point|sac|voyage|v|mois|m\/l|m2\/m|gl|global)$/i;function T(t){return ce.test(t.trim())}function X(t){let e=t.trim().toLowerCase().replace(/\.$/,"");return e==="m2"?"m\xB2":e==="m3"?"m\xB3":e==="m.l"||e==="m/l"?"ml":e==="unite"||e==="unit\xE9"||e==="un"||e==="unites"||e==="unit\xE9s"?"u":e==="ensemble"?"ens":e==="forfait"||e==="f.f"?"ff":t.trim()}var de=/^(?:[A-Z]{1,2}[.\-]?)?\d{1,3}(?:[.\-]\d{1,3})*[a-z]?\.?$|^[IVXL]{1,6}\.?$|^[A-H]\.?$/;function J(t){return de.test(t.trim())}function Z(t){return t.replace(/\.$/,"").split(/[.\-]/).filter(Boolean).length}var me=/^[IVXL]{1,6}$/,z=/^(sous[\s-]?total|s\/total|total|montant|report|a reporter|à reporter|r[ée]capitulati|tva|t\.v\.a|ttc|net a payer|net à payer|arr[êe]t[ée]|cumul|prix total)/i,Y=/^\s*lot\s*(?:n[°o]?\.?\s*)?([0-9]{1,3}[a-z]?(?:\s*[-–&et,]+\s*[0-9]{1,3})*|[ivxl]{1,6})?\b/i,pe=/^\s*(?:[IVXL]{1,6}\s*[.\-–:)]\s*)?(ouvrage|b[âa]timent|bloc|site|tranche|partie|composante|sous[\s-]?projet|module|zone|construction|r[ée]habilitation|am[ée]nagement|r[ée]alisation)\b/i,V=/^(r[ée]capitulati|r[ée]sum[ée] g[ée]n[ée]ral|synth[eè]se)/i;function K(t){let e=S(t).trim();return e?/^(n|no|n°|n °|num|numero|item|ref|reference|art|article|code|prix n|n prix|n° prix|n°prix)\b/.test(e)&&e.length<18?"num":/designation|libelle|description|nature des|ouvrages|prestations|travaux/.test(e)?"des":/^(u|un|unite|unites|u\.)\.?$/.test(e)||/^unite/.test(e)?"unit":/qte|quantite|qtes|^q\.?$|quant/.test(e)?"qty":/p\.?\s?u\b|prix unit|^pu\b|prix unitaire|p\.u\.?/.test(e)?"pu":/montant|prix total|p\.?\s?t\b|^total|^pt$/.test(e)?"amt":null:null}function G(t){let e=Math.min(t.length,60);for(let n=0;n<e;n++){let r={};if(t[n].forEach((i,o)=>{let u=K(L(i));u&&r[u]===void 0&&(r[u]=o)}),r.des!==void 0&&(r.qty!==void 0||r.pu!==void 0)){let i=t[n+1];return i&&i.forEach((o,u)=>{let c=K(L(o));c&&r[c]===void 0&&c!=="des"&&(r[c]=u)}),{index:n,map:r}}}return null}function B(t){let e=t.match(/^((?:[A-Z]{1,2}[.\-]?)?\d{1,3}(?:[.\-]\d{1,3})*[a-z]?|[IVXL]{1,6})\s*[.\-–:)/]\s*(.+)$/);if(e&&e[2].length>2)return{code:e[1],rest:e[2].trim()};let n=t.match(/^(\d{1,3}(?:\.\d{1,3})+)\s+(.+)$/);return n?{code:n[1],rest:n[2].trim()}:{code:"",rest:t}}function fe(t,e){if(t.length>=3){let[n,r,i]=t.slice(-3);return Math.abs(n*r-i)<=Math.max(2,i*.01)?{q:n,pu:r}:{q:n,pu:r}}if(t.length===2){let[n,r]=t;return{q:n,pu:r}}return t.length===1&&e?{q:t[0],pu:0}:null}function ge(t,e){let n=l=>e[l]===void 0?void 0:t[e[l]],r=L(n("num")),i=L(n("des")),o=L(n("unit")),u=$(n("qty")),c=$(n("pu")),s=$(n("amt")),p=new Set(Object.values(e)),a=t.map((l,d)=>p.has(d)?"":L(l)).filter(l=>l&&$(l)===null);if(!i&&a.length&&(i=a.join(" ")),!i&&r&&!J(r)&&(i=r,r=""),o&&!T(o)&&$(o)!==null&&u===null&&(u=$(o),o=""),!i&&!r&&u===null&&c===null&&s===null)return{kind:"skip"};let g=`${r} ${i}`.trim();if(V.test(i)||V.test(g))return{kind:"recap"};if(z.test(i)||z.test(r)||/\btotal\b/i.test(i))return{kind:"total",text:i,amount:s};u===null&&c!==null&&s!==null&&c>0&&(u=s/c),c===null&&u!==null&&s!==null&&u>0&&(c=s/u);let f=u!==null&&u!==0;if(i&&(f||o&&T(o)||c!==null&&c>0))return!o&&!f&&!c?{kind:"heading",code:r,text:i}:{kind:"item",n:r,d:i,u:o?X(o):"u",q:u!=null?u:0,pu:c!=null?c:0};if(!i)return{kind:"skip"};if(s!==null&&s>0)return{kind:"total",text:i,amount:s};let h=r?{code:r,rest:i}:B(i);return{kind:"heading",code:h.code,text:h.rest}}function he(t){let e=t.flatMap(s=>s.split(/[\u00a0\u202f\s]+/)).filter(Boolean);if(e.some(s=>$(s)===null))return t.map(s=>{var p;return(p=$(s))!=null?p:0});let n=e.length;if(n>12)return e.map(s=>$(s));let r=[],i=(s,p)=>{if(!(r.length>2e3)){if(s===n){r.push(p.map(a=>$(a)));return}i(s+1,[...p,e[s]]),p.length&&/^\d{3}([.,]\d+)?$/.test(e[s])&&/^\d{1,3}( \d{3})*$/.test(p[p.length-1])&&i(s+1,[...p.slice(0,-1),`${p[p.length-1]} ${e[s]}`])}};i(0,[]);let o=s=>{if(s.length<3)return!1;let[p,a,g]=s.slice(-3);return g>0&&Math.abs(p*a-g)<=Math.max(2,g*.005)},u=r.filter(s=>s.length===3&&o(s));if(u.length)return u[0];let c=r.filter(o).sort((s,p)=>s.length-p.length);return c.length?c[0]:t.map(s=>{var p;return(p=$(s))!=null?p:0})}function Q(t){let e=t.map(L).filter(Boolean);if(!e.length)return{kind:"skip"};let n=a=>/^[\d\s\u00a0\u202f.,]+$/.test(a)&&/\d/.test(a),r=e.length;for(;r>0&&n(e[r-1]);)r--;let i=r<e.length?he(e.slice(r)):[];if(e=e.slice(0,r).concat([]),r>0&&!T(e[r-1])){let a=e[r-1].match(/^(.*\S)\s+(m[²2³3]|ml|u|ens|ff|fft|kg|forfait|pm)$/i);a&&i.length&&(e[r-1]=a[1],e.splice(r,0,a[2]),r++)}let o="";r>0&&T(e[r-1])&&(o=e[r-1],r--);let u="",c=0;r>1&&J(e[0])&&(u=e[0],c=1);let s=e.slice(c,r).join(" ").trim();if(!u){let a=B(s);a.code&&(i.length||o)&&(u=a.code,s=a.rest)}if(!s)return{kind:"skip"};if(V.test(s))return{kind:"recap"};if(z.test(s)||/\btotal\b/i.test(s))return{kind:"total",text:s,amount:i.length?i[i.length-1]:null};let p=fe(i,!!o);if(p&&(o||i.length>=2))return{kind:"item",n:u,d:s,u:o?X(o):"u",q:p.q,pu:p.pu};if(i.length===1&&!o)return{kind:"total",text:s,amount:i[0]};if(!i.length&&!o){let a=u?{code:u,rest:s}:B(s);return{kind:"heading",code:a.code,text:a.rest}}return{kind:"text",text:s}}var be=new Set(["VRD","BA","PVC","CIE","SODECI","HA","AEP","EP","EU","EV","RDC","R+1","R+2","PEHD","HT","TTC","TVA","BPU","DQE","LED","SECUREL","CI","II","III","IV","VI","VII","VIII","IX"]);function E(t){let e=t.replace(/\s+/g," ").replace(/\s*[:\-–]\s*$/,"").trim();e=e.replace(/\bOEUVRE\b/g,"\u0152UVRE").replace(/\boeuvre\b/g,"\u0153uvre");let n=e.replace(/[^A-Za-zÀ-ÿŒœ]/g,""),r=n.replace(/[^A-ZÀ-ÞŒ]/g,"").length;if(n.length>3&&r/n.length>.8){let i=!0;e=e.split(" ").map(o=>{let u=o.replace(/[^A-Za-zÀ-ÿŒœ+0-9]/g,"");if(be.has(u))return/[A-Za-z]/.test(u)&&(i=!1),o;let c=o.toLocaleLowerCase("fr-FR");return i&&/[a-zà-ÿœ]/.test(c)&&(c=c.replace(/[a-zà-ÿœ]/,s=>s.toLocaleUpperCase("fr-FR")),i=!1),c}).join(" ")}return e}function _(t,e){let n=e.match(Y);if(n&&n[0].trim().length){let r=n[1]?n[1].toUpperCase().replace(/\s+/g,""):"",i=e.slice(n[0].length).replace(/^\s*[:\-–.)]\s*/,"").trim();return`Lot ${r}${i?` : ${E(i)}`:""}`.replace(/\s+:/," :")}return t?`Lot ${t.replace(/\.$/,"")} : ${E(e)}`:E(e)}function ye(t){let e=t.match(/^Lot\s+([0-9A-Z\-–&,]+)/i);return e?e[1].toUpperCase():null}function ke(t){let e=G(t.rows),r=t.layout==="free"?null:e,i=[],o=e?e.index+1:0,u=!1,c=0;for(let s=o;s<t.rows.length&&!u;s++){let p=t.rows[s];if(e&&G([p]))continue;let a=r?ge(p,r.map):Q(p);if(r&&a.kind==="skip"&&(a=Q(p)),a.kind==="recap"&&c>0){u=!0;break}a.kind==="item"&&c++,i.push({row:a})}return{entries:i}}var F=t=>me.test(t.replace(/\.$/,""));function $e(t,e,n,r){var N;let i=r.entries.filter(b=>b.row.kind==="heading").map(b=>b.row),o=i.some(b=>Y.test(b.text)&&/^\s*lot\b/i.test(b.text)),u=i.some(b=>F(b.code)),c=i.some(b=>b.code&&!F(b.code)&&Z(b.code)===1),s=null,p=new Set,a=null,g,f=null,h=n?e:"",l=b=>{let m={id:`S${t.sites.length+1}`,name:b};return t.sites.push(m),s=m,p.clear(),a=null,g=void 0,m},d=()=>s!=null?s:l(h||"Ouvrage principal"),k=b=>{let m=ye(b);m&&p.has(m)&&s&&(s.name==="Ouvrage principal"&&(s.name="Ouvrage 1"),l(`${h?`${h} \u2013 `:""}Ouvrage ${t.sites.length+1}`));let w=d();m&&p.add(m);let R={id:`L${++t.lotSeq}`,site:w.id,name:b,category:"divers"};return t.lots.push(R),a=R,g=void 0,R},te=b=>{for(let m=b+1;m<r.entries.length;m++){let w=r.entries[m].row;if(w.kind==="item")return!1;if(w.kind==="heading")return/^\s*lot\b/i.test(w.text)}return!1};for(let[b,{row:m}]of r.entries.entries()){if(m.kind==="skip")continue;if(m.kind==="total"){/\b(ht|hors taxe|g[ée]n[ée]ral)\b/i.test(m.text)&&!/lot|sous/i.test(m.text)&&m.amount&&(t.declaredTotal=Math.max((N=t.declaredTotal)!=null?N:0,m.amount)),f=null;continue}if(m.kind==="recap")continue;if(m.kind==="text"){f&&/^[a-zà-ÿ(]/.test(m.text)&&(f.d=`${f.d} ${m.text}`);continue}if(m.kind==="heading"){let y=m.text;if(f&&/^[a-zà-ÿ(]/.test(y)&&!m.code){f.d=`${f.d} ${y}`;continue}f=null;let M=/^\s*lot\b/i.test(y);if(pe.test(y)&&!M||!M&&o&&te(b)||u&&c&&F(m.code)){l(`${h&&!y.toLowerCase().includes(h.toLowerCase())?`${h} \u2013 `:""}${m.code?`${m.code.replace(/\.$/,"")}. `:""}${E(y)}`);continue}if(M){k(_(m.code,y));continue}if(o){a?g=E(m.code?`${m.code} ${y}`:y):k(_(m.code,y));continue}let ne=m.code?Z(m.code):0,P=y.replace(/[^A-Za-zÀ-ÿ]/g,""),re=P.length>2&&P===P.toUpperCase();m.code&&ne===1||!m.code&&re||!a?k(_(m.code,y)):g=E(m.code?`${m.code} ${y}`:y);continue}let w=a!=null?a:k("__AUTO__"),R={k:++t.k,lot:w.id,n:m.n,d:m.d,u:m.u,q:Math.round(m.q*1e3)/1e3,pu:Math.round(m.pu*100)/100};g&&(R.sec=g),t.items.push(R),f=R}}function xe(t){let e=t.lots.filter(r=>r.name==="__AUTO__");if(!e.length)return"titres";let n="titres";for(let r of e){let i=t.items.filter(a=>a.lot===r.id),o=a=>a?a.split(/[.\-]/)[0].replace(/[^0-9A-Z]/gi,""):"",u=new Map;i.forEach(a=>{var f;let g=o(a.n);u.set(g,[...(f=u.get(g))!=null?f:[],a])});let c=i.filter(a=>o(a.n)).length,s=[];if(u.size>1&&c/Math.max(1,i.length)>.8){n="numerotation";for(let[a,g]of u){let f=C("",g.map(l=>l.d)),h={id:`L${++t.lotSeq}`,site:r.site,name:`Lot ${a||"?"} : ${v(f).label}`,category:f};s.push(h),g.forEach(l=>l.lot=h.id)}}else{n="mots-cles";let a=new Map;i.forEach(f=>{var l;let h=H(f.d);a.set(h,[...(l=a.get(h))!=null?l:[],f])}),[...a.keys()].sort((f,h)=>v(f).order-v(h).order).forEach((f,h)=>{let l={id:`L${++t.lotSeq}`,site:r.site,name:`Lot ${h+1} : ${v(f).label}`,category:f};s.push(l),a.get(f).forEach(d=>d.lot=l.id)})}let p=t.lots.indexOf(r);t.lots.splice(p,1,...s)}return n}function qe(t){let e=new Map(t.lots.map((n,r)=>[n.id,r]));t.items.sort((n,r)=>e.get(n.lot)-e.get(r.lot)||n.k-r.k)}var ve=/r[ée]cap|synth[eè]se|sommaire|garde|^bpu|bordereau des prix|notice|instructions?/i;function W(t,e){let n={sites:[],lots:[],items:[],k:0,lotSeq:0,warnings:[],declaredTotal:null},i=t.map(l=>({sheet:l,res:ke(l)})).filter(l=>l.res.entries.some(d=>d.row.kind==="item")),o=i.filter(l=>!ve.test(l.sheet.name));o.length||(o=i);let u=o.length>1;for(let l of o)$e(n,l.sheet.name,u,l.res);let c=xe(n);n.lots=n.lots.filter(l=>n.items.some(d=>d.lot===l.id)),n.sites=n.sites.filter(l=>n.lots.some(d=>d.site===l.id));for(let l of n.lots)l.category==="divers"&&(l.category=C(l.name,n.items.filter(d=>d.lot===l.id).map(d=>d.d))),/^Lot\s+[0-9A-Z]*$/i.test(l.name)&&(l.name=`${l.name} : ${v(l.category).label}`);qe(n);let s=t.reduce((l,d)=>l+d.rows.length,0);n.items.length||n.warnings.push("Aucun article reconnu. V\xE9rifiez que le fichier contient bien un tableau avec d\xE9signation, unit\xE9, quantit\xE9 et prix unitaire.");let p=n.items.filter(l=>!l.pu).length;p&&n.warnings.push(`${p} article(s) sans prix unitaire (\xE0 compl\xE9ter dans le tableau).`);let a=n.items.filter(l=>!l.q).length;a&&n.warnings.push(`${a} article(s) sans quantit\xE9 (\xE0 compl\xE9ter).`);let g=n.items.reduce((l,d)=>l+d.q*d.pu,0);n.declaredTotal&&g&&Math.abs(g-n.declaredTotal)>Math.max(10,n.declaredTotal*.005)&&n.warnings.push(`Le total HT recalcul\xE9 (${Math.round(g).toLocaleString("fr-FR")} F) diff\xE8re du total indiqu\xE9 dans le document (${Math.round(n.declaredTotal).toLocaleString("fr-FR")} F) : contr\xF4lez les lignes signal\xE9es.`);let f={source:e,sheets:o.map(l=>l.sheet.name),rowsRead:s,itemsFound:n.items.length,lotsFound:n.lots.length,lotStrategy:c,declaredTotal:n.declaredTotal,warnings:n.warnings},h=l=>JSON.parse(JSON.stringify(l));return{sites:n.sites,lots:n.lots,items:n.items,att:[],suivi:null,tva:.18,orig:{lots:h(n.lots),items:h(n.items)},report:f}}var A=t=>Math.round(t).toLocaleString("fr-FR").replace(/[  ]/g," "),q=t=>(Math.round(t*100)/100).toLocaleString("fr-FR",{maximumFractionDigits:2}).replace(/[  ]/g," "),we=t=>t>=1e6?`${(t/1e6).toFixed(t>=1e7?1:2).replace(".",",")} M F`:`${A(t)} F`,I=t=>(+t.q||0)*(+t.pu||0);function x(t,e,n){return t.filter(r=>e.test(r.u.trim())&&(!n||n.test(S(r.d)))).reduce((r,i)=>r+(+i.q||0),0)}function Re(t,e){let n=[],r=[],i=x(t,/^m(³|3)$/i,/beton|semelle|poteau|chainage|poutre|dalle|linteau|longrine|radier|voile/),o=x(t,/^m(³|3)$/i,/(semelle|poteau|chainage|poutre|dalle|linteau|longrine|radier|voile|raidisseur|amorce)/),u=x(t,/^kg$/i,/acier|armature|ha\b|fer/),c=x(t,/^m(²|2)$/i,/coffrage/),s=x(t,/^m(²|2)$/i,/agglo|maconnerie|mur/),p=x(t,/^m(²|2)$/i,/enduit/),a=x(t,/^m(³|3)$/i,/fouille|deblai/),g=x(t,/^m(³|3)$/i,/remblai/),f=x(t,/^m(²|2)$/i),h=x(t,/^ml$/i),l=x(t,/^(u|ens|ff|fft)$/i);if(e==="gros_oeuvre"){if(i&&n.push(`${q(i)} m\xB3 de b\xE9ton`),u&&n.push(`${A(u)} kg d'acier HA`),c&&n.push(`${q(c)} m\xB2 de coffrage`),s&&n.push(`${q(s)} m\xB2 de ma\xE7onnerie`),p&&n.push(`${q(p)} m\xB2 d'enduit`),u&&o){let d=u/o;r.push(`Ratio acier / b\xE9ton arm\xE9 \u2248 ${A(d)} kg/m\xB3 ${d<60?"(sous la plage usuelle 60\u2013130 kg/m\xB3 : v\xE9rifier les quantit\xE9s d'acier)":d>130?"(au-dessus de la plage usuelle 60\u2013130 kg/m\xB3 : v\xE9rifier les sections)":"(dans la plage usuelle 60\u2013130 kg/m\xB3)"}`)}c&&o&&r.push(`Ratio coffrage / b\xE9ton arm\xE9 \u2248 ${q(c/o)} m\xB2/m\xB3`)}else if(e==="terrassement")a&&n.push(`${q(a)} m\xB3 de fouilles`),g&&n.push(`${q(g)} m\xB3 de remblais`),f&&n.push(`${q(f)} m\xB2 de surfaces trait\xE9es`),a&&g&&r.push(`Remblais / fouilles = ${Math.round(g/a*100)} %`);else{f&&n.push(`${q(f)} m\xB2`),h&&n.push(`${q(h)} ml`),l&&n.push(`${q(l)} unit\xE9(s) / ensemble(s)`);let d=x(t,/^kg$/i);d&&n.push(`${A(d)} kg`);let k=x(t,/^m(³|3)$/i);k&&n.push(`${q(k)} m\xB3`)}return{quantities:n,ratios:r}}function Le(t,e,n){var h,l;let r=t.items.filter(d=>d.lot===e.id),i=r.reduce((d,k)=>d+I(k),0),o=v(e.category),u=(l=(h=t.sites.find(d=>d.id===e.site))==null?void 0:h.name)!=null?l:"",c=[...r].sort((d,k)=>I(k)-I(d)).slice(0,3).filter(d=>I(d)>0).map(d=>({n:d.n,d:d.d,amount:I(d)})),{quantities:s,ratios:p}=Re(r,e.category),a=n?i/n:0,g=[...new Set(r.map(d=>d.sec).filter(Boolean))],f=`${e.name} \u2014 ${o.label.toLowerCase()} : ${r.length} article${r.length>1?"s":""} pour ${we(i)} HT, soit ${(a*100).toFixed(1).replace(".",",")} % du montant total.`;if(g.length&&(f+=` Sous-parties : ${g.slice(0,4).join(" ; ")}${g.length>4?"\u2026":""}.`),c.length){let d=c[0],k=i?Math.round(d.amount/i*100):0;f+=` Poste principal : \xAB ${d.d} \xBB (${k} % du lot).`}return{lotId:e.id,title:e.name,site:u,category:o.label,articles:r.length,amount:i,share:a,summary:f,mainItems:c,quantities:s,ratios:p,note:o.note}}function ee(t){let e=t.items.reduce((n,r)=>n+I(r),0);return t.lots.map(n=>Le(t,n,e))}return ue(Ee);})();
+</script>
+<script type="application/json" id="embedded-board">null</script>
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const todayISO=()=>{const n=new Date();return n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0");};
+const fD=s=>{if(!s)return"";const[y,m,d]=s.split("-");return d+"/"+m+"/"+y.slice(2);};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const day=s=>Date.parse(s+"T00:00:00Z")/864e5;
+const COLS=["a_faire","en_cours","termine"], LBL={a_faire:"À faire",en_cours:"En cours",termine:"Terminé"};
+
+/* ── Exemple (chantier de Bouna) ─────────────────────── */
+function exampleBoard(){
+  const t=todayISO(), add=n=>{const d=new Date(t+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
+  const p="bouna";
+  const T=(title,lot,status,progress,assignee,workers,start,due,priority,equipment)=>({id:uid(),projectId:p,title,lot,status,progress,priority:priority||"normale",assignee,workers,equipment:equipment||"",startDate:start,dueDate:due,notes:"",completedAt:status==="termine"?due:null});
+  return{example:true,projects:[{id:p,name:"Marché de volailles Bouna"}],tasks:[
+    T("Installation et implantation","Lot 0 : Généralités","termine",100,"Chef de chantier",3,add(-30),add(-25)),
+    T("Fouilles en rigole et en tranchée","Lot 1 : Terrassement","termine",100,"Équipe terrassement Ouattara",6,add(-24),add(-16),"normale","pelle, brouettes"),
+    T("Semelles filantes et béton de propreté","Lot 2 : Gros œuvre","en_cours",70,"Équipe maçons Koné",8,add(-15),add(-2),"haute","bétonnière 350 L, vibreur"),
+    T("Murs de soubassement et chaînage bas","Lot 2 : Gros œuvre","en_cours",30,"Équipe maçons Koné",6,add(-6),add(5),"normale","bétonnière 350 L"),
+    T("Remblai latéritique compacté sous dallage","Lot 1 : Terrassement","a_faire",0,"Équipe terrassement Ouattara",5,add(4),add(10),"normale","compacteur, citerne"),
+    T("Dallage BA ép. 10 cm","Lot 2 : Gros œuvre","a_faire",0,"Équipe maçons Koné",8,add(11),add(18),"haute"),
+    T("Charpente bois et couverture aluzinc","Lot 19-20 : Charpente – couverture","a_faire",0,"Sous-traitant charpente",4,add(25),add(40)),
+    T("Branchement SODECI et réseau EU","Lot 7-8 : Plomberie","a_faire",0,"",0,add(30),add(45),"basse")
+  ]};
+}
+
+/* ── Stockage : espace privé de l'utilisateur, sinon cet appareil ── */
+const LS="gestion-projet-suivi-v1", DOC="tableau";
+let ST=null, dbDoc=null, downloads=null, saveState="", lastMsg="";
+const inViewer=!!(window.claude&&window.claude.use);
+function lsGet(){try{return JSON.parse(localStorage.getItem(LS)||"null");}catch(e){return null;}}
+function lsSet(o){try{localStorage.setItem(LS,JSON.stringify(o));return true;}catch(e){return false;}}
+let saveTimer=null,saving=false,again=false;
+function persist(){
+  if(ST.example){ST.example=false;}
+  saveState="Enregistrement…";paintStatus();clearTimeout(saveTimer);saveTimer=setTimeout(()=>{saveTimer=null;doSave();},400);
+}
+async function doSave(){
+  if(saving){again=true;return;}saving=true;
+  const body={projects:ST.projects,tasks:ST.tasks,updatedAt:Date.now()};
+  try{
+    if(dbDoc){lsSet(body);if(JSON.stringify(body).length>250000)throw{code:"too_big"};await dbDoc.set(body);saveState="Enregistré dans votre espace";}
+    else if(lsSet(body))saveState="Enregistré sur cet appareil";
+    else saveState="Enregistrement impossible ici : exportez le tableau pour le garder.";
+  }catch(e){saveState=e&&e.code==="too_big"?"Tableau trop volumineux pour l'enregistrement en ligne : exportez-le.":"Échec de l'enregistrement. Réessayez dans un instant.";}
+  saving=false;paintStatus();if(again){again=false;doSave();}
+}
+// Fermeture ou changement d'onglet : enregistrement immédiat de ce qui attend.
+function flush(){
+  if(!saveTimer)return;clearTimeout(saveTimer);saveTimer=null;
+  lsSet({projects:ST.projects,tasks:ST.tasks,updatedAt:Date.now()});
+  if(dbDoc)doSave();
+}
+addEventListener("pagehide",flush);
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")flush();});
+function paintStatus(){$("#st").innerHTML=(saveState?"<b>"+esc(saveState)+"</b>":"")+(lastMsg?(saveState?" · ":"")+lastMsg:"");}
+
+/* ── Calculs ─────────────────────────────────────────── */
+let current="";   // chantier affiché ("" = tous, "sans" = sans chantier)
+let armed=null, editing=null, dragId=null;
+const pname=id=>(ST.projects.find(p=>p.id===id)||{}).name||"";
+function visible(){return ST.tasks.filter(t=>!current||(current==="sans"?!t.projectId:t.projectId===current));}
+function deadline(t,today){
+  if(!t.dueDate)return{k:"aucune",l:"Sans échéance"};
+  if(t.status==="termine"){const late=Math.round(day(t.completedAt||today)-day(t.dueDate));return late>0?{k:"depasse",l:"Terminé avec "+late+" j de retard"}:{k:"tenu",l:"Délai tenu"};}
+  const left=Math.round(day(t.dueDate)-day(today));
+  if(left<0)return{k:"retard",l:"En retard de "+(-left)+" j"};
+  if(left<=7)return{k:"proche",l:left===0?"Échéance aujourd'hui":"J-"+left};
+  return{k:"ok",l:"J-"+left};
+}
+function indicators(list,today){
+  const by={a_faire:0,en_cours:0,termine:0};let late=0,soon=0,dd=0,ok=0,eng=0;const res=new Map();
+  list.forEach(t=>{by[t.status]++;const d=deadline(t,today);
+    if(d.k==="retard")late++;if(d.k==="proche")soon++;if(d.k==="tenu"){dd++;ok++;}if(d.k==="depasse")dd++;
+    if(t.status==="en_cours")eng+=+t.workers||0;
+    if(t.status!=="termine"){const n=(t.assignee||"").trim()||"Non affecté";const r=res.get(n)||{n,c:0,f:0,w:0,l:0};
+      if(t.status==="en_cours"){r.c++;r.w+=+t.workers||0;}else r.f++; if(d.k==="retard")r.l++; res.set(n,r);}});
+  const prog=list.length?Math.round(list.reduce((s,t)=>s+(t.status==="termine"?100:+t.progress||0),0)/list.length):0;
+  return{by,late,soon,rate:dd?Math.round(ok/dd*100):null,eng,prog,res:[...res.values()].sort((a,b)=>(b.c+b.f)-(a.c+a.f)),total:list.length};
+}
+
+/* ── Rendu ───────────────────────────────────────────── */
+function render(){
+  const today=todayISO(), list=visible(), k=indicators(list,today);
+  // chantiers
+  $("#chantier").innerHTML='<option value="">Tous les chantiers</option>'+ST.projects.map(p=>'<option value="'+esc(p.id)+'"'+(current===p.id?" selected":"")+">"+esc(p.name)+"</option>").join("")+'<option value="sans"'+(current==="sans"?" selected":"")+">Tâches sans chantier</option>";
+  $("#banner").innerHTML=ST.example?'<div class="banner"><span><b>Tableau d\'exemple</b> (chantier de Bouna, dates calées sur aujourd\'hui). Modifiez-le librement ou videz-le pour commencer le vôtre.</span><button type="button" class="btn'+(armed==="clear"?" warn":"")+'" id="clearEx">'+(armed==="clear"?"Confirmer : vider l'exemple ?":"Vider l'exemple")+"</button></div>":"";
+  // indicateurs
+  const equipes=k.res.filter(r=>r.n!=="Non affecté").length;
+  $("#kpis").innerHTML=
+    '<div class="kpi"><span class="l">Avancement global</span><span class="v">'+k.prog+' %</span><div class="meter"><i style="width:'+k.prog+'%"></i></div><span class="s">'+k.by.termine+"/"+k.total+' tâches terminées</span></div>'+
+    '<div class="kpi"><span class="l">Tâches</span><span class="v">'+k.by.en_cours+' en cours</span><span class="s">'+k.by.a_faire+" à faire · "+k.by.termine+' terminée(s)</span></div>'+
+    '<div class="kpi '+(k.late?"bad":"good")+'"><span class="l">Délais</span><span class="v">'+(k.late?k.late+" en retard":"Aucun retard")+'</span><span class="s">'+k.soon+" échéance(s) sous 7 jours"+(k.rate!==null?" · "+k.rate+" % terminées dans les délais":"")+"</span></div>"+
+    '<div class="kpi"><span class="l">Ressources</span><span class="v">'+k.eng+' pers.</span><span class="s">engagées sur les tâches en cours · '+equipes+" équipe(s)</span></div>";
+  // colonnes
+  $("#board").innerHTML=COLS.map((c,ci)=>{const ts=list.filter(t=>t.status===c);
+    return '<section class="col" data-col="'+c+'" aria-label="'+LBL[c]+'"><header><h2>'+LBL[c]+'</h2><span class="count">'+ts.length+'</span></header><div class="list">'+
+      (ts.length?ts.map(t=>editing===t.id?editCard(t):card(t,ci,today)).join(""):'<div class="empty">'+(c==="a_faire"?"Aucune tâche à faire.":c==="en_cours"?"Glissez ici une tâche démarrée.":"Glissez ici une tâche achevée.")+"</div>")+
+      "</div></section>";}).join("");
+  // ressources
+  $("#res").innerHTML=k.res.length?'<table class="tbl"><thead><tr><th>Ressource</th><th class="r">En cours</th><th class="r">À faire</th><th class="r">Effectif engagé</th><th class="r">En retard</th></tr></thead><tbody>'+
+    k.res.map(r=>"<tr><td><b>"+esc(r.n)+'</b></td><td class="r">'+r.c+'</td><td class="r">'+r.f+'</td><td class="r">'+(r.w?r.w+" pers.":"—")+'</td><td class="r"'+(r.l?' style="color:var(--bad);font-weight:600"':"")+">"+(r.l||"—")+"</td></tr>").join("")+"</tbody></table>"
+    :'<p class="muted">Aucune tâche en attente.</p>';
+  paintStatus();
+}
+function card(t,ci,today){
+  const d=deadline(t,today);
+  const meta=[(!current&&t.projectId)?"▤ "+esc(pname(t.projectId)):"",t.lot&&!t.title.startsWith(t.lot)?esc(t.lot):"",t.priority!=="normale"?"Priorité "+(t.priority==="haute"?"haute":"basse"):""].filter(Boolean).join(" · ");
+  const res=[t.assignee?"<b>"+esc(t.assignee)+"</b>":"",+t.workers?t.workers+" pers.":"",t.equipment?esc(t.equipment):""].filter(Boolean).join(" · ");
+  const dates=(t.startDate?"Du "+fD(t.startDate):"")+(t.dueDate?(t.startDate?" au ":"Échéance ")+fD(t.dueDate):"");
+  return '<article class="card p-'+t.priority+(dragId===t.id?" drag":"")+'" draggable="true" data-id="'+t.id+'">'+
+    '<div class="hd"><h3>'+esc(t.title)+'</h3><span class="badge b-'+d.k+'">'+d.l+"</span></div>"+
+    (meta?'<div class="meta">'+meta+"</div>":"")+(res?'<div class="meta">'+res+"</div>":"")+(dates?'<div class="meta">'+dates+"</div>":"")+
+    '<div class="prog"><input type="range" min="0" max="100" step="5" value="'+(+t.progress||0)+'" data-prog="'+t.id+'" aria-label="Avancement de '+esc(t.title)+'"><span>'+(+t.progress||0)+" %</span></div>"+
+    (t.notes?'<div class="meta">'+esc(t.notes)+"</div>":"")+
+    '<div class="acts"><div>'+(ci>0?'<button type="button" class="mv" data-mv="'+t.id+'" data-to="'+COLS[ci-1]+'">← '+LBL[COLS[ci-1]]+"</button>":"")+(ci<2?'<button type="button" class="mv fw" data-mv="'+t.id+'" data-to="'+COLS[ci+1]+'">'+LBL[COLS[ci+1]]+" →</button>":"")+"</div>"+
+    '<div><button type="button" class="lnk" data-edit="'+t.id+'">Modifier</button><button type="button" class="lnk'+(armed==="del"+t.id?" warn":"")+'" data-del="'+t.id+'">'+(armed==="del"+t.id?"Confirmer ?":"Supprimer")+"</button></div></div></article>";
+}
+function formFields(t,pre){
+  t=t||{};const p=pre||"n";
+  const opt=(v,l,cur)=>'<option value="'+esc(v)+'"'+(v===cur?" selected":"")+">"+esc(l)+"</option>";
+  const pid=t.projectId!==undefined?t.projectId:(current&&current!=="sans"?current:"");
+  return '<label class="field span2" for="'+p+'title">Tâche<input id="'+p+'title" name="title" value="'+esc(t.title||"")+'" placeholder="Ex : Coulage dallage bloc A" required></label>'+
+    '<label class="field" for="'+p+'proj">Chantier<select id="'+p+'proj" name="projectId">'+opt("","— Sans chantier —",pid)+ST.projects.map(x=>opt(x.id,x.name,pid)).join("")+"</select></label>"+
+    '<label class="field" for="'+p+'lot">Lot / corps d\'état<input id="'+p+'lot" name="lot" value="'+esc(t.lot||"")+'" placeholder="Ex : Lot 2 : Gros œuvre"></label>'+
+    '<label class="field" for="'+p+'ass">Ressource<input id="'+p+'ass" name="assignee" value="'+esc(t.assignee||"")+'" placeholder="Équipe, chef d\'équipe, sous-traitant"></label>'+
+    '<div class="grid2"><label class="field" for="'+p+'wk">Effectif<input id="'+p+'wk" name="workers" type="number" min="0" max="999" value="'+(+t.workers||0)+'"></label>'+
+    '<label class="field" for="'+p+'pri">Priorité<select id="'+p+'pri" name="priority">'+opt("haute","Haute",t.priority||"normale")+opt("normale","Normale",t.priority||"normale")+opt("basse","Basse",t.priority||"normale")+"</select></label></div>"+
+    '<label class="field" for="'+p+'sd">Début<input id="'+p+'sd" name="startDate" type="date" value="'+esc(t.startDate||"")+'"></label>'+
+    '<label class="field" for="'+p+'dd">Échéance<input id="'+p+'dd" name="dueDate" type="date" value="'+esc(t.dueDate||"")+'"></label>'+
+    '<label class="field span2" for="'+p+'eq">Matériel<input id="'+p+'eq" name="equipment" value="'+esc(t.equipment||"")+'" placeholder="Ex : bétonnière 350 L, vibreur, compacteur"></label>'+
+    '<label class="field span2" for="'+p+'no">Notes<textarea id="'+p+'no" name="notes" rows="2">'+esc(t.notes||"")+"</textarea></label>"+
+    '<p class="err span2" data-err></p>';
+}
+function editCard(t){return '<form class="card grid2" data-editform="'+t.id+'" style="cursor:default">'+formFields(t,"e"+t.id)+'<div class="span2" style="display:flex;gap:8px"><button class="btn pri" type="submit">Enregistrer</button><button class="btn" type="button" data-cancel>Annuler</button></div></form>';}
+function renderNewForm(){$("#taskForm").innerHTML=formFields(null,"n")+'<div class="span2"><button class="btn pri" type="submit">Ajouter à « À faire »</button></div>';}
+
+function readForm(form){
+  const f=new FormData(form),g=k=>String(f.get(k)||"").trim();
+  const title=g("title");if(title.length<2)return{err:"Indiquez l'intitulé de la tâche."};
+  const startDate=g("startDate")||null,dueDate=g("dueDate")||null;
+  if(startDate&&dueDate&&startDate>dueDate)return{err:"L'échéance doit être postérieure au début."};
+  const w=parseInt(g("workers"),10);
+  return{v:{title:title.slice(0,200),projectId:g("projectId")||null,lot:g("lot"),assignee:g("assignee"),workers:isNaN(w)||w<0?0:Math.min(w,999),priority:["haute","normale","basse"].includes(g("priority"))?g("priority"):"normale",startDate,dueDate,equipment:g("equipment"),notes:g("notes")}};
+}
+
+/* ── Actions ─────────────────────────────────────────── */
+function move(id,to){const t=ST.tasks.find(x=>x.id===id);if(!t||t.status===to)return;
+  t.status=to;if(to==="termine"){t.progress=100;t.completedAt=todayISO();}else{t.completedAt=null;t.progress=to==="a_faire"?0:(t.progress>=100?90:Math.max(+t.progress||0,5));if(to==="en_cours"&&!t.startDate)t.startDate=todayISO();}
+  lastMsg="« "+esc(t.title)+" » → "+LBL[to]+".";render();persist();}
+function setProgress(id,p){const t=ST.tasks.find(x=>x.id===id);if(!t)return;p=Math.max(0,Math.min(100,Math.round(p)));t.progress=p;
+  if(p>=100){t.status="termine";t.completedAt=t.completedAt||todayISO();}else if(p>0||t.status==="termine"){if(t.status!=="en_cours"&&!t.startDate)t.startDate=todayISO();t.status="en_cours";t.completedAt=null;}
+  render();persist();}
+function arm(k){armed=k;setTimeout(()=>{if(armed===k){armed=null;render();}},3000);}
+
+document.addEventListener("submit",e=>{e.preventDefault();const f=e.target;
+  if(f.id==="taskForm"){const r=readForm(f);if(r.err){f.querySelector("[data-err]").textContent=r.err;return;}
+    ST.tasks.push(Object.assign({id:uid(),status:"a_faire",progress:0,completedAt:null},r.v));lastMsg="<b>Tâche ajoutée</b> dans « À faire ».";renderNewForm();render();persist();return;}
+  if(f.dataset.editform){const t=ST.tasks.find(x=>x.id===f.dataset.editform);const r=readForm(f);if(r.err){f.querySelector("[data-err]").textContent=r.err;return;}
+    Object.assign(t,r.v);editing=null;lastMsg="Tâche modifiée.";render();persist();}
+});
+document.addEventListener("click",e=>{const tg=e.target;
+  const mv=tg.closest("[data-mv]");if(mv){move(mv.dataset.mv,mv.dataset.to);return;}
+  const ed=tg.closest("[data-edit]");if(ed){editing=ed.dataset.edit;render();return;}
+  if(tg.closest("[data-cancel]")){editing=null;render();return;}
+  const del=tg.closest("[data-del]");if(del){const id=del.dataset.del;if(armed!=="del"+id){arm("del"+id);render();return;}
+    armed=null;ST.tasks=ST.tasks.filter(t=>t.id!==id);lastMsg="Tâche supprimée.";render();persist();return;}
+  if(tg.closest("#clearEx")){if(armed!=="clear"){arm("clear");render();return;}armed=null;ST={example:false,projects:[],tasks:[]};current="";lastMsg="Exemple vidé : ajoutez votre premier chantier.";renderNewForm();render();persist();return;}
+  if(tg.closest("#newChantier")){addChantier();return;}
+  if(tg.closest("#csv")){exportCsv();return;}
+  if(tg.closest("#html")){exportHtml();return;}
+});
+document.addEventListener("change",e=>{const el=e.target;
+  if(el.id==="chantier"){current=el.value;editing=null;renderNewForm();render();return;}
+  if(el.dataset.prog){setProgress(el.dataset.prog,+el.value);}
+});
+document.addEventListener("input",e=>{if(e.target.dataset.prog){e.target.nextElementSibling.textContent=e.target.value+" %";}});
+// Glisser-déposer (un appui sur un contrôle ne déplace pas la carte)
+let noDrag=false;
+document.addEventListener("pointerdown",e=>{noDrag=!!e.target.closest("input,button,select,textarea,a");},true);
+document.addEventListener("dragstart",e=>{const c=e.target.closest&&e.target.closest(".card[data-id]");if(!c)return;if(noDrag){e.preventDefault();return;}
+  dragId=c.dataset.id;c.classList.add("drag");try{e.dataTransfer.setData("text/plain",dragId);e.dataTransfer.effectAllowed="move";}catch(_){}});
+document.addEventListener("dragend",()=>{dragId=null;document.querySelectorAll(".card.drag,.col.over").forEach(n=>n.classList.remove("drag","over"));});
+document.addEventListener("dragover",e=>{const col=e.target.closest&&e.target.closest(".col");if(!col)return;e.preventDefault();document.querySelectorAll(".col.over").forEach(n=>n!==col&&n.classList.remove("over"));col.classList.add("over");});
+document.addEventListener("drop",e=>{const col=e.target.closest&&e.target.closest(".col");if(!col)return;e.preventDefault();col.classList.remove("over");
+  let id=dragId;try{id=e.dataTransfer.getData("text/plain")||id;}catch(_){}if(id)move(id,col.dataset.col);dragId=null;});
+
+/* Nouveau chantier : petit formulaire en ligne (pas de boîte de dialogue) */
+function addChantier(){
+  const ctl=$(".top .ctl");if(ctl.querySelector("#chForm"))return;
+  const f=document.createElement("form");f.id="chForm";f.style.cssText="display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap";
+  f.innerHTML='<label class="field" for="chName">Nom du chantier<input id="chName" required placeholder="Ex : Villa R+1 Cocody"></label><button class="btn pri" type="submit">Ajouter</button><button class="btn" type="button" id="chCancel">Annuler</button>';
+  ctl.appendChild(f);$("#chName").focus();
+  f.addEventListener("submit",ev=>{ev.preventDefault();ev.stopPropagation();const n=$("#chName").value.trim();if(!n)return;const p={id:uid(),name:n.slice(0,120)};ST.projects.push(p);current=p.id;f.remove();lastMsg="Chantier « "+esc(n)+" » créé.";renderNewForm();render();persist();});
+  $("#chCancel").addEventListener("click",()=>f.remove());
+}
+
+/* ── Tâches depuis un DQE ────────────────────────────── */
+/* ── Lecture des fichiers ─────────────────────────────── */
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.onload=res;s.onerror=()=>{s.remove();rej(userError("Le module de lecture n'a pas pu être chargé. Vérifiez votre connexion internet puis réessayez."));};document.head.appendChild(s);});}
+let xlsxReady=null,pdfReady=null,docxReady=null;
+const needXlsx=()=>xlsxReady||(xlsxReady=loadScript("https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"));
+const needPdf=()=>pdfReady||(pdfReady=loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js").then(()=>loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js")).then(()=>{window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";}));
+const needDocx=()=>docxReady||(docxReady=loadScript("https://cdn.jsdelivr.net/npm/docx@9.5.1/dist/index.iife.js"));
+
+function userError(msg){const e=new Error(msg);e.user=true;return e;}
+
+async function readExcel(buf){
+  await needXlsx();
+  let wb; try{wb=XLSX.read(new Uint8Array(buf),{type:"array",cellDates:false});}catch(e){throw userError("Fichier Excel illisible ou protégé par mot de passe.");}
+  const meta=(wb.Workbook&&wb.Workbook.Sheets)||[];
+  const sheets=[];
+  wb.SheetNames.forEach((n,i)=>{
+    if(meta[i]&&meta[i].Hidden) return;
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:true}).slice(0,5000)
+      .map(r=>r.slice(0,30).map(v=>typeof v==="number"||typeof v==="string"?v:null));
+    sheets.push({name:n,rows});
+  });
+  if(!sheets.length) throw userError("Le classeur ne contient aucune feuille visible.");
+  return sheets;
+}
+function readCsv(text){
+  const clean=text.replace(/^﻿/,""); const first=clean.split(/\r?\n/,1)[0]||"";
+  const sep=(first.match(/;/g)||[]).length>=(first.match(/,/g)||[]).length?";":(first.includes("\t")?"\t":",");
+  const rows=[];let row=[],cur="",inQ=false;
+  for(let i=0;i<clean.length;i++){const ch=clean[i];
+    if(inQ){if(ch==='"'&&clean[i+1]==='"'){cur+='"';i++;}else if(ch==='"')inQ=false;else cur+=ch;}
+    else if(ch==='"')inQ=true; else if(ch===sep){row.push(cur);cur="";}
+    else if(ch==="\n"||ch==="\r"){if(ch==="\r"&&clean[i+1]==="\n")i++;row.push(cur);rows.push(row);row=[];cur="";}
+    else cur+=ch;}
+  if(cur||row.length){row.push(cur);rows.push(row);}
+  return [{name:"CSV",rows}];
+}
+async function readPdf(buf){
+  await needPdf();
+  let doc; try{doc=await pdfjsLib.getDocument({data:new Uint8Array(buf),isEvalSupported:false}).promise;}catch(e){throw userError("PDF illisible ou protégé.");}
+  const rows=[];let chars=0;
+  for(let pn=1;pn<=doc.numPages;pn++){
+    const page=await doc.getPage(pn); const tc=await page.getTextContent();
+    const list=tc.items.filter(i=>i.str&&i.str.trim()).map(i=>({str:i.str,x:i.transform[4],y:i.transform[5],width:i.width,fs:Math.hypot(i.transform[2],i.transform[3])||i.height||10}));
+    chars+=list.reduce((s,i)=>s+i.str.trim().length,0);
+    list.sort((a,b)=>b.y-a.y||a.x-b.x);
+    const lines=[];
+    for(const it of list){const tol=Math.max(2,it.fs*0.45);const ln=lines.find(l=>Math.abs(l[0].y-it.y)<=tol);if(ln)ln.push(it);else lines.push([it]);}
+    lines.sort((a,b)=>b[0].y-a[0].y);
+    for(const ln of lines){ln.sort((a,b)=>a.x-b.x);const cells=[];let cur="",lastEnd=-Infinity;
+      for(const it of ln){const gap=it.x-lastEnd;if(cur&&gap>it.fs*0.9){cells.push(cur.trim());cur="";}cur+=(cur&&gap>it.fs*0.15?" ":"")+it.str;lastEnd=it.x+it.width;}
+      if(cur.trim())cells.push(cur.trim()); rows.push(cells);}
+  }
+  if(chars<40) throw userError("Ce PDF ne contient pas de texte (document scanné). Importez la version Excel du DQE ou un PDF généré depuis Excel ou Word.");
+  return [{name:"PDF",rows,layout:"free"}];
+}
+async function analyse(file){
+  try{return await analyseInner(file);}catch(e){if(/module de lecture/.test(e.message||"")){xlsxReady=pdfReady=null;}throw e;}
+}
+async function analyseInner(file){
+  const buf=await file.arrayBuffer(); const h=new Uint8Array(buf.slice(0,4)); const ext=(file.name.split(".").pop()||"").toLowerCase();
+  if((h[0]===0x25&&h[1]===0x50&&h[2]===0x44&&h[3]===0x46)||ext==="pdf") return DQE.parseDqe(await readPdf(buf),"pdf");
+  if(ext==="csv"||ext==="txt") return DQE.parseDqe(readCsv(new TextDecoder("utf-8").decode(buf)),"csv");
+  if((h[0]===0x50&&h[1]===0x4b)||(h[0]===0xd0&&h[1]===0xcf)||/^xls/.test(ext)) return DQE.parseDqe(await readExcel(buf),"excel");
+  throw userError("Format non pris en charge. Importez un fichier Excel (.xlsx, .xls), CSV ou PDF.");
+}
+
+
+async function fromDqe(file){
+  const m=$("#dqeMsg");if(!file)return;
+  m.className="small";m.innerHTML='<span class="spin"></span> Analyse de « '+esc(file.name)+" »…";
+  try{
+    const d=await analyse(file);
+    if(!d.lots.length){m.className="err";m.textContent="Aucun lot reconnu dans ce fichier.";return;}
+    let pid=current&&current!=="sans"?current:null;
+    if(!pid){const name=file.name.replace(/\.[^.]+$/,"").replace(/[_]+/g," ").slice(0,120);const ex=ST.projects.find(p=>p.name===name);pid=ex?ex.id:uid();if(!ex)ST.projects.push({id:pid,name});current=pid;}
+    const multi=d.sites.length>1,have=new Set(ST.tasks.filter(t=>t.projectId===pid).map(t=>t.title));let n=0;
+    d.lots.forEach(l=>{const site=(d.sites.find(s=>s.id===l.site)||{}).name||"";const title=(multi?l.name+" — "+site.replace(/^\d+\.\s*/,""):l.name).slice(0,200);if(have.has(title))return;
+      const nb=d.items.filter(i=>i.lot===l.id).length,ht=d.items.filter(i=>i.lot===l.id).reduce((s,i)=>s+i.q*i.pu,0);
+      ST.tasks.push({id:uid(),projectId:pid,title,lot:l.name,status:"a_faire",progress:0,priority:"normale",assignee:"",workers:0,equipment:"",startDate:null,dueDate:null,notes:nb+" article(s) · "+Math.round(ht).toLocaleString("fr-FR").replace(/[  ]/g," ")+" F HT",completedAt:null});n++;});
+    m.className=n?"ok":"err";m.textContent=n?n+" tâche(s) créée(s) dans « À faire » pour « "+pname(pid)+" ».":"Les lots de ce DQE sont déjà dans le tableau.";
+    renderNewForm();render();if(n)persist();
+  }catch(e){m.className="err";m.textContent=e&&e.user?e.message:"Lecture du fichier impossible. Vérifiez qu'il s'agit bien d'un DQE Excel ou PDF.";}
+}
+$("#dqeFile").addEventListener("change",e=>{fromDqe(e.target.files[0]);e.target.value="";});
+const dz=$("#dqeDrop");
+dz.addEventListener("dragover",e=>{e.preventDefault();e.stopPropagation();dz.classList.add("over");});
+dz.addEventListener("dragleave",()=>dz.classList.remove("over"));
+dz.addEventListener("drop",e=>{e.preventDefault();e.stopPropagation();dz.classList.remove("over");fromDqe(e.dataTransfer.files[0]);});
+
+/* ── Exports ─────────────────────────────────────────── */
+async function offer(filename,data){
+  if(!downloads&&!inViewer){const a=document.createElement("a");a.href=URL.createObjectURL(data instanceof Blob?data:new Blob([data]));a.download=filename;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},800);lastMsg="<b>Fichier téléchargé :</b> "+esc(filename)+".";paintStatus();return;}
+  if(!downloads){lastMsg="<b>Téléchargement bloqué dans cet affichage.</b> Ouvrez la page dans un navigateur depuis claude.ai et acceptez la demande de téléchargement.";paintStatus();return;}
+  try{await downloads.save({filename,data});lastMsg="<b>Fichier proposé au téléchargement :</b> "+esc(filename)+".";}
+  catch(e){lastMsg=e&&e.code==="declined"?"Téléchargement annulé.":e&&e.code==="rate_limited"?"Une demande de téléchargement est déjà ouverte.":"Téléchargement indisponible ici.";}
+  paintStatus();
+}
+const safe=()=>(current&&current!=="sans"?pname(current):"Tous_chantiers").replace(/[^\p{L}\p{N}]+/gu,"_").slice(0,50);
+function exportCsv(){const today=todayISO();
+  const R=[["Chantier","Tâche","Lot","Statut","Avancement %","Priorité","Ressource","Effectif","Matériel","Début","Échéance","Délai","Notes"]];
+  COLS.forEach(c=>visible().filter(t=>t.status===c).forEach(t=>R.push([pname(t.projectId),t.title,t.lot||"",LBL[t.status],+t.progress||0,t.priority,t.assignee||"",+t.workers||0,t.equipment||"",fD(t.startDate),fD(t.dueDate),deadline(t,today).l,t.notes||""])));
+  const k=indicators(visible(),today);R.push([]);R.push(["Avancement global",k.prog+" %","","Tâches en retard",k.late,"","Effectif engagé",k.eng]);R.push(["Établi par : Moulo Jean Claude","","","Situation au "+fD(today)]);
+  offer("Suivi_chantier_"+safe()+"_"+today+".csv","﻿"+R.map(r=>r.map(v=>{v=String(v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}).join(";")).join("\r\n"));}
+function exportHtml(){
+  const c=document.documentElement.cloneNode(true);c.querySelectorAll("script[src]").forEach(n=>n.remove());
+  const emb=c.querySelector("#embedded-board");if(emb)emb.textContent=JSON.stringify({projects:ST.projects,tasks:ST.tasks,updatedAt:Date.now()}).replace(/</g,"\\u003c");
+  ["#board","#kpis","#res","#banner","#st","#dqeMsg"].forEach(s=>{const n=c.querySelector(s);if(n)n.innerHTML="";});
+  const cf=c.querySelector("#chForm");if(cf)cf.remove();
+  offer("Gestion_projet_"+safe()+"_"+todayISO()+".html",new Blob(["<!doctype html>\n"+c.outerHTML],{type:"text/html"}));
+}
+
+/* ── Démarrage ───────────────────────────────────────── */
+function adopt(o){return o&&Array.isArray(o.tasks)?{example:false,projects:o.projects||[],tasks:o.tasks,updatedAt:o.updatedAt||0}:null;}
+async function start(){
+  let emb=null;try{emb=adopt(JSON.parse(document.getElementById("embedded-board").textContent));}catch(e){}
+  const local=adopt(lsGet());
+  ST=[emb,local].filter(Boolean).sort((a,b)=>b.updatedAt-a.updatedAt)[0]||exampleBoard();
+  renderNewForm();render();
+  if(!inViewer)return;
+  claude.use("downloads").then(x=>{downloads=x;});
+  try{
+    const [db,user]=await Promise.all([claude.use("db"),claude.use("user")]);if(!db||!user)return;
+    const id=await user.id();if(!id)return;
+    const ref=db.collection("data/users/"+id).doc(DOC);
+    const snap=await Promise.race([ref.get(),new Promise((_,rej)=>setTimeout(()=>rej(new Error("délai")),10000))]);
+    dbDoc=ref;const online=adopt(snap.data&&snap.data());
+    if(online&&(!ST||ST.example||online.updatedAt>=(ST.updatedAt||0))){ST=online;saveState="Tableau chargé depuis votre espace";}
+    else if(!ST.example){doSave();}
+    renderNewForm();render();
+  }catch(e){/* reste sur l'enregistrement de cet appareil */}
+}
+start();
+})();
+</script>
+
+</body>
+</html>
