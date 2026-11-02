@@ -149,6 +149,16 @@ export async function buildNoteDocx(study: Study, images: NoteImages, kind: Note
         FORMULA(`Kirpich : tc = 0,945·(L³/ΔH)^0,385 = ${f(hyd.tcH, 3)} h ≈ ${f(hyd.tcMin, 1)} min`),
         FORMULA(`Montana : I = a/t^b = ${f(hy.montanaA, 0)}/${f(hyd.tcMin, 1)}^${f(hy.montanaB)} = ${f(hyd.I, 1)} mm/h`),
         FORMULA(`Méthode rationnelle : Qp = C·I·A/3,6 = ${f(hyd.Qp)} m³/s`),
+      ] : hyd.method === "orstom" && hyd.orstom ? [
+        H2("Débit de crue de projet — méthode ORSTOM (Rodier-Auvray)"),
+        table(["Paramètre", "Valeur"], [
+          ["Superficie du bassin versant S", `${f(hy.A)} km²`], ["Indice de pente Ig ≈ ΔH/L", `${f(hyd.orstom.Ig, 1)} m/km`],
+          ["Pluie journalière décennale P10 / pluie annuelle Pan", `${f(hy.orstom.P10, 0)} mm / ${f(hy.orstom.Pan, 0)} mm`],
+          ["Kr10 / Tb10 / α10 / m", `${f(hy.orstom.Kr10, 1)} % / ${f(hy.orstom.Tb10, 0)} min / ${f(hy.orstom.alpha)} / ${f(hy.orstom.m)}`],
+          ["Période de retour T / rapport QT/Q10", `${f(hy.T, 0)} ans / ${f(hy.orstom.kT)}`],
+        ], [0.6, 0.4]),
+        FORMULA(`Abattement (Vuillaume) : A = 1 − (161 − 0,042·Pan)/1000·log S = ${f(hyd.orstom.Aab, 3)}`),
+        FORMULA(`Qr10 = A·P10·Kr10·α10·S/Tb10 = ${f(hyd.orstom.Qr10)} m³/s ; Q10 = m·Qr10 = ${f(hyd.orstom.Q10)} m³/s ; Qp = ${f(hyd.Qp)} m³/s`),
       ] : [P(`Débit de projet issu d'une étude hydrologique externe : Qp = ${f(hyd.Qp)} m³/s.`)]),
       H2("Écoulement dans l'ouvrage"),
       FORMULA(`Q = K·S·R^(2/3)·Ir^(1/2), K = ${f(hy.K, 0)}, Ir = ${f(hy.pente)} % — débit par cellule ${f(hyd.Qcell)} m³/s`, "Manning-Strickler"),
@@ -572,7 +582,9 @@ function hydroBody(study: Study): (Paragraph | Table | TableOfContents)[] {
     P(`La présente note établit le débit de projet du dalot « ${id.ouvrage} » du projet « ${id.projet} » et vérifie que sa section d'écoulement (${n} cellule${n > 1 ? "s" : ""} de ${inp.openings.map((o) => f(o)).join(" + ")} m × ${f(inp.hInt)} m) l'évacue avec une revanche suffisante. Le dimensionnement béton armé fait l'objet d'une note séparée.`),
     H1("2. Références"),
     BULLET("Guide SETRA « Ouvrages hydrauliques de rétablissement des écoulements naturels »."),
-    BULLET("Méthode rationnelle ; temps de concentration de Kirpich ; courbes intensité-durée-fréquence de Montana."),
+    BULLET("Méthode rationnelle ; temps de concentration de Kirpich ; courbes intensité-durée-fréquence de Montana (bassins ≤ 4 km²)."),
+    BULLET("Méthode ORSTOM de Rodier et Auvray (crue décennale des petits bassins d'Afrique de l'Ouest), abattement de Vuillaume."),
+    BULLET("Données pluviométriques de la SODEXAM (station la plus proche du bassin versant)."),
     BULLET("Formule de Manning-Strickler pour l'écoulement uniforme à surface libre."),
   );
   if (!hy.actif || !hyd) {
@@ -586,11 +598,30 @@ function hydroBody(study: Study): (Paragraph | Table | TableOfContents)[] {
         ["Superficie du bassin versant", "A", `${f(hy.A)} km²`], ["Longueur du plus long talweg", "L", `${f(hy.L)} km`],
         ["Dénivelée", "ΔH", `${f(hy.dH, 1)} m`], ["Coefficient de ruissellement", "C", f(hy.C)], ["Période de retour", "T", `${f(hy.T, 0)} ans`],
         ["Coefficients de Montana", "a ; b", `${f(hy.montanaA, 0)} ; ${f(hy.montanaB)}`],
+        ["Origine des données", "—", hy.source || "non indiquée"],
       ], [0.5, 0.15, 0.35]),
       H1("4. Débit de projet"),
       FORMULA(`Temps de concentration (Kirpich) : tc = 0,945·(L³/ΔH)^0,385 = 0,945 × (${f(hy.L)}³ / ${f(hy.dH, 1)})^0,385 = ${f(hyd.tcH, 3)} h = ${f(hyd.tcMin, 1)} min`),
       FORMULA(`Intensité de pluie (Montana) : I = a / t^b = ${f(hy.montanaA, 0)} / ${f(hyd.tcMin, 1)}^${f(hy.montanaB)} = ${f(hyd.I, 1)} mm/h`),
       FORMULA(`Débit de pointe (méthode rationnelle) : Qp = C·I·A / 3,6 = ${f(hy.C)} × ${f(hyd.I, 1)} × ${f(hy.A)} / 3,6 = ${f(hyd.Qp)} m³/s`),
+    );
+  } else if (hyd.method === "orstom" && hyd.orstom) {
+    const o = hy.orstom, r = hyd.orstom;
+    body.push(
+      H1("3. Bassin versant"),
+      table(["Paramètre", "Symbole", "Valeur"], [
+        ["Superficie du bassin versant", "S", `${f(hy.A)} km²`], ["Longueur du plus long talweg", "L", `${f(hy.L)} km`],
+        ["Dénivelée", "ΔH", `${f(hy.dH, 1)} m`], ["Indice de pente approché ΔH/L", "Ig", `${f(r.Ig, 1)} m/km`],
+        ["Pluie journalière décennale", "P10", `${f(o.P10, 0)} mm`], ["Pluie annuelle moyenne", "Pan", `${f(o.Pan, 0)} mm`],
+        ["Coefficient de ruissellement décennal", "Kr10", `${f(o.Kr10, 1)} %`], ["Temps de base décennal", "Tb10", `${f(o.Tb10, 0)} min`],
+        ["Coefficient de pointe", "α10", f(o.alpha)], ["Coefficient de majoration", "m", f(o.m)],
+        ["Période de retour / rapport QT/Q10", "T", `${f(hy.T, 0)} ans / ${f(o.kT)}`],
+        ["Origine des données", "—", hy.source || "non indiquée"],
+      ], [0.5, 0.15, 0.35]),
+      H1("4. Débit de projet (méthode ORSTOM, Rodier-Auvray)"),
+      FORMULA(`Coefficient d'abattement (Vuillaume) : A = 1 − (161 − 0,042 × ${f(o.Pan, 0)})/1000 × log(${f(hy.A)}) = ${f(r.Aab, 3)}`),
+      FORMULA(`Débit de ruissellement décennal : Qr10 = A·P10·Kr10·α10·S/Tb10 = ${f(r.Aab, 3)} × ${f(o.P10, 0)} × ${f(o.Kr10 / 100, 3)} × ${f(o.alpha)} × ${f(hy.A)} × 1000 / (${f(o.Tb10, 0)} × 60) = ${f(r.Qr10)} m³/s`),
+      FORMULA(`Crue décennale : Q10 = m·Qr10 = ${f(o.m)} × ${f(r.Qr10)} = ${f(r.Q10)} m³/s ; débit de projet Qp = ${f(o.kT)} × Q10 = ${f(hyd.Qp)} m³/s`),
     );
   } else {
     body.push(H1("3. Débit de projet"), P(`Débit de projet issu d'une étude hydrologique externe : Qp = ${f(hyd.Qp)} m³/s.`));
@@ -598,7 +629,7 @@ function hydroBody(study: Study): (Paragraph | Table | TableOfContents)[] {
   const b = Math.min(...inp.openings);
   const Ir = hy.pente / 100;
   body.push(
-    H1(hyd.method === "rationnelle" ? "5. Écoulement dans l'ouvrage" : "4. Écoulement dans l'ouvrage"),
+    H1(hyd.method !== "impose" ? "5. Écoulement dans l'ouvrage" : "4. Écoulement dans l'ouvrage"),
     FORMULA(`Débit par cellule (au prorata des ouvertures) : Qc = Qp × b / Σb = ${f(hyd.Qp)} × ${f(b)} / ${f(bTot)} = ${f(hyd.Qcell)} m³/s`),
     FORMULA(`Manning-Strickler : Q = K·S·R^(2/3)·√I, K = ${f(hy.K, 0)} m^(1/3)/s, I = ${f(hy.pente)} % = ${f(Ir, 4)} m/m`, "Manning-Strickler"),
     FORMULA(`Tirant d'eau normal (résolution par dichotomie) : h = ${f(hyd.h, 3)} m`),
@@ -608,9 +639,9 @@ function hydroBody(study: Study): (Paragraph | Table | TableOfContents)[] {
     FORMULA(`Vitesse moyenne : V = Qc / S = ${f(hyd.Qcell)} / ${f(hyd.S, 3)} = ${f(hyd.V)} m/s`),
     FORMULA(`Nombre de Froude : Fr = V / √(g·h) = ${f(hyd.V)} / √(9,81 × ${f(hyd.h, 3)}) = ${f(hyd.Fr)} (${hyd.Fr > 1 ? "régime torrentiel" : "régime fluvial"})`),
     FORMULA(`Revanche sous la dalle : r = h intérieure − h = ${f(inp.hInt)} − ${f(hyd.h, 3)} = ${f(hyd.revanche, 3)} m (${f(hyd.revanchePct, 0)} % de la hauteur libre)`),
-    H1(hyd.method === "rationnelle" ? "6. Vérifications hydrauliques" : "5. Vérifications hydrauliques"),
+    H1(hyd.method !== "impose" ? "6. Vérifications hydrauliques" : "5. Vérifications hydrauliques"),
     checksTable(checks),
-    H1(hyd.method === "rationnelle" ? "7. Conclusion" : "6. Conclusion"),
+    H1(hyd.method !== "impose" ? "7. Conclusion" : "6. Conclusion"),
     P(k.non_conforme === 0
       ? `La section de ${n} × ${f(b)} × ${f(inp.hInt)} m évacue le débit de projet de ${f(hyd.Qp)} m³/s à surface libre, avec une revanche de ${f(hyd.revanche)} m.`
       : `La section ne satisfait pas toutes les vérifications hydrauliques (${k.non_conforme} non conforme(s)) : augmenter l'ouverture, le nombre de cellules ou la hauteur, ou prévoir une protection à la sortie.`, { bold: true }),

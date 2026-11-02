@@ -185,6 +185,11 @@ export function HydroAside({ outcome }: { outcome: RunOutcome | null }) {
           <dt className="text-slate-500">Temps de concentration</dt><dd className="text-right font-medium">{fr(h.tcMin, 1)} min</dd>
           <dt className="text-slate-500">Intensité de pluie</dt><dd className="text-right font-medium">{fr(h.I, 1)} mm/h</dd>
         </>)}
+        {h.method === "orstom" && h.orstom && (<>
+          <dt className="text-slate-500">Indice de pente Ig ≈ ΔH/L</dt><dd className="text-right font-medium">{fr(h.orstom.Ig, 1)} m/km</dd>
+          <dt className="text-slate-500">Abattement A</dt><dd className="text-right font-medium">{fr(h.orstom.Aab, 3)}</dd>
+          <dt className="text-slate-500">Qr10 / Q10</dt><dd className="text-right font-medium">{fr(h.orstom.Qr10)} / {fr(h.orstom.Q10)} m³/s</dd>
+        </>)}
         <dt className="text-slate-500">Débit de projet Qp</dt><dd className="text-right font-semibold text-blue-800">{fr(h.Qp)} m³/s</dd>
         <dt className="text-slate-500">Débit par cellule</dt><dd className="text-right font-medium">{fr(h.Qcell)} m³/s</dd>
         <dt className="text-slate-500">Tirant d&apos;eau normal</dt><dd className="text-right font-medium">{fr(h.h)} m</dd>

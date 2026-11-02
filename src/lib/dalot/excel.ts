@@ -188,9 +188,21 @@ export function studyToXlsx(study: Study): Uint8Array {
     const bb = row("Montana b", IN(h.montanaB), null, "", "");
     const tc = row("Temps de concentration (Kirpich)", R(`0.945*(${Lk}^3/${dH})^0.385`), hy.tcH, "h", "tc = 0,945·(L³/ΔH)^0,385");
     const I = row("Intensité de pluie", R(`${a}/(${tc}*60)^${bb}`), hy.I, "mm/h", "i = a·(60·tc)^−b");
-    const Q = h.methode === "rationnelle"
-      ? row("Débit de pointe (méthode rationnelle)", R(`${Cc}*${I}*${A}/3.6`), hy.Qp, "m³/s", "Q = C·i·A / 3,6")
-      : row("Débit de projet imposé", IN(h.Qimpose), hy.Qp, "m³/s", "");
+    let Q: string;
+    if (h.methode === "rationnelle") Q = row("Débit de pointe (méthode rationnelle)", R(`${Cc}*${I}*${A}/3.6`), hy.Qp, "m³/s", "Q = C·i·A / 3,6");
+    else if (h.methode === "orstom" && hy.orstom) {
+      const o = h.orstom;
+      const P10 = row("Pluie journalière décennale P10", IN(o.P10), null, "mm", "");
+      const Pan = row("Pluie annuelle moyenne Pan", IN(o.Pan), null, "mm", "");
+      const Kr = row("Kr10", IN(o.Kr10 / 100), null, "—", "abaques ORSTOM");
+      const Tb = row("Tb10", IN(o.Tb10), null, "min", "abaques ORSTOM");
+      const al = row("α10", IN(o.alpha), null, "—", "");
+      const mm = row("m", IN(o.m), null, "—", "");
+      const kT = row("QT / Q10", IN(o.kT), null, "—", "");
+      const Ab = row("Abattement (Vuillaume)", R(`MIN(1,1-(161-0.042*${Pan})/1000*LOG10(${A}))`), hy.orstom.Aab, "—", "A = 1 − (161 − 0,042·Pan)/1000·log S");
+      const Qr = row("Qr10", R(`${Ab}*${P10}*${Kr}*${al}*${A}*1000/(${Tb}*60)`), hy.orstom.Qr10, "m³/s", "A·P10·Kr10·α10·S/Tb10");
+      Q = row("Débit de projet (ORSTOM)", R(`${kT}*${mm}*${Qr}`), hy.Qp, "m³/s", "Qp = (QT/Q10)·m·Qr10");
+    } else Q = row("Débit de projet imposé", IN(h.Qimpose), hy.Qp, "m³/s", "");
     const bc = row("Largeur d'une cellule", IN(Math.min(...inp.openings)), null, "m", "");
     const Qc = row("Débit par cellule", R(`${Q}*${bc}/${inp.openings.reduce((s, o) => s + o, 0)}`), hy.Qcell, "m³/s", "au prorata des ouvertures");
     const K = row("Coefficient de Strickler K", IN(h.K), null, "m^(1/3)/s", "");

@@ -54,8 +54,10 @@ for (const n of [2, 3, 4]) for (const L of [7, 8]) {
   console.log(`OK   série ${n} × 2,00 × 2,00, L = ${L} ml : ${res.study.checks.length} vérifications, statut ${res.study.status}, ${res.study.quantities.steelMass.toFixed(0)} kg d'acier`);
 }
 const demo = runStudy(defaultSpec());
-if (!demo.ok || demo.study.status !== "conforme") { failed++; console.log("ÉCHEC  l'ouvrage de démonstration doit être conforme"); }
-else console.log("OK   ouvrage de démonstration conforme");
+// Seule réserve admise : l'origine des données de pluie, non renseignée sur l'ouvrage de démonstration.
+const demoOpen = demo.ok ? demo.study.checks.filter((c) => c.status === "non_conforme" || (c.status === "non_verifie" && c.id !== "H-SRC")) : [];
+if (!demo.ok || demoOpen.length > 0) { failed++; console.log(`ÉCHEC  l'ouvrage de démonstration doit être conforme (${demoOpen.map((c) => c.id).join(", ")})`); }
+else console.log("OK   ouvrage de démonstration conforme (hors origine des données de pluie)");
 
 // 4. Dossiers de plans sur les modèles types : 8 planches et perspectives 3D, cotes de la vue en plan.
 for (const [id, model, ids] of [

@@ -95,16 +95,26 @@ export const FIELDS: FieldDef[] = [
   // ── Hydrologie et hydraulique ─────────────────────────────
   { key: "hyActif", section: "hydro", group: "Étude hydraulique", label: "Justifier la capacité hydraulique de l'ouvrage", kind: "bool", default: true },
   { key: "hyMethode", section: "hydro", group: "Débit de crue de projet", label: "Origine du débit de projet", kind: "select", default: "rationnelle", options: [
-    { value: "rationnelle", label: "Méthode rationnelle (Kirpich + Montana)" }, { value: "impose", label: "Débit imposé (étude hydrologique externe)" },
+    { value: "rationnelle", label: "Méthode rationnelle (Kirpich + Montana) — bassins ≤ 4 km²" },
+    { value: "orstom", label: "Méthode ORSTOM (Rodier-Auvray) — crue décennale, 4 à 200 km²" },
+    { value: "impose", label: "Débit imposé (étude hydrologique externe)" },
   ], visibleIf: yes("hyActif") },
   { key: "hyQ", section: "hydro", group: "Débit de crue de projet", label: "Débit de projet Qp imposé", unit: "m³/s", kind: "number", default: 10, min: 0.01, max: 2000, visibleIf: (v) => v.hyActif === true && v.hyMethode === "impose" },
   { key: "hyT", section: "hydro", group: "Débit de crue de projet", label: "Période de retour", unit: "ans", kind: "number", default: 10, min: 2, max: 100, visibleIf: yes("hyActif"), help: "10 ans pour une voie secondaire, 25 à 50 ans pour une route nationale." },
   { key: "hyA", section: "hydro", group: "Bassin versant", label: "Superficie du bassin versant A", unit: "km²", kind: "number", default: 1.2, min: 0.001, max: 500, required: true, visibleIf: (v) => v.hyActif === true && v.hyMethode !== "impose" },
   { key: "hyL", section: "hydro", group: "Bassin versant", label: "Longueur du plus long talweg L", unit: "km", kind: "number", default: 1.7, min: 0.01, max: 100, required: true, visibleIf: (v) => v.hyActif === true && v.hyMethode !== "impose" },
   { key: "hyDH", section: "hydro", group: "Bassin versant", label: "Dénivelée point haut / exutoire ΔH", unit: "m", kind: "number", default: 32, min: 0.5, max: 2000, required: true, visibleIf: (v) => v.hyActif === true && v.hyMethode !== "impose" },
-  { key: "hyC", section: "hydro", group: "Bassin versant", label: "Coefficient de ruissellement C", kind: "number", default: 0.3, min: 0.05, max: 1, step: 0.01, required: true, visibleIf: (v) => v.hyActif === true && v.hyMethode !== "impose" },
-  { key: "hyMa", section: "hydro", group: "Pluie de projet (Montana I = a/t^b)", label: "Coefficient a", kind: "number", default: 350, min: 10, max: 3000, visibleIf: (v) => v.hyActif === true && v.hyMethode !== "impose", help: "Valeurs par défaut : station de Man, T = 10 ans (à recaler sur les séries ASECNA ou les abaques CIEH/ORSTOM)." },
-  { key: "hyMb", section: "hydro", group: "Pluie de projet (Montana I = a/t^b)", label: "Coefficient b", kind: "number", default: 0.38, min: 0.1, max: 1, step: 0.01, visibleIf: (v) => v.hyActif === true && v.hyMethode !== "impose" },
+  { key: "hyC", section: "hydro", group: "Bassin versant", label: "Coefficient de ruissellement C", kind: "number", default: 0.3, min: 0.05, max: 1, step: 0.01, required: true, visibleIf: (v) => v.hyActif === true && v.hyMethode === "rationnelle" },
+  { key: "hySource", section: "hydro", group: "Bassin versant", label: "Origine des données de pluie et du bassin", kind: "text", default: "", visibleIf: (v) => v.hyActif === true && v.hyMethode !== "impose", help: "Ex. « Station SODEXAM de Bouaké, coefficients de Montana T = 10 ans ; BV délimité sur carte IGN 1/50 000 ». Vide : la note signale des données non justifiées." },
+  { key: "hyP10", section: "hydro", group: "Méthode ORSTOM (Rodier-Auvray)", label: "Pluie journalière décennale P10", unit: "mm", kind: "number", default: 120, min: 30, max: 400, visibleIf: (v) => v.hyActif === true && v.hyMethode === "orstom", help: "Station SODEXAM la plus proche (ajustement des maxima journaliers)." },
+  { key: "hyPan", section: "hydro", group: "Méthode ORSTOM (Rodier-Auvray)", label: "Pluie annuelle moyenne Pan", unit: "mm", kind: "number", default: 1200, min: 200, max: 3000, visibleIf: (v) => v.hyActif === true && v.hyMethode === "orstom", help: "Sert au coefficient d'abattement de Vuillaume." },
+  { key: "hyKr10", section: "hydro", group: "Méthode ORSTOM (Rodier-Auvray)", label: "Coefficient de ruissellement décennal Kr10", unit: "%", kind: "number", default: 30, min: 1, max: 100, visibleIf: (v) => v.hyActif === true && v.hyMethode === "orstom", help: "À lire sur les abaques ORSTOM selon la classe de perméabilité, la pente (Ig) et la superficie." },
+  { key: "hyTb10", section: "hydro", group: "Méthode ORSTOM (Rodier-Auvray)", label: "Temps de base de la crue décennale Tb10", unit: "min", kind: "number", default: 300, min: 10, max: 5000, visibleIf: (v) => v.hyActif === true && v.hyMethode === "orstom", help: "À lire sur les abaques ORSTOM selon la pente et la superficie." },
+  { key: "hyAlpha", section: "hydro", group: "Méthode ORSTOM (Rodier-Auvray)", label: "Coefficient de pointe α10", kind: "number", default: 2.6, min: 1.5, max: 4, step: 0.05, visibleIf: (v) => v.hyActif === true && v.hyMethode === "orstom", help: "Rapport débit de pointe / débit moyen de ruissellement, d'après l'étude hydrologique de la zone." },
+  { key: "hyM", section: "hydro", group: "Méthode ORSTOM (Rodier-Auvray)", label: "Coefficient de majoration m (écoulement retardé)", kind: "number", default: 1.03, min: 1, max: 1.5, step: 0.01, visibleIf: (v) => v.hyActif === true && v.hyMethode === "orstom" },
+  { key: "hyKT", section: "hydro", group: "Méthode ORSTOM (Rodier-Auvray)", label: "Rapport QT / Q10 pour la période de retour retenue", kind: "number", default: 1, min: 1, max: 5, step: 0.05, visibleIf: (v) => v.hyActif === true && v.hyMethode === "orstom", help: "1 pour T = 10 ans ; sinon, valeur justifiée par l'étude hydrologique." },
+  { key: "hyMa", section: "hydro", group: "Pluie de projet (Montana I = a/t^b)", label: "Coefficient a", kind: "number", default: 350, min: 10, max: 3000, visibleIf: (v) => v.hyActif === true && v.hyMethode === "rationnelle", help: "Valeurs par défaut indicatives, non rattachées à une station : saisir les coefficients de la station SODEXAM la plus proche pour la période de retour retenue (I en mm/h, t en min)." },
+  { key: "hyMb", section: "hydro", group: "Pluie de projet (Montana I = a/t^b)", label: "Coefficient b", kind: "number", default: 0.38, min: 0.1, max: 1, step: 0.01, visibleIf: (v) => v.hyActif === true && v.hyMethode === "rationnelle" },
   { key: "hyK", section: "hydro", group: "Écoulement dans l'ouvrage", label: "Coefficient de Strickler K", kind: "number", default: 70, min: 20, max: 100, visibleIf: yes("hyActif"), help: "70 pour un radier en béton lisse." },
   { key: "hyI", section: "hydro", group: "Écoulement dans l'ouvrage", label: "Pente longitudinale du radier", unit: "%", kind: "number", default: 0.6, min: 0.05, max: 10, step: 0.05, visibleIf: yes("hyActif") },
   { key: "hyRevPct", section: "hydro", group: "Critères", label: "Revanche minimale (% de la hauteur libre)", unit: "%", kind: "number", default: 25, min: 0, max: 50, visibleIf: yes("hyActif") },
@@ -322,8 +332,9 @@ export type DalotInput = {
   };
   talus: { actif: boolean; pente: number; phi: number; c: number };
   hydro: {
-    actif: boolean; methode: "rationnelle" | "impose"; Qimpose: number; T: number;
-    A: number; L: number; dH: number; C: number; montanaA: number; montanaB: number;
+    actif: boolean; methode: "rationnelle" | "orstom" | "impose"; Qimpose: number; T: number;
+    A: number; L: number; dH: number; C: number; montanaA: number; montanaB: number; source: string;
+    orstom: { P10: number; Pan: number; Kr10: number; Tb10: number; alpha: number; m: number; kT: number };
     K: number; pente: number; revanchePct: number; revancheMin: number; vAdm: number; protection: boolean;
   };
   imposed: DalotSpec["imposed"];
@@ -412,8 +423,10 @@ export function toInput(spec: DalotSpec): DalotInput {
     },
     talus: { actif: v.talusActif === true, pente: num(v.talusPente, 1.5), phi: num(v.talusPhi, 30), c: num(v.talusC, 0) },
     hydro: {
-      actif: v.hyActif === true, methode: v.hyMethode === "impose" ? "impose" : "rationnelle", Qimpose: num(v.hyQ, 10), T: num(v.hyT, 10),
+      actif: v.hyActif === true, methode: v.hyMethode === "impose" ? "impose" : v.hyMethode === "orstom" ? "orstom" : "rationnelle", Qimpose: num(v.hyQ, 10), T: num(v.hyT, 10),
       A: num(v.hyA, 1), L: num(v.hyL, 1), dH: num(v.hyDH, 10), C: num(v.hyC, 0.3), montanaA: num(v.hyMa, 350), montanaB: num(v.hyMb, 0.38),
+      source: String(v.hySource ?? "").trim(),
+      orstom: { P10: num(v.hyP10, 120), Pan: num(v.hyPan, 1200), Kr10: num(v.hyKr10, 30), Tb10: num(v.hyTb10, 300), alpha: num(v.hyAlpha, 2.6), m: num(v.hyM, 1.03), kT: num(v.hyKT, 1) },
       K: num(v.hyK, 70), pente: num(v.hyI, 0.6), revanchePct: num(v.hyRevPct, 25), revancheMin: num(v.hyRevMin, 0.2),
       vAdm: num(v.hyVadm, 2), protection: v.hyProtection === true,
     },
