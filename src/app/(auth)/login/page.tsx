@@ -11,6 +11,11 @@ export default function LoginPage() {
       <div className="mt-6">
         <LoginForm />
       </div>
+      <p className="mt-4 text-right text-sm">
+        <Link href="/mot-de-passe-oublie" className="text-blue-700 hover:underline">
+          Mot de passe oublié ?
+        </Link>
+      </p>
       <p className="mt-6 text-center text-sm text-slate-500">
         Pas encore de compte ?{" "}
         <Link href="/signup" className="font-medium text-blue-700 hover:underline">

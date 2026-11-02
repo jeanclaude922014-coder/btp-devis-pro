@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="author" content="Moulo Jean Claude">
+<style>body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>DQE Lots &amp; Suivi</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Mise en page : bandeau d'import en tête, puis une colonne de travail (indicateurs → lots → saisie → DQE détaillé). Encre « plan » bleu nuit + accent latérite. */
+:root{
+  --bg:#f6f4f1; --surface:#ffffff; --surface-2:#efebe6; --line:#ddd6cd; --line-2:#c9bfb2;
+  --ink:#1b2433; --ink-2:#4a5262; --muted:#7a7f89;
+  --accent:#b4532a; --accent-ink:#ffffff; --accent-soft:#f6e3d8;
+  --navy:#1d3557; --navy-soft:#e3e9f2;
+  --good:#2f7d4f; --good-soft:#e2f1e7; --bad:#b42318; --bad-soft:#fbe5e2; --warn:#8a5a00; --warn-soft:#fdf1d6;
+  --chg:#fff0dc; --chg-line:#e8a45c;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --r:8px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12161d; --surface:#1a2029; --surface-2:#222a35; --line:#2e3744; --line-2:#3d4857;
+  --ink:#e9e6e1; --ink-2:#b9bcc3; --muted:#8d929b;
+  --accent:#e0794a; --accent-ink:#1a0e08; --accent-soft:#3a2418;
+  --navy:#9fb8dc; --navy-soft:#1f2a3a;
+  --good:#5fbf86; --good-soft:#17301f; --bad:#f07b6b; --bad-soft:#3a1b18; --warn:#e7b85c; --warn-soft:#33270f;
+  --chg:#3a2a14; --chg-line:#b8792f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12161d; --surface:#1a2029; --surface-2:#222a35; --line:#2e3744; --line-2:#3d4857;
+  --ink:#e9e6e1; --ink-2:#b9bcc3; --muted:#8d929b;
+  --accent:#e0794a; --accent-ink:#1a0e08; --accent-soft:#3a2418;
+  --navy:#9fb8dc; --navy-soft:#1f2a3a;
+  --good:#5fbf86; --good-soft:#17301f; --bad:#f07b6b; --bad-soft:#3a1b18; --warn:#e7b85c; --warn-soft:#33270f;
+  --chg:#3a2a14; --chg-line:#b8792f; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+.wrap{max-width:1320px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px;display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+.wrap>*,#app>*{min-width:0}
+#app{display:grid;gap:16px}
+h1,h2,h3{font-family:var(--f-display);letter-spacing:.01em;text-wrap:balance;margin:0;color:var(--ink)}
+h1{font-size:30px;font-weight:700;line-height:1.05}
+h2{font-size:20px;font-weight:600}
+h3{font-size:17px;font-weight:600}
+.eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.muted{color:var(--muted)} .small{font-size:12px}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn{border:1px solid var(--line-2);background:var(--surface);border-radius:6px;padding:7px 12px;font-size:13px;color:var(--ink)}
+.btn:hover{background:var(--surface-2)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.pri:hover{filter:brightness(1.05)}
+.btn.warn{border-color:var(--bad);background:var(--bad-soft);color:var(--bad)}
+.btn.on{background:var(--navy);border-color:var(--navy);color:var(--surface)}
+.btn:disabled{opacity:.5;cursor:default}
+.field{display:grid;gap:4px;font-size:12px;color:var(--muted)}
+.field input,.field select{border:1px solid var(--line-2);background:var(--surface);border-radius:6px;padding:7px 9px;font-size:14px;color:var(--ink);min-width:0;width:100%}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+
+/* En-tête */
+.top{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between}
+.top .lead{max-width:62ch;color:var(--ink-2);margin:6px 0 0}
+.lib{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.lib .field{min-width:220px}
+
+/* Import */
+.drop{display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;border:2px dashed var(--line-2);border-radius:var(--r);padding:16px;background:var(--surface);cursor:pointer}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop .ico{width:44px;height:44px;border-radius:8px;background:var(--navy);color:var(--surface);display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:13px}
+.drop b{display:block;font-size:15px}
+@media (max-width:640px){.drop{grid-template-columns:1fr}.drop .ico{display:none}}
+.busy{display:flex;gap:10px;align-items:center;color:var(--ink-2)}
+.spin{width:16px;height:16px;border:2px solid var(--line-2);border-top-color:var(--accent);border-radius:50%;animation:sp 0.8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+.err{border:1px solid var(--bad);background:var(--bad-soft);color:var(--bad);border-radius:6px;padding:10px 12px}
+
+/* Bandeau d'analyse */
+.report{border-left:4px solid var(--navy);background:var(--navy-soft);border-radius:6px;padding:12px 14px;color:var(--ink)}
+.report.example{border-left-color:var(--accent);background:var(--accent-soft)}
+.report ul{margin:6px 0 0;padding-left:18px;color:var(--warn)}
+.title-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.title-row input.name{font-family:var(--f-display);font-size:26px;font-weight:700;border:1px solid transparent;background:transparent;border-radius:6px;padding:0 4px;min-width:0;width:100%;max-width:760px;color:var(--ink)}
+.title-row input.name:hover{border-color:var(--line)}
+
+/* Barre d'outils */
+.tools{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.tools .grow{flex:1 1 200px}
+.status{width:100%;font-size:12px;color:var(--muted)}
+.status b{color:var(--ink-2)}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+@media (max-width:1000px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px;display:grid;gap:2px;align-content:start}
+.kpi .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.kpi .v{font-family:var(--f-display);font-size:26px;font-weight:600;line-height:1.1}
+.kpi .s{font-size:12px;color:var(--muted)}
+.kpi.main{background:var(--navy);border-color:var(--navy)}
+.kpi.main .l,.kpi.main .s,.kpi.main .v{color:var(--surface)}
+.kpi.good .v{color:var(--good)} .kpi.bad .v{color:var(--bad)}
+.meter{height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden;margin:4px 0 2px}
+.meter i{display:block;height:100%;background:var(--good)}
+
+/* Description des lots */
+.sec-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}
+@media (max-width:860px){.cards{grid-template-columns:1fr}}
+.card{border:1px solid var(--line);border-radius:var(--r);padding:12px;display:grid;gap:6px;align-content:start;min-width:0}
+.card .hd{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:start}
+.card .hd input{font-family:var(--f-display);font-size:18px;font-weight:600;border:1px solid transparent;background:transparent;border-radius:4px;padding:0 3px;min-width:0;width:100%;color:var(--ink)}
+.card .hd input:hover{border-color:var(--line)}
+.card .amt{font-family:var(--f-mono);font-size:13px;font-weight:500;white-space:nowrap}
+.card .meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:var(--muted)}
+.card select{border:1px solid var(--line);background:var(--surface-2);border-radius:999px;padding:2px 8px;font-size:12px;color:var(--ink);max-width:100%}
+.share{height:4px;border-radius:2px;background:var(--surface-2);overflow:hidden}
+.share i{display:block;height:100%;background:var(--accent)}
+.card p{margin:0;font-size:13px;color:var(--ink-2)}
+.card p b{color:var(--ink)}
+.vig{background:var(--warn-soft);color:var(--warn);border-radius:4px;padding:6px 8px;font-size:12px!important}
+.vig b{color:var(--warn)!important}
+
+/* Saisie + avancement */
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+@media (max-width:900px){.two{grid-template-columns:1fr}}
+.att-grid{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px;margin-top:10px}
+@media (max-width:560px){.att-grid{grid-template-columns:1fr}}
+.att-row{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-top:10px}
+.att-row .q{width:130px} .att-row .o{flex:1 1 160px}
+.info{font-size:12px;color:var(--ink-2);margin-top:8px}
+.lb{display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr) auto;gap:8px;align-items:center;font-size:12px}
+.lb .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lb .nm small{color:var(--muted)}
+.lb .track{display:block;height:10px;border-radius:5px;background:var(--surface-2)}
+.lb .track i{display:block;height:100%;border-radius:5px;background:var(--good)}
+.lb .v{color:var(--muted);white-space:nowrap;font-family:var(--f-mono);font-size:11px}
+.lots{display:grid;gap:6px;margin-top:10px;max-height:330px;overflow:auto;padding-right:4px}
+
+/* Courbe & journal */
+svg.curve{width:100%;height:auto;display:block;margin-top:8px}
+svg.curve text{fill:var(--muted);font-size:11px;font-family:var(--f-body)}
+.jr{max-height:300px;overflow:auto;margin-top:8px}
+.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl th{text-align:left;font-weight:600;color:var(--muted);padding:6px 6px;border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0}
+.tbl td{padding:4px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+.r{text-align:right}
+.x{border:0;background:transparent;color:var(--muted);border-radius:4px;padding:2px 6px}
+.x:hover{color:var(--bad)}
+.x.warn{background:var(--bad-soft);color:var(--bad)}
+
+/* DQE détaillé */
+.dqe-wrap{overflow-x:auto;margin-top:10px;border:1px solid var(--line);border-radius:6px}
+table.dqe{min-width:1040px}
+table.dqe td.num{font-family:var(--f-mono);font-size:11px;color:var(--muted);white-space:nowrap}
+table.dqe input{border:1px solid transparent;background:transparent;border-radius:4px;padding:3px 4px;font-size:12px;color:var(--ink);width:100%;min-width:0}
+table.dqe input:hover{border-color:var(--line)}
+table.dqe input:focus{background:var(--surface);border-color:var(--accent);outline:none}
+table.dqe input.d{min-width:280px} table.dqe input.u{width:52px} table.dqe input.q{width:84px;text-align:right} table.dqe input.p{width:96px;text-align:right}
+table.dqe input.chg{background:var(--chg);border-color:var(--chg-line)}
+tr.site td{background:var(--ink);color:var(--bg);font-family:var(--f-display);font-size:15px;font-weight:600;padding:7px 8px}
+tr.lot td{background:var(--navy-soft);font-weight:600;cursor:pointer;padding:6px}
+tr.lot .caret{display:inline-block;width:14px;color:var(--muted)}
+tr.lot .cat{font-weight:400;font-size:11px;color:var(--muted);margin-left:8px}
+tr.secrow td{font-style:italic;color:var(--muted);padding-top:6px}
+tr.tot td{background:var(--surface-2);font-weight:600;border-top:2px solid var(--line-2)}
+tr.grand td{background:var(--navy);color:var(--surface);font-weight:700;padding:8px 6px}
+tr.sub td{background:var(--surface-2)}
+.pbar{display:flex;align-items:center;gap:6px}
+.pbar span{display:block;width:56px;height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden}
+.pbar span i{display:block;height:100%;background:var(--good)}
+.pbar.over span i{background:var(--bad)}
+.pbar b{font-weight:500;font-size:11px}
+.add{border:1px solid var(--line-2);background:var(--surface);border-radius:4px;color:var(--navy);font-weight:700;padding:0 7px}
+.foot{font-size:12px;color:var(--muted);text-align:center}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Devis quantitatif et estimatif · F CFA</div>
+      <h1>DQE Lots &amp; Suivi</h1>
+      <p class="lead">Déposez un DQE en Excel ou en PDF : les ouvrages, les lots et les articles sont reconnus seuls, chaque lot est décrit, et le suivi d'exécution est prêt.</p>
+    </div>
+    <div class="lib">
+      <label class="field" for="libSel">Mes DQE
+        <select id="libSel"></select>
+      </label>
+      <button class="btn" id="delDqe" type="button">Supprimer ce DQE</button>
+    </div>
+  </header>
+
+  <label class="drop" id="drop" for="file">
+    <span class="ico">DQE</span>
+    <span><b id="dropTitle">Déposez votre DQE ici, ou cliquez pour le choisir</b><span class="muted small">Excel (.xlsx, .xls), CSV ou PDF texte. Le fichier est lu dans votre navigateur.</span></span>
+    <span class="btn pri">Importer un DQE</span>
+    <input type="file" id="file" accept=".xlsx,.xlsm,.xls,.csv,.pdf" hidden>
+  </label>
+  <div id="importMsg" hidden></div>
+
+  <div id="app"></div>
+  <p class="foot">Auteur : Moulo Jean Claude · Normes de référence BAEL 91 mod. 99 / Eurocode 2 · Les ratios et points de vigilance sont indicatifs et ne remplacent pas les notes de calcul.</p>
+</div>
+
+<script>var DQE=(()=>{var O=Object.defineProperty;var ie=Object.getOwnPropertyDescriptor;var se=Object.getOwnPropertyNames;var oe=Object.prototype.hasOwnProperty;var ae=(t,e)=>{for(var n in e)O(t,n,{get:e[n],enumerable:!0})},le=(t,e,n,r)=>{if(e&&typeof e=="object"||typeof e=="function")for(let i of se(e))!oe.call(t,i)&&i!==n&&O(t,i,{get:()=>e[i],enumerable:!(r=ie(e,i))||r.enumerable});return t};var ue=t=>le(O({},"__esModule",{value:!0}),t);var Ee={};ae(Ee,{CATEGORIES:()=>D,categoryByKey:()=>v,describeAll:()=>ee,parseDqe:()=>W,toNumber:()=>$});var D=[{key:"generalites",label:"Installation de chantier \u2013 g\xE9n\xE9ralit\xE9s",order:0,keywords:["installation","repli","amenee","implantation","panneau de chantier","generalite","etudes","plan d'execution","constat","dossier","signalisation"],note:"Installation, implantation contradictoire et repli : \xE0 faire constater par PV ; pr\xE9voir le panneau de chantier et les plans d'ex\xE9cution avant d\xE9marrage."},{key:"terrassement",label:"Terrassement",order:1,keywords:["terrassement","debroussaill","decapage","fouille","deblai","remblai","nivellement","compactage","evacuation des terres","plateforme","laterite","fouilles"],note:"Sol lat\xE9ritique : purger les poches argileuses, remblais en couches de 20 cm compact\xE9es \xE0 95 % de l'OPM (Proctor modifi\xE9) avant dallage ; essais de plaque ou densit\xE9 in situ recommand\xE9s."},{key:"gros_oeuvre",label:"Gros \u0153uvre \u2013 b\xE9ton arm\xE9 et ma\xE7onnerie",order:2,keywords:["gros oeuvre","gros-oeuvre","beton","semelle","fondation","poteau","poutre","chainage","linteau","dalle","dallage","agglo","maconnerie","enduit","coffrage","acier","armature","ha ","ferraillage","voile","longrine","radier","claustra","hourdis","polyane"],note:"B\xE9ton arm\xE9 \xE0 justifier selon BAEL 91 mod. 99 / EC2 : dosage \u2265 350 kg/m\xB3 pour les \xE9l\xE9ments porteurs, enrobage \u2265 3 cm \xE0 l'ext\xE9rieur, cure humide d'au moins 7 jours (climat tropical chaud) et vibration syst\xE9matique ; pr\xE9voir \xE9prouvettes de contr\xF4le (fc28)."},{key:"etancheite",label:"\xC9tanch\xE9it\xE9",order:3,keywords:["etancheite","etanche","bitum","paxalumin","multicouche","relev\xE9","releve","forme de pente"],note:"Forme de pente \u2265 1,5 % vers les EP, relev\xE9s \u2265 15 cm ; protection anti-UV indispensable sous fort ensoleillement."},{key:"charpente_couverture",label:"Charpente \u2013 couverture",order:4,keywords:["charpente","couverture","tole","bac alu","aluzinc","faitiere","panne","chevron","ferme","liteau","gouttiere","rive","toiture","tuile"],note:"Bois trait\xE9s insecticide-fongicide (termites), ancrage des fermes dans le cha\xEEnage contre les vents de tornade ; recouvrement des t\xF4les conforme au fabricant."},{key:"menuiserie_bois",label:"Menuiserie bois",order:5,keywords:["menuiserie bois","porte isoplane","porte en bois","bois rouge","placard","isoplane","quincaillerie","serrure ","paumelle"],note:"Bois sec (humidit\xE9 \u2264 18 %) et trait\xE9 ; prot\xE9ger les menuiseries des remont\xE9es d'humidit\xE9."},{key:"menuiserie_metallique",label:"Menuiserie m\xE9tallique \u2013 serrurerie",order:6,keywords:["metallique","serrurerie","grille","garde-corps","garde corps","portail","naco","persienne","barreaudage","ferronnerie"],note:"Profil\xE9s trait\xE9s antirouille (2 couches) avant pose ; scellements au mortier dos\xE9 \xE0 350 kg/m\xB3."},{key:"menuiserie_alu",label:"Menuiserie aluminium \u2013 vitrerie",order:7,keywords:["aluminium","alu ","vitrage","vitrerie","vitre","verre","baie","coulissant"],note:"Joints d'\xE9tanch\xE9it\xE9 p\xE9riph\xE9riques et rejingots pour les pluies battantes."},{key:"plomberie",label:"Plomberie \u2013 sanitaires",order:8,keywords:["plomberie","sanitaire","wc","lavabo","evier","robinet","pvc","tuyau","sodeci","douche","siphon","chasse","urinoir","lave-mains","lave mains","pression","pehd","cuve","chateau d'eau"],note:"Essais d'\xE9tanch\xE9it\xE9 sous pression avant fermeture des saign\xE9es ; branchement SODECI \xE0 coordonner t\xF4t."},{key:"assainissement",label:"Assainissement \u2013 VRD",order:9,keywords:["assainissement","regard","fosse","puisard","puits perdu","caniveau","dalot","buse","drain","eaux usees","eaux pluviales","septique","latrine","vrd","voirie","bordure","pave"],note:"Puisards et puits perdus : v\xE9rifier la perm\xE9abilit\xE9 du sol lat\xE9ritique ; implanter \xE0 distance r\xE9glementaire des points d'eau."},{key:"electricite",label:"\xC9lectricit\xE9",order:10,keywords:["electricite","electrique","cable","fil h07","tableau","disjoncteur","interrupteur","prise","pc ","reglette","luminaire","lampe","hublot","mise a la terre","securel","cie","icd","gaine","eclairage","ventilateur","brasseur"],note:"Installation conforme NF C 15-100 ; mise \xE0 la terre < 100 \u03A9 et attestation SECUREL avant mise sous tension CIE."},{key:"revetements",label:"Rev\xEAtements durs \u2013 carrelage",order:11,keywords:["revetement","carreau","carrelage","faience","gres","plinthe","chape","granito","marbre"],note:"Pose sur chape ou dallage sec ; joints de fractionnement tous les 40 m\xB2 environ (dilatation thermique)."},{key:"faux_plafond",label:"Faux plafonds",order:12,keywords:["faux plafond","faux-plafond","plafond","contreplaque","staff","dalles de plafond","lambris"],note:"Ossature trait\xE9e et ventilation des combles pour limiter la chaleur sous toiture."},{key:"peinture",label:"Peinture \u2013 vernis",order:13,keywords:["peinture","vinylique","glycero","vernis","brossage","egrainage","enduit de lissage","badigeon","antirouille","impression"],note:"Enduits secs (\u2248 28 jours) avant peinture ; peintures ext\xE9rieures adapt\xE9es aux UV et \xE0 l'humidit\xE9."},{key:"equipements",label:"\xC9quipements \u2013 divers",order:14,keywords:["equipement","mobilier","climatis","split","forage","pompe","solaire","panneau","extincteur"],note:"V\xE9rifier les fiches techniques et garanties fournisseurs avant commande."}],j={key:"divers",label:"Divers",order:99,keywords:[],note:"Lot sans corps d'\xE9tat reconnu : v\xE9rifier le rattachement des articles."};function v(t){var e;return(e=D.find(n=>n.key===t))!=null?e:j}function S(t){return` ${t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/œ/g,"oe").replace(/[’']/g,"'").replace(/\s+/g," ")} `}function U(t,e,n){var i;let r=S(t);for(let o of D)for(let u of o.keywords)r.includes(u)&&n.set(o.key,((i=n.get(o.key))!=null?i:0)+e*(u.length>6?2:1))}function C(t,e){let n=new Map;U(t,10,n);for(let o of e)U(o,1,n);let r=j.key,i=0;for(let[o,u]of n)u>i&&(r=o,i=u);return r}function H(t){return C("",[t])}function $(t){var o,u;if(t==null)return null;if(typeof t=="number")return Number.isFinite(t)?t:null;let e=String(t).replace(/[   \s]/g,"").replace(/(f\.?cfa|fcfa|xof|cfa|f)$/i,"").trim();if(!e||!/^-?[\d.,]+$/.test(e)||!/\d/.test(e))return null;let n=((o=e.match(/\./g))!=null?o:[]).length,r=((u=e.match(/,/g))!=null?u:[]).length;n&&r?e.lastIndexOf(",")>e.lastIndexOf(".")?e=e.replace(/\./g,"").replace(",","."):e=e.replace(/,/g,""):r>1?e=e.replace(/,/g,""):r===1?e=e.replace(",","."):n>1&&(e=e.replace(/\./g,""));let i=Number(e);return Number.isFinite(i)?i:null}function L(t){return t==null?"":String(t).replace(/[  ]/g," ").replace(/\s+/g," ").trim()}var ce=/^(m[²2³3]?|ml|m\.?l\.?|u|un|unit[ée]s?|u\.|ens|ensemble|ff|fft|forfait|f\.f\.?|kg|t|tonnes?|l|litres?|pm|p\.m\.?|pce|pi[èe]ces?|nb|nbre|no|j|jours?|h|heures?|km|ha|lot|pt|point|sac|voyage|v|mois|m\/l|m2\/m|gl|global)$/i;function T(t){return ce.test(t.trim())}function X(t){let e=t.trim().toLowerCase().replace(/\.$/,"");return e==="m2"?"m\xB2":e==="m3"?"m\xB3":e==="m.l"||e==="m/l"?"ml":e==="unite"||e==="unit\xE9"||e==="un"||e==="unites"||e==="unit\xE9s"?"u":e==="ensemble"?"ens":e==="forfait"||e==="f.f"?"ff":t.trim()}var de=/^(?:[A-Z]{1,2}[.\-]?)?\d{1,3}(?:[.\-]\d{1,3})*[a-z]?\.?$|^[IVXL]{1,6}\.?$|^[A-H]\.?$/;function J(t){return de.test(t.trim())}function Z(t){return t.replace(/\.$/,"").split(/[.\-]/).filter(Boolean).length}var me=/^[IVXL]{1,6}$/,z=/^(sous[\s-]?total|s\/total|total|montant|report|a reporter|à reporter|r[ée]capitulati|tva|t\.v\.a|ttc|net a payer|net à payer|arr[êe]t[ée]|cumul|prix total)/i,Y=/^\s*lot\s*(?:n[°o]?\.?\s*)?([0-9]{1,3}[a-z]?(?:\s*[-–&et,]+\s*[0-9]{1,3})*|[ivxl]{1,6})?\b/i,pe=/^\s*(?:[IVXL]{1,6}\s*[.\-–:)]\s*)?(ouvrage|b[âa]timent|bloc|site|tranche|partie|composante|sous[\s-]?projet|module|zone|construction|r[ée]habilitation|am[ée]nagement|r[ée]alisation)\b/i,V=/^(r[ée]capitulati|r[ée]sum[ée] g[ée]n[ée]ral|synth[eè]se)/i;function K(t){let e=S(t).trim();return e?/^(n|no|n°|n °|num|numero|item|ref|reference|art|article|code|prix n|n prix|n° prix|n°prix)\b/.test(e)&&e.length<18?"num":/designation|libelle|description|nature des|ouvrages|prestations|travaux/.test(e)?"des":/^(u|un|unite|unites|u\.)\.?$/.test(e)||/^unite/.test(e)?"unit":/qte|quantite|qtes|^q\.?$|quant/.test(e)?"qty":/p\.?\s?u\b|prix unit|^pu\b|prix unitaire|p\.u\.?/.test(e)?"pu":/montant|prix total|p\.?\s?t\b|^total|^pt$/.test(e)?"amt":null:null}function G(t){let e=Math.min(t.length,60);for(let n=0;n<e;n++){let r={};if(t[n].forEach((i,o)=>{let u=K(L(i));u&&r[u]===void 0&&(r[u]=o)}),r.des!==void 0&&(r.qty!==void 0||r.pu!==void 0)){let i=t[n+1];return i&&i.forEach((o,u)=>{let c=K(L(o));c&&r[c]===void 0&&c!=="des"&&(r[c]=u)}),{index:n,map:r}}}return null}function B(t){let e=t.match(/^((?:[A-Z]{1,2}[.\-]?)?\d{1,3}(?:[.\-]\d{1,3})*[a-z]?|[IVXL]{1,6})\s*[.\-–:)/]\s*(.+)$/);if(e&&e[2].length>2)return{code:e[1],rest:e[2].trim()};let n=t.match(/^(\d{1,3}(?:\.\d{1,3})+)\s+(.+)$/);return n?{code:n[1],rest:n[2].trim()}:{code:"",rest:t}}function fe(t,e){if(t.length>=3){let[n,r,i]=t.slice(-3);return Math.abs(n*r-i)<=Math.max(2,i*.01)?{q:n,pu:r}:{q:n,pu:r}}if(t.length===2){let[n,r]=t;return{q:n,pu:r}}return t.length===1&&e?{q:t[0],pu:0}:null}function ge(t,e){let n=l=>e[l]===void 0?void 0:t[e[l]],r=L(n("num")),i=L(n("des")),o=L(n("unit")),u=$(n("qty")),c=$(n("pu")),s=$(n("amt")),p=new Set(Object.values(e)),a=t.map((l,d)=>p.has(d)?"":L(l)).filter(l=>l&&$(l)===null);if(!i&&a.length&&(i=a.join(" ")),!i&&r&&!J(r)&&(i=r,r=""),o&&!T(o)&&$(o)!==null&&u===null&&(u=$(o),o=""),!i&&!r&&u===null&&c===null&&s===null)return{kind:"skip"};let g=`${r} ${i}`.trim();if(V.test(i)||V.test(g))return{kind:"recap"};if(z.test(i)||z.test(r)||/\btotal\b/i.test(i))return{kind:"total",text:i,amount:s};u===null&&c!==null&&s!==null&&c>0&&(u=s/c),c===null&&u!==null&&s!==null&&u>0&&(c=s/u);let f=u!==null&&u!==0;if(i&&(f||o&&T(o)||c!==null&&c>0))return!o&&!f&&!c?{kind:"heading",code:r,text:i}:{kind:"item",n:r,d:i,u:o?X(o):"u",q:u!=null?u:0,pu:c!=null?c:0};if(!i)return{kind:"skip"};if(s!==null&&s>0)return{kind:"total",text:i,amount:s};let h=r?{code:r,rest:i}:B(i);return{kind:"heading",code:h.code,text:h.rest}}function he(t){let e=t.flatMap(s=>s.split(/[\u00a0\u202f\s]+/)).filter(Boolean);if(e.some(s=>$(s)===null))return t.map(s=>{var p;return(p=$(s))!=null?p:0});let n=e.length;if(n>12)return e.map(s=>$(s));let r=[],i=(s,p)=>{if(!(r.length>2e3)){if(s===n){r.push(p.map(a=>$(a)));return}i(s+1,[...p,e[s]]),p.length&&/^\d{3}([.,]\d+)?$/.test(e[s])&&/^\d{1,3}( \d{3})*$/.test(p[p.length-1])&&i(s+1,[...p.slice(0,-1),`${p[p.length-1]} ${e[s]}`])}};i(0,[]);let o=s=>{if(s.length<3)return!1;let[p,a,g]=s.slice(-3);return g>0&&Math.abs(p*a-g)<=Math.max(2,g*.005)},u=r.filter(s=>s.length===3&&o(s));if(u.length)return u[0];let c=r.filter(o).sort((s,p)=>s.length-p.length);return c.length?c[0]:t.map(s=>{var p;return(p=$(s))!=null?p:0})}function Q(t){let e=t.map(L).filter(Boolean);if(!e.length)return{kind:"skip"};let n=a=>/^[\d\s\u00a0\u202f.,]+$/.test(a)&&/\d/.test(a),r=e.length;for(;r>0&&n(e[r-1]);)r--;let i=r<e.length?he(e.slice(r)):[];if(e=e.slice(0,r).concat([]),r>0&&!T(e[r-1])){let a=e[r-1].match(/^(.*\S)\s+(m[²2³3]|ml|u|ens|ff|fft|kg|forfait|pm)$/i);a&&i.length&&(e[r-1]=a[1],e.splice(r,0,a[2]),r++)}let o="";r>0&&T(e[r-1])&&(o=e[r-1],r--);let u="",c=0;r>1&&J(e[0])&&(u=e[0],c=1);let s=e.slice(c,r).join(" ").trim();if(!u){let a=B(s);a.code&&(i.length||o)&&(u=a.code,s=a.rest)}if(!s)return{kind:"skip"};if(V.test(s))return{kind:"recap"};if(z.test(s)||/\btotal\b/i.test(s))return{kind:"total",text:s,amount:i.length?i[i.length-1]:null};let p=fe(i,!!o);if(p&&(o||i.length>=2))return{kind:"item",n:u,d:s,u:o?X(o):"u",q:p.q,pu:p.pu};if(i.length===1&&!o)return{kind:"total",text:s,amount:i[0]};if(!i.length&&!o){let a=u?{code:u,rest:s}:B(s);return{kind:"heading",code:a.code,text:a.rest}}return{kind:"text",text:s}}var be=new Set(["VRD","BA","PVC","CIE","SODECI","HA","AEP","EP","EU","EV","RDC","R+1","R+2","PEHD","HT","TTC","TVA","BPU","DQE","LED","SECUREL","CI","II","III","IV","VI","VII","VIII","IX"]);function E(t){let e=t.replace(/\s+/g," ").replace(/\s*[:\-–]\s*$/,"").trim();e=e.replace(/\bOEUVRE\b/g,"\u0152UVRE").replace(/\boeuvre\b/g,"\u0153uvre");let n=e.replace(/[^A-Za-zÀ-ÿŒœ]/g,""),r=n.replace(/[^A-ZÀ-ÞŒ]/g,"").length;if(n.length>3&&r/n.length>.8){let i=!0;e=e.split(" ").map(o=>{let u=o.replace(/[^A-Za-zÀ-ÿŒœ+0-9]/g,"");if(be.has(u))return/[A-Za-z]/.test(u)&&(i=!1),o;let c=o.toLocaleLowerCase("fr-FR");return i&&/[a-zà-ÿœ]/.test(c)&&(c=c.replace(/[a-zà-ÿœ]/,s=>s.toLocaleUpperCase("fr-FR")),i=!1),c}).join(" ")}return e}function _(t,e){let n=e.match(Y);if(n&&n[0].trim().length){let r=n[1]?n[1].toUpperCase().replace(/\s+/g,""):"",i=e.slice(n[0].length).replace(/^\s*[:\-–.)]\s*/,"").trim();return`Lot ${r}${i?` : ${E(i)}`:""}`.replace(/\s+:/," :")}return t?`Lot ${t.replace(/\.$/,"")} : ${E(e)}`:E(e)}function ye(t){let e=t.match(/^Lot\s+([0-9A-Z\-–&,]+)/i);return e?e[1].toUpperCase():null}function ke(t){let e=G(t.rows),r=t.layout==="free"?null:e,i=[],o=e?e.index+1:0,u=!1,c=0;for(let s=o;s<t.rows.length&&!u;s++){let p=t.rows[s];if(e&&G([p]))continue;let a=r?ge(p,r.map):Q(p);if(r&&a.kind==="skip"&&(a=Q(p)),a.kind==="recap"&&c>0){u=!0;break}a.kind==="item"&&c++,i.push({row:a})}return{entries:i}}var F=t=>me.test(t.replace(/\.$/,""));function $e(t,e,n,r){var N;let i=r.entries.filter(b=>b.row.kind==="heading").map(b=>b.row),o=i.some(b=>Y.test(b.text)&&/^\s*lot\b/i.test(b.text)),u=i.some(b=>F(b.code)),c=i.some(b=>b.code&&!F(b.code)&&Z(b.code)===1),s=null,p=new Set,a=null,g,f=null,h=n?e:"",l=b=>{let m={id:`S${t.sites.length+1}`,name:b};return t.sites.push(m),s=m,p.clear(),a=null,g=void 0,m},d=()=>s!=null?s:l(h||"Ouvrage principal"),k=b=>{let m=ye(b);m&&p.has(m)&&s&&(s.name==="Ouvrage principal"&&(s.name="Ouvrage 1"),l(`${h?`${h} \u2013 `:""}Ouvrage ${t.sites.length+1}`));let w=d();m&&p.add(m);let R={id:`L${++t.lotSeq}`,site:w.id,name:b,category:"divers"};return t.lots.push(R),a=R,g=void 0,R},te=b=>{for(let m=b+1;m<r.entries.length;m++){let w=r.entries[m].row;if(w.kind==="item")return!1;if(w.kind==="heading")return/^\s*lot\b/i.test(w.text)}return!1};for(let[b,{row:m}]of r.entries.entries()){if(m.kind==="skip")continue;if(m.kind==="total"){/\b(ht|hors taxe|g[ée]n[ée]ral)\b/i.test(m.text)&&!/lot|sous/i.test(m.text)&&m.amount&&(t.declaredTotal=Math.max((N=t.declaredTotal)!=null?N:0,m.amount)),f=null;continue}if(m.kind==="recap")continue;if(m.kind==="text"){f&&/^[a-zà-ÿ(]/.test(m.text)&&(f.d=`${f.d} ${m.text}`);continue}if(m.kind==="heading"){let y=m.text;if(f&&/^[a-zà-ÿ(]/.test(y)&&!m.code){f.d=`${f.d} ${y}`;continue}f=null;let M=/^\s*lot\b/i.test(y);if(pe.test(y)&&!M||!M&&o&&te(b)||u&&c&&F(m.code)){l(`${h&&!y.toLowerCase().includes(h.toLowerCase())?`${h} \u2013 `:""}${m.code?`${m.code.replace(/\.$/,"")}. `:""}${E(y)}`);continue}if(M){k(_(m.code,y));continue}if(o){a?g=E(m.code?`${m.code} ${y}`:y):k(_(m.code,y));continue}let ne=m.code?Z(m.code):0,P=y.replace(/[^A-Za-zÀ-ÿ]/g,""),re=P.length>2&&P===P.toUpperCase();m.code&&ne===1||!m.code&&re||!a?k(_(m.code,y)):g=E(m.code?`${m.code} ${y}`:y);continue}let w=a!=null?a:k("__AUTO__"),R={k:++t.k,lot:w.id,n:m.n,d:m.d,u:m.u,q:Math.round(m.q*1e3)/1e3,pu:Math.round(m.pu*100)/100};g&&(R.sec=g),t.items.push(R),f=R}}function xe(t){let e=t.lots.filter(r=>r.name==="__AUTO__");if(!e.length)return"titres";let n="titres";for(let r of e){let i=t.items.filter(a=>a.lot===r.id),o=a=>a?a.split(/[.\-]/)[0].replace(/[^0-9A-Z]/gi,""):"",u=new Map;i.forEach(a=>{var f;let g=o(a.n);u.set(g,[...(f=u.get(g))!=null?f:[],a])});let c=i.filter(a=>o(a.n)).length,s=[];if(u.size>1&&c/Math.max(1,i.length)>.8){n="numerotation";for(let[a,g]of u){let f=C("",g.map(l=>l.d)),h={id:`L${++t.lotSeq}`,site:r.site,name:`Lot ${a||"?"} : ${v(f).label}`,category:f};s.push(h),g.forEach(l=>l.lot=h.id)}}else{n="mots-cles";let a=new Map;i.forEach(f=>{var l;let h=H(f.d);a.set(h,[...(l=a.get(h))!=null?l:[],f])}),[...a.keys()].sort((f,h)=>v(f).order-v(h).order).forEach((f,h)=>{let l={id:`L${++t.lotSeq}`,site:r.site,name:`Lot ${h+1} : ${v(f).label}`,category:f};s.push(l),a.get(f).forEach(d=>d.lot=l.id)})}let p=t.lots.indexOf(r);t.lots.splice(p,1,...s)}return n}function qe(t){let e=new Map(t.lots.map((n,r)=>[n.id,r]));t.items.sort((n,r)=>e.get(n.lot)-e.get(r.lot)||n.k-r.k)}var ve=/r[ée]cap|synth[eè]se|sommaire|garde|^bpu|bordereau des prix|notice|instructions?/i;function W(t,e){let n={sites:[],lots:[],items:[],k:0,lotSeq:0,warnings:[],declaredTotal:null},i=t.map(l=>({sheet:l,res:ke(l)})).filter(l=>l.res.entries.some(d=>d.row.kind==="item")),o=i.filter(l=>!ve.test(l.sheet.name));o.length||(o=i);let u=o.length>1;for(let l of o)$e(n,l.sheet.name,u,l.res);let c=xe(n);n.lots=n.lots.filter(l=>n.items.some(d=>d.lot===l.id)),n.sites=n.sites.filter(l=>n.lots.some(d=>d.site===l.id));for(let l of n.lots)l.category==="divers"&&(l.category=C(l.name,n.items.filter(d=>d.lot===l.id).map(d=>d.d))),/^Lot\s+[0-9A-Z]*$/i.test(l.name)&&(l.name=`${l.name} : ${v(l.category).label}`);qe(n);let s=t.reduce((l,d)=>l+d.rows.length,0);n.items.length||n.warnings.push("Aucun article reconnu. V\xE9rifiez que le fichier contient bien un tableau avec d\xE9signation, unit\xE9, quantit\xE9 et prix unitaire.");let p=n.items.filter(l=>!l.pu).length;p&&n.warnings.push(`${p} article(s) sans prix unitaire (\xE0 compl\xE9ter dans le tableau).`);let a=n.items.filter(l=>!l.q).length;a&&n.warnings.push(`${a} article(s) sans quantit\xE9 (\xE0 compl\xE9ter).`);let g=n.items.reduce((l,d)=>l+d.q*d.pu,0);n.declaredTotal&&g&&Math.abs(g-n.declaredTotal)>Math.max(10,n.declaredTotal*.005)&&n.warnings.push(`Le total HT recalcul\xE9 (${Math.round(g).toLocaleString("fr-FR")} F) diff\xE8re du total indiqu\xE9 dans le document (${Math.round(n.declaredTotal).toLocaleString("fr-FR")} F) : contr\xF4lez les lignes signal\xE9es.`);let f={source:e,sheets:o.map(l=>l.sheet.name),rowsRead:s,itemsFound:n.items.length,lotsFound:n.lots.length,lotStrategy:c,declaredTotal:n.declaredTotal,warnings:n.warnings},h=l=>JSON.parse(JSON.stringify(l));return{sites:n.sites,lots:n.lots,items:n.items,att:[],suivi:null,tva:.18,orig:{lots:h(n.lots),items:h(n.items)},report:f}}var A=t=>Math.round(t).toLocaleString("fr-FR").replace(/[  ]/g," "),q=t=>(Math.round(t*100)/100).toLocaleString("fr-FR",{maximumFractionDigits:2}).replace(/[  ]/g," "),we=t=>t>=1e6?`${(t/1e6).toFixed(t>=1e7?1:2).replace(".",",")} M F`:`${A(t)} F`,I=t=>(+t.q||0)*(+t.pu||0);function x(t,e,n){return t.filter(r=>e.test(r.u.trim())&&(!n||n.test(S(r.d)))).reduce((r,i)=>r+(+i.q||0),0)}function Re(t,e){let n=[],r=[],i=x(t,/^m(³|3)$/i,/beton|semelle|poteau|chainage|poutre|dalle|linteau|longrine|radier|voile/),o=x(t,/^m(³|3)$/i,/(semelle|poteau|chainage|poutre|dalle|linteau|longrine|radier|voile|raidisseur|amorce)/),u=x(t,/^kg$/i,/acier|armature|ha\b|fer/),c=x(t,/^m(²|2)$/i,/coffrage/),s=x(t,/^m(²|2)$/i,/agglo|maconnerie|mur/),p=x(t,/^m(²|2)$/i,/enduit/),a=x(t,/^m(³|3)$/i,/fouille|deblai/),g=x(t,/^m(³|3)$/i,/remblai/),f=x(t,/^m(²|2)$/i),h=x(t,/^ml$/i),l=x(t,/^(u|ens|ff|fft)$/i);if(e==="gros_oeuvre"){if(i&&n.push(`${q(i)} m\xB3 de b\xE9ton`),u&&n.push(`${A(u)} kg d'acier HA`),c&&n.push(`${q(c)} m\xB2 de coffrage`),s&&n.push(`${q(s)} m\xB2 de ma\xE7onnerie`),p&&n.push(`${q(p)} m\xB2 d'enduit`),u&&o){let d=u/o;r.push(`Ratio acier / b\xE9ton arm\xE9 \u2248 ${A(d)} kg/m\xB3 ${d<60?"(sous la plage usuelle 60\u2013130 kg/m\xB3 : v\xE9rifier les quantit\xE9s d'acier)":d>130?"(au-dessus de la plage usuelle 60\u2013130 kg/m\xB3 : v\xE9rifier les sections)":"(dans la plage usuelle 60\u2013130 kg/m\xB3)"}`)}c&&o&&r.push(`Ratio coffrage / b\xE9ton arm\xE9 \u2248 ${q(c/o)} m\xB2/m\xB3`)}else if(e==="terrassement")a&&n.push(`${q(a)} m\xB3 de fouilles`),g&&n.push(`${q(g)} m\xB3 de remblais`),f&&n.push(`${q(f)} m\xB2 de surfaces trait\xE9es`),a&&g&&r.push(`Remblais / fouilles = ${Math.round(g/a*100)} %`);else{f&&n.push(`${q(f)} m\xB2`),h&&n.push(`${q(h)} ml`),l&&n.push(`${q(l)} unit\xE9(s) / ensemble(s)`);let d=x(t,/^kg$/i);d&&n.push(`${A(d)} kg`);let k=x(t,/^m(³|3)$/i);k&&n.push(`${q(k)} m\xB3`)}return{quantities:n,ratios:r}}function Le(t,e,n){var h,l;let r=t.items.filter(d=>d.lot===e.id),i=r.reduce((d,k)=>d+I(k),0),o=v(e.category),u=(l=(h=t.sites.find(d=>d.id===e.site))==null?void 0:h.name)!=null?l:"",c=[...r].sort((d,k)=>I(k)-I(d)).slice(0,3).filter(d=>I(d)>0).map(d=>({n:d.n,d:d.d,amount:I(d)})),{quantities:s,ratios:p}=Re(r,e.category),a=n?i/n:0,g=[...new Set(r.map(d=>d.sec).filter(Boolean))],f=`${e.name} \u2014 ${o.label.toLowerCase()} : ${r.length} article${r.length>1?"s":""} pour ${we(i)} HT, soit ${(a*100).toFixed(1).replace(".",",")} % du montant total.`;if(g.length&&(f+=` Sous-parties : ${g.slice(0,4).join(" ; ")}${g.length>4?"\u2026":""}.`),c.length){let d=c[0],k=i?Math.round(d.amount/i*100):0;f+=` Poste principal : \xAB ${d.d} \xBB (${k} % du lot).`}return{lotId:e.id,title:e.name,site:u,category:o.label,articles:r.length,amount:i,share:a,summary:f,mainItems:c,quantities:s,ratios:p,note:o.note}}function ee(t){let e=t.items.reduce((n,r)=>n+I(r),0);return t.lots.map(n=>Le(t,n,e))}return ue(Ee);})();
+</script>
+<script type="application/json" id="example-data">{"sites":[{"id":"S1","name":"1. Marché de volailles traditionnelles améliorées"},{"id":"S2","name":"2. Bloc latrines 4 cabines + lave-mains"}],"lots":[{"id":"L1","site":"S1","name":"Lot 0 : Généralités","category":"generalites"},{"id":"L2","site":"S1","name":"Lot 1 : Terrassement","category":"terrassement"},{"id":"L3","site":"S1","name":"Lot 2 : Gros œuvre","category":"gros_oeuvre"},{"id":"L4","site":"S1","name":"Lot 6 : Serrurerie","category":"menuiserie_metallique"},{"id":"L5","site":"S1","name":"Lot 7-8 : Plomberie – sanitaires – assainissement","category":"plomberie"},{"id":"L6","site":"S1","name":"Lot 10 : Électricité","category":"electricite"},{"id":"L7","site":"S1","name":"Lot 14 : Revêtements durs","category":"revetements"},{"id":"L8","site":"S1","name":"Lot 17 : Faux plafonds","category":"faux_plafond"},{"id":"L9","site":"S1","name":"Lot 18 : Peinture","category":"peinture"},{"id":"L10","site":"S1","name":"Lot 19 : Charpente bois","category":"charpente_couverture"},{"id":"L11","site":"S1","name":"Lot 20 : Couverture","category":"charpente_couverture"},{"id":"L12","site":"S2","name":"Lot 1 : Terrassements","category":"terrassement"},{"id":"L13","site":"S2","name":"Lot 2 : Gros œuvre","category":"gros_oeuvre"},{"id":"L14","site":"S2","name":"Lot 3 : Assainissement","category":"assainissement"},{"id":"L15","site":"S2","name":"Lot 4 : Menuiserie – quincaillerie","category":"menuiserie_bois"},{"id":"L16","site":"S2","name":"Lot 5 : Carreaux","category":"revetements"},{"id":"L17","site":"S2","name":"Lot 6 : Charpente / couverture","category":"charpente_couverture"},{"id":"L18","site":"S2","name":"Lot 7 : Peinture – vernis","category":"peinture"},{"id":"L19","site":"S2","name":"Lot 8 : Dispositif de lave-mains","category":"plomberie"}],"items":[{"k":1,"lot":"L1","n":"0.1.2","d":"Installation et repli de chantier","u":"ens","q":1,"pu":2000000},{"k":2,"lot":"L1","n":"0.1.3","d":"Implantation du bâtiment","u":"ens","q":1,"pu":300000},{"k":3,"lot":"L2","n":"1.1.1","d":"Débroussaillage","u":"m²","q":1600,"pu":100},{"k":4,"lot":"L2","n":"1.1.2","d":"Décapage de la terre végétale pour la plateforme","u":"m²","q":1600,"pu":150},{"k":5,"lot":"L2","n":"1.2","d":"Fouilles en rigole et en tranchée","u":"m³","q":69.7,"pu":2000},{"k":6,"lot":"L2","n":"1.3.1","d":"Remblais des fouilles","u":"m³","q":36.86,"pu":1500},{"k":7,"lot":"L2","n":"1.3.2","d":"Remblais compactés sous dallage (latérite)","u":"m³","q":96.53,"pu":3000},{"k":8,"lot":"L3","n":"2.1.1","d":"Béton de propreté ép. 5 cm dosé à 150 kg/m³","u":"m³","q":4.407,"pu":65000},{"k":9,"lot":"L3","n":"2.1.2a","d":"Béton de semelle filante ép. 20 cm dosé à 350 kg/m³ – béton","u":"m³","q":14.514,"pu":85000},{"k":10,"lot":"L3","n":"2.1.2b","d":"Béton de semelle filante – acier HA","u":"kg","q":435.42,"pu":1000},{"k":11,"lot":"L3","n":"2.1.2c","d":"Semelles isolées dosé à 350 kg/m³ – béton","u":"m³","q":1.44,"pu":85000},{"k":12,"lot":"L3","n":"2.1.2d","d":"Semelles isolées – acier HA","u":"kg","q":57.6,"pu":1000},{"k":13,"lot":"L3","n":"2.2.1","d":"Murs de soubassement en agglos pleins de 15 cm","u":"m²","q":103.39,"pu":12000},{"k":14,"lot":"L3","n":"2.2.2.1a","d":"Amorces de poteaux et raidisseurs BA 350 – béton","u":"m³","q":1.164,"pu":85000},{"k":15,"lot":"L3","n":"2.2.2.1b","d":"Amorces de poteaux et raidisseurs – acier","u":"kg","q":131.2,"pu":1000},{"k":16,"lot":"L3","n":"2.2.2.1c","d":"Amorces de poteaux et raidisseurs – coffrage","u":"m²","q":18.03,"pu":2000},{"k":17,"lot":"L3","n":"2.2.2.2a","d":"Chaînage bas BA 350 – béton","u":"m³","q":3.63,"pu":85000},{"k":18,"lot":"L3","n":"2.2.2.2b","d":"Chaînage bas – acier","u":"kg","q":260.3,"pu":1000},{"k":19,"lot":"L3","n":"2.2.2.2c","d":"Chaînage bas – coffrage","u":"m²","q":57.84,"pu":2000},{"k":20,"lot":"L3","n":"2.2.2.3a","d":"Dallage BA ép. 10 cm avec chape incorporée y/c treillis soudé","u":"m²","q":417.48,"pu":11000},{"k":21,"lot":"L3","n":"2.2.2.3b","d":"Fourniture et pose film polyane","u":"m²","q":417.48,"pu":650},{"k":22,"lot":"L3","n":"2.3.1","d":"Murs en élévation en agglos creux de 15 cm","u":"m²","q":493.8,"pu":9500},{"k":23,"lot":"L3","n":"2.3.2.1a","d":"Poteaux et raidisseurs BA 350 – béton","u":"m³","q":4.44,"pu":85000},{"k":24,"lot":"L3","n":"2.3.2.1b","d":"Poteaux et raidisseurs – acier","u":"kg","q":355.2,"pu":1000},{"k":25,"lot":"L3","n":"2.3.2.1c","d":"Poteaux et raidisseurs – coffrage","u":"m²","q":78.38,"pu":2000},{"k":26,"lot":"L3","n":"2.3.2.2a","d":"Chaînage haut BA 350 – béton","u":"m³","q":7.446,"pu":85000},{"k":27,"lot":"L3","n":"2.3.2.2b","d":"Chaînage haut – acier","u":"kg","q":446.76,"pu":1000},{"k":28,"lot":"L3","n":"2.3.2.2c","d":"Chaînage haut – coffrage","u":"m²","q":106.36,"pu":2000},{"k":29,"lot":"L3","n":"2.5","d":"Enduit sur murs extérieurs et intérieurs dosé à 300 kg/m³","u":"m²","q":654.93,"pu":2400},{"k":30,"lot":"L3","n":"2.7.2","d":"Claustras (épaisseur 15 cm)","u":"m²","q":3.6,"pu":14000},{"k":31,"lot":"L3","n":"2.7.3","d":"Dalle pleine ép. 10 cm étal-passaille","u":"m²","q":136.69,"pu":11000},{"k":32,"lot":"L4","n":"6.1.1","d":"Porte métallique 120×220 y/c cadenas","u":"u","q":2,"pu":145000},{"k":33,"lot":"L4","n":"6.1.2","d":"Porte métallique 100×220 y/c cadenas","u":"u","q":3,"pu":135000},{"k":34,"lot":"L4","n":"6.1.3","d":"Porte métallique 90×220 y/c cadenas","u":"u","q":1,"pu":125000},{"k":35,"lot":"L4","n":"6.1.4","d":"Fenêtre métallique type naco 120×120","u":"u","q":3,"pu":120000},{"k":36,"lot":"L5","n":"7.1","d":"Branchement ordinaire SODECI y/c raccordement","u":"fft","q":1,"pu":450000},{"k":37,"lot":"L5","n":"7.2","d":"Tuyau PVC évacuation Ø75","u":"ml","q":10,"pu":5000},{"k":38,"lot":"L5","n":"7.3","d":"Tuyau PVC pression alimentation eau potable Ø25","u":"ml","q":30,"pu":1500},{"k":39,"lot":"L5","n":"7.4","d":"Robinet de puisage 15/21","u":"u","q":2,"pu":8000},{"k":40,"lot":"L5","n":"7.5","d":"Robinet d’arrêt 15×21","u":"u","q":1,"pu":7000},{"k":41,"lot":"L5","n":"7.6","d":"Regard de visite en agglos pleins 50×50×50","u":"u","q":1,"pu":35000},{"k":42,"lot":"L5","n":"7.7","d":"Puits perdu 4 à 10 usagers","u":"u","q":1,"pu":425000},{"k":43,"lot":"L5","n":"7.8","d":"Ensemble évier une cuve inox à encastrer","u":"u","q":2,"pu":65000},{"k":44,"lot":"L5","n":"7.9","d":"Siphon de sol plastique","u":"u","q":1,"pu":5000},{"k":45,"lot":"L6","n":"10.1.1","d":"Exécution d’une mise à la terre","u":"ens","q":1,"pu":80000},{"k":46,"lot":"L6","n":"10.1.4","d":"Niche 1,20×1,80×0,60","u":"u","q":1,"pu":80000},{"k":47,"lot":"L6","n":"10.2.1","d":"Tableau général (coupe-circuit 10A, disjoncteur 5-10A, accessoires)","u":"u","q":1,"pu":250000},{"k":48,"lot":"L6","n":"10.3.1.1","d":"Fil H07V-U 3×1,5 mm² sous tube ICD Ø11","u":"ml","q":200,"pu":1500},{"k":49,"lot":"L6","n":"10.3.1.2","d":"Fil H07V-U 3×2,5 mm² sous tube ICD Ø11","u":"ml","q":200,"pu":2000},{"k":50,"lot":"L6","n":"10.3.1.3","d":"Câble VGV 3×1,5 mm²","u":"ml","q":100,"pu":2000},{"k":51,"lot":"L6","n":"10.4.1","d":"Interrupteur SA","u":"u","q":8,"pu":3000},{"k":52,"lot":"L6","n":"10.4.2","d":"Interrupteur VV double","u":"u","q":2,"pu":5000},{"k":53,"lot":"L6","n":"10.4.3","d":"PC 10/16A 2P+T","u":"u","q":3,"pu":7000},{"k":54,"lot":"L6","n":"10.4.4","d":"PC 10/16A 2P+T étanche","u":"u","q":3,"pu":8000},{"k":55,"lot":"L6","n":"10.5.2","d":"Réglette LED 1,20 m","u":"u","q":24,"pu":15000},{"k":56,"lot":"L6","n":"10.5.3","d":"Réglette étanche 1,20 m éclairage extérieur","u":"u","q":7,"pu":18000},{"k":57,"lot":"L6","n":"10.6","d":"Contrôle, vérification + attestation SECUREL","u":"ens","q":1,"pu":350000},{"k":58,"lot":"L7","n":"14.1","d":"Carreaux antidérapants grès cérame type importé","u":"m²","q":22.26,"pu":22000},{"k":59,"lot":"L7","n":"14.2","d":"Carreaux faïence type importé","u":"m²","q":9.69,"pu":20000},{"k":60,"lot":"L8","n":"17.1.2","d":"Faux plafond contreplaqué 8 mm y/c ossature","u":"m²","q":465.24,"pu":11000},{"k":61,"lot":"L9","n":"18.1.1","d":"Brossage et égrainage murs et béton","u":"m²","q":654.93,"pu":200},{"k":62,"lot":"L9","n":"18.2.2.1","d":"2 couches peinture vinylique murs int. et ext.","u":"m²","q":681.4,"pu":2400},{"k":63,"lot":"L9","n":"18.3.1","d":"Peinture vinylique sur faux plafond","u":"m²","q":465.24,"pu":2400},{"k":64,"lot":"L9","n":"18.4.1.1","d":"Peinture glycéro sur portes métalliques","u":"m²","q":30.56,"pu":2400},{"k":65,"lot":"L10","n":"19.1.1","d":"Charpente en bois rouge non assemblé","u":"m³","q":4.705,"pu":475000},{"k":66,"lot":"L11","n":"20.1","d":"Tôle bac aluzinc y/c accessoires","u":"m²","q":501.16,"pu":10500},{"k":67,"lot":"L11","n":"20.2","d":"Faîtière y/c accessoires","u":"ml","q":26.9,"pu":9500},{"k":68,"lot":"L11","n":"20.3","d":"Bardage en tôle bac aluzinc","u":"m²","q":34.2,"pu":8500},{"k":69,"lot":"L12","n":"1.1","d":"Fouille en rigoles","u":"m³","q":8.28,"pu":2000},{"k":70,"lot":"L12","n":"1.2","d":"Fouille en excavation (fosse sèche)","u":"m³","q":31.01,"pu":5000},{"k":71,"lot":"L12","n":"1.3","d":"Remblai des fouilles","u":"m³","q":8.27,"pu":1500},{"k":72,"lot":"L12","n":"1.4","d":"Évacuation des terres","u":"m³","q":31.33,"pu":1500},{"k":73,"lot":"L13","n":"2.1.1","d":"Béton de semelle ép. 0,15 dosé 350 kg/m³ (gravier concassé local)","u":"m³","q":2.06,"pu":85000},{"k":74,"lot":"L13","n":"2.1.2","d":"Murs de soubassement en agglos 15 pleins","u":"m²","q":58.88,"pu":12000},{"k":75,"lot":"L13","n":"2.1.3.1","d":"Raidisseurs – béton 350","u":"m³","q":0.39,"pu":85000},{"k":76,"lot":"L13","n":"2.1.3.2","d":"Raidisseurs – coffrage","u":"m²","q":4.89,"pu":2000},{"k":77,"lot":"L13","n":"2.1.3.3","d":"Raidisseurs – acier","u":"kg","q":27.41,"pu":1000},{"k":78,"lot":"L13","n":"2.1.4.1","d":"Chaînages bas – béton 350","u":"m³","q":1.08,"pu":85000},{"k":79,"lot":"L13","n":"2.1.4.2","d":"Chaînages bas – coffrage","u":"m²","q":10.3,"pu":2000},{"k":80,"lot":"L13","n":"2.1.4.3","d":"Chaînages bas – acier","u":"kg","q":75.81,"pu":1000},{"k":81,"lot":"L13","n":"2.1.5.1","d":"Poutre – béton 350","u":"m³","q":0.16,"pu":85000},{"k":82,"lot":"L13","n":"2.1.5.2","d":"Poutre – coffrage","u":"m²","q":2.27,"pu":2000},{"k":83,"lot":"L13","n":"2.1.5.3","d":"Poutre – acier","u":"kg","q":11.45,"pu":1000},{"k":84,"lot":"L13","n":"2.1.6.1","d":"Dallettes – béton 350 (y/c coffrage)","u":"m³","q":1.19,"pu":85000},{"k":85,"lot":"L13","n":"2.1.6.2","d":"Dallettes – acier","u":"kg","q":83.62,"pu":1000},{"k":86,"lot":"L13","n":"2.1.7","d":"Dallage BA ép. 10 cm chape incorporée y/c treillis soudé","u":"m²","q":11.99,"pu":11000},{"k":87,"lot":"L13","n":"2.2.1.1","d":"Mur en agglos creux de 15 cm","u":"m²","q":58.79,"pu":9500},{"k":88,"lot":"L13","n":"2.2.1.2","d":"Enduits intérieurs et extérieurs","u":"m²","q":117.58,"pu":2400},{"k":89,"lot":"L13","n":"2.2.1.4","d":"Claustras type boîte à lettres","u":"m²","q":1.8,"pu":14000},{"k":90,"lot":"L14","n":"3.1","d":"Tuyau d’aération PVC Ø110 muni de nylon","u":"ml","q":15.5,"pu":10000},{"k":91,"lot":"L14","n":"3.2","d":"Tés et coudes Ø110 y/c colliers","u":"u","q":12,"pu":12000},{"k":92,"lot":"L14","n":"3.3","d":"WC turc type local y/c sujétions","u":"u","q":4,"pu":65000},{"k":93,"lot":"L15","n":"4.1","d":"Portes métalliques avec imposte grillage anti-mouche + crochets + cadenas","u":"u","q":4,"pu":140000},{"k":94,"lot":"L15","n":"4.2","d":"Tubes métalliques d’appui pour handicapés","u":"u","q":4,"pu":25000},{"k":95,"lot":"L16","n":"5.1","d":"Carreaux grès cérame pour dalle de défécation","u":"m²","q":5.76,"pu":10000},{"k":96,"lot":"L16","n":"5.2","d":"Faïence sur murs intérieurs des cabines (h = 1,00 m)","u":"m²","q":16.4,"pu":7000},{"k":97,"lot":"L17","n":"6.1","d":"Charpente en bois rouge non assemblée","u":"m³","q":0.25,"pu":425000},{"k":98,"lot":"L17","n":"6.2","d":"Tôle ondulée y/c pastillage sur tire-fonds","u":"m²","q":27.28,"pu":9000},{"k":99,"lot":"L17","n":"6.3","d":"Bardage en tôle ondulée","u":"m²","q":5.88,"pu":9000},{"k":100,"lot":"L18","n":"7.1","d":"Peinture vinylique murs intérieurs et extérieurs","u":"m²","q":117.58,"pu":2400},{"k":101,"lot":"L18","n":"7.2","d":"Peinture glycéro sur menuiseries métalliques et bois","u":"m²","q":9.24,"pu":2400},{"k":102,"lot":"L19","n":"8.1","d":"Fouille en rigole","u":"m³","q":0.11,"pu":2000},{"k":103,"lot":"L19","n":"8.2","d":"Béton de dalle et marche","u":"m³","q":0.05,"pu":85000},{"k":104,"lot":"L19","n":"8.3","d":"Agglos 15 pleins","u":"m²","q":5.38,"pu":12000},{"k":105,"lot":"L19","n":"8.4","d":"Remblai de socle","u":"m³","q":0.22,"pu":1500},{"k":106,"lot":"L19","n":"8.5","d":"Gros béton","u":"m³","q":0.02,"pu":85000},{"k":107,"lot":"L19","n":"8.6","d":"Enduit ordinaire","u":"m²","q":5.38,"pu":2400},{"k":108,"lot":"L19","n":"8.7","d":"Couverture métallique + cadre + système de condamnation à cadenas","u":"u","q":1,"pu":125000},{"k":109,"lot":"L19","n":"8.8","d":"Remplissage du drain avec gravier","u":"m³","q":0.06,"pu":60000},{"k":110,"lot":"L19","n":"8.9","d":"Peinture à huile type Deluxe mur extérieur (marron foncé)","u":"m²","q":5.38,"pu":12000},{"k":111,"lot":"L19","n":"8.10","d":"Fût plastique à eau 200 L y/c sujétions","u":"u","q":1,"pu":350000}],"att":[{"d":"2026-09-02","k":1,"q":1},{"d":"2026-09-04","k":3,"q":1600},{"d":"2026-09-08","k":4,"q":1600},{"d":"2026-09-12","k":5,"q":49.5,"o":"Fouilles bloc A"},{"d":"2026-09-17","k":8,"q":3.2},{"d":"2026-09-22","k":9,"q":10.5},{"d":"2026-09-26","k":10,"q":310},{"d":"2026-09-29","k":2,"q":1}],"suivi":"2026-09-29","tva":0.18,"orig":{"lots":[{"id":"L1","site":"S1","name":"Lot 0 : Généralités","category":"generalites"},{"id":"L2","site":"S1","name":"Lot 1 : Terrassement","category":"terrassement"},{"id":"L3","site":"S1","name":"Lot 2 : Gros œuvre","category":"gros_oeuvre"},{"id":"L4","site":"S1","name":"Lot 6 : Serrurerie","category":"menuiserie_metallique"},{"id":"L5","site":"S1","name":"Lot 7-8 : Plomberie – sanitaires – assainissement","category":"plomberie"},{"id":"L6","site":"S1","name":"Lot 10 : Électricité","category":"electricite"},{"id":"L7","site":"S1","name":"Lot 14 : Revêtements durs","category":"revetements"},{"id":"L8","site":"S1","name":"Lot 17 : Faux plafonds","category":"faux_plafond"},{"id":"L9","site":"S1","name":"Lot 18 : Peinture","category":"peinture"},{"id":"L10","site":"S1","name":"Lot 19 : Charpente bois","category":"charpente_couverture"},{"id":"L11","site":"S1","name":"Lot 20 : Couverture","category":"charpente_couverture"},{"id":"L12","site":"S2","name":"Lot 1 : Terrassements","category":"terrassement"},{"id":"L13","site":"S2","name":"Lot 2 : Gros œuvre","category":"gros_oeuvre"},{"id":"L14","site":"S2","name":"Lot 3 : Assainissement","category":"assainissement"},{"id":"L15","site":"S2","name":"Lot 4 : Menuiserie – quincaillerie","category":"menuiserie_bois"},{"id":"L16","site":"S2","name":"Lot 5 : Carreaux","category":"revetements"},{"id":"L17","site":"S2","name":"Lot 6 : Charpente / couverture","category":"charpente_couverture"},{"id":"L18","site":"S2","name":"Lot 7 : Peinture – vernis","category":"peinture"},{"id":"L19","site":"S2","name":"Lot 8 : Dispositif de lave-mains","category":"plomberie"}],"items":[{"k":1,"lot":"L1","n":"0.1.2","d":"Installation et repli de chantier","u":"ens","q":1,"pu":2000000},{"k":2,"lot":"L1","n":"0.1.3","d":"Implantation du bâtiment","u":"ens","q":1,"pu":300000},{"k":3,"lot":"L2","n":"1.1.1","d":"Débroussaillage","u":"m²","q":1600,"pu":100},{"k":4,"lot":"L2","n":"1.1.2","d":"Décapage de la terre végétale pour la plateforme","u":"m²","q":1600,"pu":150},{"k":5,"lot":"L2","n":"1.2","d":"Fouilles en rigole et en tranchée","u":"m³","q":69.7,"pu":2000},{"k":6,"lot":"L2","n":"1.3.1","d":"Remblais des fouilles","u":"m³","q":36.86,"pu":1500},{"k":7,"lot":"L2","n":"1.3.2","d":"Remblais compactés sous dallage (latérite)","u":"m³","q":96.53,"pu":3000},{"k":8,"lot":"L3","n":"2.1.1","d":"Béton de propreté ép. 5 cm dosé à 150 kg/m³","u":"m³","q":4.407,"pu":65000},{"k":9,"lot":"L3","n":"2.1.2a","d":"Béton de semelle filante ép. 20 cm dosé à 350 kg/m³ – béton","u":"m³","q":14.514,"pu":85000},{"k":10,"lot":"L3","n":"2.1.2b","d":"Béton de semelle filante – acier HA","u":"kg","q":435.42,"pu":1000},{"k":11,"lot":"L3","n":"2.1.2c","d":"Semelles isolées dosé à 350 kg/m³ – béton","u":"m³","q":1.44,"pu":85000},{"k":12,"lot":"L3","n":"2.1.2d","d":"Semelles isolées – acier HA","u":"kg","q":57.6,"pu":1000},{"k":13,"lot":"L3","n":"2.2.1","d":"Murs de soubassement en agglos pleins de 15 cm","u":"m²","q":103.39,"pu":12000},{"k":14,"lot":"L3","n":"2.2.2.1a","d":"Amorces de poteaux et raidisseurs BA 350 – béton","u":"m³","q":1.164,"pu":85000},{"k":15,"lot":"L3","n":"2.2.2.1b","d":"Amorces de poteaux et raidisseurs – acier","u":"kg","q":131.2,"pu":1000},{"k":16,"lot":"L3","n":"2.2.2.1c","d":"Amorces de poteaux et raidisseurs – coffrage","u":"m²","q":18.03,"pu":2000},{"k":17,"lot":"L3","n":"2.2.2.2a","d":"Chaînage bas BA 350 – béton","u":"m³","q":3.63,"pu":85000},{"k":18,"lot":"L3","n":"2.2.2.2b","d":"Chaînage bas – acier","u":"kg","q":260.3,"pu":1000},{"k":19,"lot":"L3","n":"2.2.2.2c","d":"Chaînage bas – coffrage","u":"m²","q":57.84,"pu":2000},{"k":20,"lot":"L3","n":"2.2.2.3a","d":"Dallage BA ép. 10 cm avec chape incorporée y/c treillis soudé","u":"m²","q":417.48,"pu":11000},{"k":21,"lot":"L3","n":"2.2.2.3b","d":"Fourniture et pose film polyane","u":"m²","q":417.48,"pu":650},{"k":22,"lot":"L3","n":"2.3.1","d":"Murs en élévation en agglos creux de 15 cm","u":"m²","q":493.8,"pu":9500},{"k":23,"lot":"L3","n":"2.3.2.1a","d":"Poteaux et raidisseurs BA 350 – béton","u":"m³","q":4.44,"pu":85000},{"k":24,"lot":"L3","n":"2.3.2.1b","d":"Poteaux et raidisseurs – acier","u":"kg","q":355.2,"pu":1000},{"k":25,"lot":"L3","n":"2.3.2.1c","d":"Poteaux et raidisseurs – coffrage","u":"m²","q":78.38,"pu":2000},{"k":26,"lot":"L3","n":"2.3.2.2a","d":"Chaînage haut BA 350 – béton","u":"m³","q":7.446,"pu":85000},{"k":27,"lot":"L3","n":"2.3.2.2b","d":"Chaînage haut – acier","u":"kg","q":446.76,"pu":1000},{"k":28,"lot":"L3","n":"2.3.2.2c","d":"Chaînage haut – coffrage","u":"m²","q":106.36,"pu":2000},{"k":29,"lot":"L3","n":"2.5","d":"Enduit sur murs extérieurs et intérieurs dosé à 300 kg/m³","u":"m²","q":654.93,"pu":2400},{"k":30,"lot":"L3","n":"2.7.2","d":"Claustras (épaisseur 15 cm)","u":"m²","q":3.6,"pu":14000},{"k":31,"lot":"L3","n":"2.7.3","d":"Dalle pleine ép. 10 cm étal-passaille","u":"m²","q":136.69,"pu":11000},{"k":32,"lot":"L4","n":"6.1.1","d":"Porte métallique 120×220 y/c cadenas","u":"u","q":2,"pu":145000},{"k":33,"lot":"L4","n":"6.1.2","d":"Porte métallique 100×220 y/c cadenas","u":"u","q":3,"pu":135000},{"k":34,"lot":"L4","n":"6.1.3","d":"Porte métallique 90×220 y/c cadenas","u":"u","q":1,"pu":125000},{"k":35,"lot":"L4","n":"6.1.4","d":"Fenêtre métallique type naco 120×120","u":"u","q":3,"pu":120000},{"k":36,"lot":"L5","n":"7.1","d":"Branchement ordinaire SODECI y/c raccordement","u":"fft","q":1,"pu":450000},{"k":37,"lot":"L5","n":"7.2","d":"Tuyau PVC évacuation Ø75","u":"ml","q":10,"pu":5000},{"k":38,"lot":"L5","n":"7.3","d":"Tuyau PVC pression alimentation eau potable Ø25","u":"ml","q":30,"pu":1500},{"k":39,"lot":"L5","n":"7.4","d":"Robinet de puisage 15/21","u":"u","q":2,"pu":8000},{"k":40,"lot":"L5","n":"7.5","d":"Robinet d’arrêt 15×21","u":"u","q":1,"pu":7000},{"k":41,"lot":"L5","n":"7.6","d":"Regard de visite en agglos pleins 50×50×50","u":"u","q":1,"pu":35000},{"k":42,"lot":"L5","n":"7.7","d":"Puits perdu 4 à 10 usagers","u":"u","q":1,"pu":425000},{"k":43,"lot":"L5","n":"7.8","d":"Ensemble évier une cuve inox à encastrer","u":"u","q":2,"pu":65000},{"k":44,"lot":"L5","n":"7.9","d":"Siphon de sol plastique","u":"u","q":1,"pu":5000},{"k":45,"lot":"L6","n":"10.1.1","d":"Exécution d’une mise à la terre","u":"ens","q":1,"pu":80000},{"k":46,"lot":"L6","n":"10.1.4","d":"Niche 1,20×1,80×0,60","u":"u","q":1,"pu":80000},{"k":47,"lot":"L6","n":"10.2.1","d":"Tableau général (coupe-circuit 10A, disjoncteur 5-10A, accessoires)","u":"u","q":1,"pu":250000},{"k":48,"lot":"L6","n":"10.3.1.1","d":"Fil H07V-U 3×1,5 mm² sous tube ICD Ø11","u":"ml","q":200,"pu":1500},{"k":49,"lot":"L6","n":"10.3.1.2","d":"Fil H07V-U 3×2,5 mm² sous tube ICD Ø11","u":"ml","q":200,"pu":2000},{"k":50,"lot":"L6","n":"10.3.1.3","d":"Câble VGV 3×1,5 mm²","u":"ml","q":100,"pu":2000},{"k":51,"lot":"L6","n":"10.4.1","d":"Interrupteur SA","u":"u","q":8,"pu":3000},{"k":52,"lot":"L6","n":"10.4.2","d":"Interrupteur VV double","u":"u","q":2,"pu":5000},{"k":53,"lot":"L6","n":"10.4.3","d":"PC 10/16A 2P+T","u":"u","q":3,"pu":7000},{"k":54,"lot":"L6","n":"10.4.4","d":"PC 10/16A 2P+T étanche","u":"u","q":3,"pu":8000},{"k":55,"lot":"L6","n":"10.5.2","d":"Réglette LED 1,20 m","u":"u","q":24,"pu":15000},{"k":56,"lot":"L6","n":"10.5.3","d":"Réglette étanche 1,20 m éclairage extérieur","u":"u","q":7,"pu":18000},{"k":57,"lot":"L6","n":"10.6","d":"Contrôle, vérification + attestation SECUREL","u":"ens","q":1,"pu":350000},{"k":58,"lot":"L7","n":"14.1","d":"Carreaux antidérapants grès cérame type importé","u":"m²","q":22.26,"pu":22000},{"k":59,"lot":"L7","n":"14.2","d":"Carreaux faïence type importé","u":"m²","q":9.69,"pu":20000},{"k":60,"lot":"L8","n":"17.1.2","d":"Faux plafond contreplaqué 8 mm y/c ossature","u":"m²","q":465.24,"pu":11000},{"k":61,"lot":"L9","n":"18.1.1","d":"Brossage et égrainage murs et béton","u":"m²","q":654.93,"pu":200},{"k":62,"lot":"L9","n":"18.2.2.1","d":"2 couches peinture vinylique murs int. et ext.","u":"m²","q":681.4,"pu":2400},{"k":63,"lot":"L9","n":"18.3.1","d":"Peinture vinylique sur faux plafond","u":"m²","q":465.24,"pu":2400},{"k":64,"lot":"L9","n":"18.4.1.1","d":"Peinture glycéro sur portes métalliques","u":"m²","q":30.56,"pu":2400},{"k":65,"lot":"L10","n":"19.1.1","d":"Charpente en bois rouge non assemblé","u":"m³","q":4.705,"pu":475000},{"k":66,"lot":"L11","n":"20.1","d":"Tôle bac aluzinc y/c accessoires","u":"m²","q":501.16,"pu":10500},{"k":67,"lot":"L11","n":"20.2","d":"Faîtière y/c accessoires","u":"ml","q":26.9,"pu":9500},{"k":68,"lot":"L11","n":"20.3","d":"Bardage en tôle bac aluzinc","u":"m²","q":34.2,"pu":8500},{"k":69,"lot":"L12","n":"1.1","d":"Fouille en rigoles","u":"m³","q":8.28,"pu":2000},{"k":70,"lot":"L12","n":"1.2","d":"Fouille en excavation (fosse sèche)","u":"m³","q":31.01,"pu":5000},{"k":71,"lot":"L12","n":"1.3","d":"Remblai des fouilles","u":"m³","q":8.27,"pu":1500},{"k":72,"lot":"L12","n":"1.4","d":"Évacuation des terres","u":"m³","q":31.33,"pu":1500},{"k":73,"lot":"L13","n":"2.1.1","d":"Béton de semelle ép. 0,15 dosé 350 kg/m³ (gravier concassé local)","u":"m³","q":2.06,"pu":85000},{"k":74,"lot":"L13","n":"2.1.2","d":"Murs de soubassement en agglos 15 pleins","u":"m²","q":58.88,"pu":12000},{"k":75,"lot":"L13","n":"2.1.3.1","d":"Raidisseurs – béton 350","u":"m³","q":0.39,"pu":85000},{"k":76,"lot":"L13","n":"2.1.3.2","d":"Raidisseurs – coffrage","u":"m²","q":4.89,"pu":2000},{"k":77,"lot":"L13","n":"2.1.3.3","d":"Raidisseurs – acier","u":"kg","q":27.41,"pu":1000},{"k":78,"lot":"L13","n":"2.1.4.1","d":"Chaînages bas – béton 350","u":"m³","q":1.08,"pu":85000},{"k":79,"lot":"L13","n":"2.1.4.2","d":"Chaînages bas – coffrage","u":"m²","q":10.3,"pu":2000},{"k":80,"lot":"L13","n":"2.1.4.3","d":"Chaînages bas – acier","u":"kg","q":75.81,"pu":1000},{"k":81,"lot":"L13","n":"2.1.5.1","d":"Poutre – béton 350","u":"m³","q":0.16,"pu":85000},{"k":82,"lot":"L13","n":"2.1.5.2","d":"Poutre – coffrage","u":"m²","q":2.27,"pu":2000},{"k":83,"lot":"L13","n":"2.1.5.3","d":"Poutre – acier","u":"kg","q":11.45,"pu":1000},{"k":84,"lot":"L13","n":"2.1.6.1","d":"Dallettes – béton 350 (y/c coffrage)","u":"m³","q":1.19,"pu":85000},{"k":85,"lot":"L13","n":"2.1.6.2","d":"Dallettes – acier","u":"kg","q":83.62,"pu":1000},{"k":86,"lot":"L13","n":"2.1.7","d":"Dallage BA ép. 10 cm chape incorporée y/c treillis soudé","u":"m²","q":11.99,"pu":11000},{"k":87,"lot":"L13","n":"2.2.1.1","d":"Mur en agglos creux de 15 cm","u":"m²","q":58.79,"pu":9500},{"k":88,"lot":"L13","n":"2.2.1.2","d":"Enduits intérieurs et extérieurs","u":"m²","q":117.58,"pu":2400},{"k":89,"lot":"L13","n":"2.2.1.4","d":"Claustras type boîte à lettres","u":"m²","q":1.8,"pu":14000},{"k":90,"lot":"L14","n":"3.1","d":"Tuyau d’aération PVC Ø110 muni de nylon","u":"ml","q":15.5,"pu":10000},{"k":91,"lot":"L14","n":"3.2","d":"Tés et coudes Ø110 y/c colliers","u":"u","q":12,"pu":12000},{"k":92,"lot":"L14","n":"3.3","d":"WC turc type local y/c sujétions","u":"u","q":4,"pu":65000},{"k":93,"lot":"L15","n":"4.1","d":"Portes métalliques avec imposte grillage anti-mouche + crochets + cadenas","u":"u","q":4,"pu":140000},{"k":94,"lot":"L15","n":"4.2","d":"Tubes métalliques d’appui pour handicapés","u":"u","q":4,"pu":25000},{"k":95,"lot":"L16","n":"5.1","d":"Carreaux grès cérame pour dalle de défécation","u":"m²","q":5.76,"pu":10000},{"k":96,"lot":"L16","n":"5.2","d":"Faïence sur murs intérieurs des cabines (h = 1,00 m)","u":"m²","q":16.4,"pu":7000},{"k":97,"lot":"L17","n":"6.1","d":"Charpente en bois rouge non assemblée","u":"m³","q":0.25,"pu":425000},{"k":98,"lot":"L17","n":"6.2","d":"Tôle ondulée y/c pastillage sur tire-fonds","u":"m²","q":27.28,"pu":9000},{"k":99,"lot":"L17","n":"6.3","d":"Bardage en tôle ondulée","u":"m²","q":5.88,"pu":9000},{"k":100,"lot":"L18","n":"7.1","d":"Peinture vinylique murs intérieurs et extérieurs","u":"m²","q":117.58,"pu":2400},{"k":101,"lot":"L18","n":"7.2","d":"Peinture glycéro sur menuiseries métalliques et bois","u":"m²","q":9.24,"pu":2400},{"k":102,"lot":"L19","n":"8.1","d":"Fouille en rigole","u":"m³","q":0.11,"pu":2000},{"k":103,"lot":"L19","n":"8.2","d":"Béton de dalle et marche","u":"m³","q":0.05,"pu":85000},{"k":104,"lot":"L19","n":"8.3","d":"Agglos 15 pleins","u":"m²","q":5.38,"pu":12000},{"k":105,"lot":"L19","n":"8.4","d":"Remblai de socle","u":"m³","q":0.22,"pu":1500},{"k":106,"lot":"L19","n":"8.5","d":"Gros béton","u":"m³","q":0.02,"pu":85000},{"k":107,"lot":"L19","n":"8.6","d":"Enduit ordinaire","u":"m²","q":5.38,"pu":2400},{"k":108,"lot":"L19","n":"8.7","d":"Couverture métallique + cadre + système de condamnation à cadenas","u":"u","q":1,"pu":125000},{"k":109,"lot":"L19","n":"8.8","d":"Remplissage du drain avec gravier","u":"m³","q":0.06,"pu":60000},{"k":110,"lot":"L19","n":"8.9","d":"Peinture à huile type Deluxe mur extérieur (marron foncé)","u":"m²","q":5.38,"pu":12000},{"k":111,"lot":"L19","n":"8.10","d":"Fût plastique à eau 200 L y/c sujétions","u":"u","q":1,"pu":350000}]},"report":{"source":"excel","sheets":["DQE"],"rowsRead":160,"itemsFound":111,"lotsFound":19,"lotStrategy":"titres","declaredTotal":49053257,"warnings":[]}}</script>
+<script type="application/json" id="embedded-dqe">null</script>
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const F=n=>Math.round(n).toLocaleString("fr-FR").replace(/[  ]/g," ");
+const Q=n=>(Math.round(n*1000)/1000).toLocaleString("fr-FR",{maximumFractionDigits:3}).replace(/[  ]/g," ");
+const P1=n=>n.toFixed(1).replace(".",",");
+const todayISO=()=>{const n=new Date();return n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0");};
+const fD=s=>{if(!s)return"";const[y,m,d]=s.split("-");return d+"/"+m+"/"+y.slice(2);};
+const clone=o=>JSON.parse(JSON.stringify(o));
+const mt=i=>Math.round((+i.q||0)*(+i.pu||0));
+const newId=()=>"d"+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const CAT=k=>DQE.categoryByKey(k);
+const STRAT={titres:"à partir des titres de lots du document",numerotation:"à partir de la numérotation des prix (pas de titres de lots dans le document)","mots-cles":"par reconnaissance des désignations (ni titres de lots ni numérotation dans le document)"};
+
+/* ── Stockage : base privée de l'utilisateur, sinon cet appareil ── */
+const LS="dqe-lots-suivi-v1";
+const store={mode:"memory",col:null,
+  lsGet(){try{return JSON.parse(localStorage.getItem(LS)||"null")||{};}catch(e){return null;}},
+  lsSet(o){try{localStorage.setItem(LS,JSON.stringify(o));return true;}catch(e){return false;}},
+  async list(){
+    if(this.mode==="db"){const s=await this.col.get();return s.docs.map(d=>Object.assign({id:d.id},d.data()));}
+    const o=this.lsGet(); if(o===null){return[];} this.mode="local"; return Object.keys(o).map(id=>Object.assign({id},o[id]));
+  },
+  async put(rec){
+    const body={name:rec.name,fileName:rec.fileName,updatedAt:Date.now(),data:rec.data};
+    if(this.mode==="db"){
+      if(JSON.stringify(body).length>250000) throw {code:"too_big"};
+      await this.col.doc(rec.id).set(body); return "en ligne";
+    }
+    const o=this.lsGet(); if(o===null) throw {code:"no_storage"};
+    o[rec.id]=body; if(!this.lsSet(o)) throw {code:"no_storage"}; this.mode="local"; return "sur cet appareil";
+  },
+  async del(id){
+    if(this.mode==="db"){await this.col.doc(id).delete();return;}
+    const o=this.lsGet(); if(o){delete o[id]; this.lsSet(o);}
+  }
+};
+
+let LIB=[];           // [{id,name,fileName,updatedAt,data}]
+let CUR=null;         // DQE affiché
+let EXAMPLE=null;
+let downloads=null;
+let collapsed={}, onlyRun=false, site="", query="", openDesc=true, armed=null, lastMsg="", saveState="";
+
+try{EXAMPLE=JSON.parse(document.getElementById("example-data").textContent);}catch(e){}
+function exampleRec(){return{id:"__exemple__",example:true,name:"Exemple : Marché de volailles Bouna",fileName:"DQE_Marche_Volaille_Bouna.xlsx",data:clone(EXAMPLE)};}
+
+/* ── Lecture des fichiers ─────────────────────────────── */
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.onload=res;s.onerror=()=>{s.remove();rej(userError("Le module de lecture n'a pas pu être chargé. Vérifiez votre connexion internet puis réessayez."));};document.head.appendChild(s);});}
+let xlsxReady=null,pdfReady=null,docxReady=null;
+const needXlsx=()=>xlsxReady||(xlsxReady=loadScript("https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"));
+const needPdf=()=>pdfReady||(pdfReady=loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js").then(()=>loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js")).then(()=>{window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";}));
+const needDocx=()=>docxReady||(docxReady=loadScript("https://cdn.jsdelivr.net/npm/docx@9.5.1/dist/index.iife.js"));
+
+function userError(msg){const e=new Error(msg);e.user=true;return e;}
+
+async function readExcel(buf){
+  await needXlsx();
+  let wb; try{wb=XLSX.read(new Uint8Array(buf),{type:"array",cellDates:false});}catch(e){throw userError("Fichier Excel illisible ou protégé par mot de passe.");}
+  const meta=(wb.Workbook&&wb.Workbook.Sheets)||[];
+  const sheets=[];
+  wb.SheetNames.forEach((n,i)=>{
+    if(meta[i]&&meta[i].Hidden) return;
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:true}).slice(0,5000)
+      .map(r=>r.slice(0,30).map(v=>typeof v==="number"||typeof v==="string"?v:null));
+    sheets.push({name:n,rows});
+  });
+  if(!sheets.length) throw userError("Le classeur ne contient aucune feuille visible.");
+  return sheets;
+}
+function readCsv(text){
+  const clean=text.replace(/^﻿/,""); const first=clean.split(/\r?\n/,1)[0]||"";
+  const sep=(first.match(/;/g)||[]).length>=(first.match(/,/g)||[]).length?";":(first.includes("\t")?"\t":",");
+  const rows=[];let row=[],cur="",inQ=false;
+  for(let i=0;i<clean.length;i++){const ch=clean[i];
+    if(inQ){if(ch==='"'&&clean[i+1]==='"'){cur+='"';i++;}else if(ch==='"')inQ=false;else cur+=ch;}
+    else if(ch==='"')inQ=true; else if(ch===sep){row.push(cur);cur="";}
+    else if(ch==="\n"||ch==="\r"){if(ch==="\r"&&clean[i+1]==="\n")i++;row.push(cur);rows.push(row);row=[];cur="";}
+    else cur+=ch;}
+  if(cur||row.length){row.push(cur);rows.push(row);}
+  return [{name:"CSV",rows}];
+}
+async function readPdf(buf){
+  await needPdf();
+  let doc; try{doc=await pdfjsLib.getDocument({data:new Uint8Array(buf),isEvalSupported:false}).promise;}catch(e){throw userError("PDF illisible ou protégé.");}
+  const rows=[];let chars=0;
+  for(let pn=1;pn<=doc.numPages;pn++){
+    const page=await doc.getPage(pn); const tc=await page.getTextContent();
+    const list=tc.items.filter(i=>i.str&&i.str.trim()).map(i=>({str:i.str,x:i.transform[4],y:i.transform[5],width:i.width,fs:Math.hypot(i.transform[2],i.transform[3])||i.height||10}));
+    chars+=list.reduce((s,i)=>s+i.str.trim().length,0);
+    list.sort((a,b)=>b.y-a.y||a.x-b.x);
+    const lines=[];
+    for(const it of list){const tol=Math.max(2,it.fs*0.45);const ln=lines.find(l=>Math.abs(l[0].y-it.y)<=tol);if(ln)ln.push(it);else lines.push([it]);}
+    lines.sort((a,b)=>b[0].y-a[0].y);
+    for(const ln of lines){ln.sort((a,b)=>a.x-b.x);const cells=[];let cur="",lastEnd=-Infinity;
+      for(const it of ln){const gap=it.x-lastEnd;if(cur&&gap>it.fs*0.9){cells.push(cur.trim());cur="";}cur+=(cur&&gap>it.fs*0.15?" ":"")+it.str;lastEnd=it.x+it.width;}
+      if(cur.trim())cells.push(cur.trim()); rows.push(cells);}
+  }
+  if(chars<40) throw userError("Ce PDF ne contient pas de texte (document scanné). Importez la version Excel du DQE ou un PDF généré depuis Excel ou Word.");
+  return [{name:"PDF",rows,layout:"free"}];
+}
+async function analyse(file){
+  try{return await analyseInner(file);}catch(e){if(/module de lecture/.test(e.message||"")){xlsxReady=pdfReady=null;}throw e;}
+}
+async function analyseInner(file){
+  const buf=await file.arrayBuffer(); const h=new Uint8Array(buf.slice(0,4)); const ext=(file.name.split(".").pop()||"").toLowerCase();
+  if((h[0]===0x25&&h[1]===0x50&&h[2]===0x44&&h[3]===0x46)||ext==="pdf") return DQE.parseDqe(await readPdf(buf),"pdf");
+  if(ext==="csv"||ext==="txt") return DQE.parseDqe(readCsv(new TextDecoder("utf-8").decode(buf)),"csv");
+  if((h[0]===0x50&&h[1]===0x4b)||(h[0]===0xd0&&h[1]===0xcf)||/^xls/.test(ext)) return DQE.parseDqe(await readExcel(buf),"excel");
+  throw userError("Format non pris en charge. Importez un fichier Excel (.xlsx, .xls), CSV ou PDF.");
+}
+
+function importMsg(html,cls){const m=$("#importMsg");m.hidden=!html;m.className=cls||"";m.innerHTML=html||"";}
+async function handleFile(file){
+  if(!file) return;
+  if(file.size>15*1024*1024){importMsg("Fichier trop volumineux (15 Mo maximum).","err");return;}
+  importMsg('<div class="busy"><span class="spin"></span>Analyse de « '+esc(file.name)+' »…</div>');
+  try{
+    const data=await analyse(file);
+    if(!data.items.length){importMsg("<b>Aucun article de DQE reconnu dans ce fichier.</b> Le tableau doit comporter au minimum une désignation, une unité, une quantité et un prix unitaire."+(data.report.warnings.length?"<br><span class='small'>"+data.report.warnings.map(esc).join("<br>")+"</span>":""),"err");return;}
+    data.suivi=todayISO();
+    const rec={id:newId(),name:file.name.replace(/\.[^.]+$/,"").replace(/_+/g," "),fileName:file.name,data};
+    LIB.unshift(rec); CUR=rec; collapsed={}; site=""; query=""; onlyRun=false;
+    importMsg("");
+    lastMsg="<b>DQE importé.</b> Vérifiez la description des lots ci-dessous ; noms et corps d'état sont modifiables.";
+    renderLib(); render(); persist(true);
+    document.getElementById("app").scrollIntoView({behavior:"smooth",block:"start"});
+  }catch(e){
+    console.error(e);
+    importMsg(esc(e&&e.user?e.message:"Lecture du fichier impossible. Vérifiez qu'il s'agit bien d'un DQE au format Excel ou PDF."),"err");
+  }
+}
+$("#file").addEventListener("change",e=>{handleFile(e.target.files[0]);e.target.value="";});
+const drop=$("#drop");
+drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("over");});
+drop.addEventListener("dragleave",()=>drop.classList.remove("over"));
+drop.addEventListener("drop",e=>{e.preventDefault();drop.classList.remove("over");handleFile(e.dataTransfer.files[0]);});
+
+/* ── Enregistrement ──────────────────────────────────── */
+let saveTimer=null,saving=false,again=false;
+function persist(now){
+  if(!CUR||CUR.example){return;}
+  saveState="Modifications en cours d'enregistrement…"; paintStatus();
+  clearTimeout(saveTimer); saveTimer=setTimeout(doSave,now?0:800);
+}
+async function doSave(){
+  if(saving){again=true;return;} saving=true;
+  const rec=CUR;
+  try{const where=await store.put(rec); saveState="Enregistré "+where;}
+  catch(e){saveState=e&&e.code==="too_big"?"DQE trop volumineux pour l'enregistrement en ligne : utilisez l'export Excel pour le conserver.":e&&e.code==="no_storage"?"Enregistrement impossible dans ce navigateur : utilisez l'export Excel pour conserver vos saisies.":"Échec de l'enregistrement. Réessayez dans un instant.";}
+  saving=false; paintStatus(); if(again){again=false;doSave();}
+}
+function paintStatus(){const s=$("#st");if(s)s.innerHTML=(saveState?"<b>"+esc(saveState)+"</b>":"")+(lastMsg?" · "+lastMsg:"");}
+
+/* ── Bibliothèque ────────────────────────────────────── */
+function renderLib(){
+  const sel=$("#libSel");
+  let o=LIB.map(r=>'<option value="'+esc(r.id)+'"'+(CUR&&CUR.id===r.id?" selected":"")+">"+esc(r.name)+"</option>").join("");
+  o+='<option value="__exemple__"'+(CUR&&CUR.example?" selected":"")+">Exemple : Marché de volailles Bouna</option>";
+  sel.innerHTML=o;
+  $("#delDqe").hidden=!CUR||CUR.example;
+  $("#delDqe").textContent="Supprimer ce DQE"; $("#delDqe").classList.remove("warn");
+}
+$("#libSel").addEventListener("change",e=>{
+  const id=e.target.value; CUR=id==="__exemple__"?exampleRec():LIB.find(r=>r.id===id); collapsed={};site="";query="";lastMsg="";saveState="";renderLib();render();
+});
+let delArmed=false;
+$("#delDqe").addEventListener("click",async e=>{
+  const b=e.currentTarget; if(!CUR||CUR.example) return;
+  if(!delArmed){delArmed=true;b.textContent="Confirmer la suppression définitive ?";b.classList.add("warn");setTimeout(()=>{delArmed=false;renderLib();},4000);return;}
+  delArmed=false; const id=CUR.id;
+  try{await store.del(id);}catch(err){}
+  LIB=LIB.filter(r=>r.id!==id); CUR=LIB[0]||exampleRec(); lastMsg="DQE supprimé."; renderLib(); render();
+});
+
+/* ── Calculs ─────────────────────────────────────────── */
+function D(){return CUR.data;}
+function execQ(k,upto){return D().att.filter(a=>a.k===k&&(!upto||a.d<=upto)).reduce((s,a)=>s+(+a.q||0),0);}
+function lotOf(i){return D().lots.find(l=>l.id===i.lot);}
+function inSite(i){const l=lotOf(i);return !!l&&(!site||l.site===site);}
+function totals(){const up=D().suivi;let ht=0,ex=0,n=0,done=0;
+  D().items.forEach(i=>{if(!inSite(i))return;const e=execQ(i.k,up);ht+=mt(i);ex+=Math.min(e,Math.max(+i.q||0,0))*(+i.pu||0);n++;if(+i.q>0&&e>=+i.q)done++;});
+  const o=D().orig;const orig=o.items.filter(i=>{const l=o.lots.find(x=>x.id===i.lot);return l&&(!site||l.site===site);}).reduce((s,i)=>s+mt(i),0);
+  return{ht,ex,n,done,diff:ht-orig};}
+const siteName=id=>(D().sites.find(s=>s.id===id)||{}).name||"";
+
+/* ── Rendu ───────────────────────────────────────────── */
+function render(){
+  const app=$("#app"); if(!CUR){app.innerHTML="";return;}
+  const d=D(); if(!d.suivi) d.suivi=todayISO();
+  const r=d.report, T=totals(), up=d.suivi, tva=d.tva;
+  const pct=T.ht?T.ex/T.ht*100:0;
+  let h="";
+  h+='<section class="report'+(CUR.example?" example":"")+'">'+
+    (CUR.example?'<div class="eyebrow">Exemple chargé</div><b>Ceci est votre DQE de Bouna analysé en démonstration.</b> Importez votre propre DQE ci-dessus pour commencer ; vos saisies sur l\'exemple ne sont pas enregistrées.<br>':"")+
+    "<b>Analyse automatique : "+d.sites.length+" ouvrage"+(d.sites.length>1?"s":"")+", "+d.lots.length+" lots, "+d.items.length+" articles reconnus ("+(r.source==="pdf"?"PDF":r.source==="csv"?"CSV":"Excel")+").</b> "+
+    "Lots constitués "+(STRAT[r.lotStrategy]||"")+"."+(r.declaredTotal?" Total HT indiqué dans le document : "+F(r.declaredTotal)+" F.":"")+
+    (r.warnings.length?"<ul>"+r.warnings.map(w=>"<li>"+esc(w)+"</li>").join("")+"</ul>":"")+"</section>";
+
+  h+='<section class="panel" style="display:grid;gap:12px">'+
+    '<div class="title-row"><input class="name" id="dqeName" value="'+esc(CUR.name)+'" aria-label="Nom du marché"'+(CUR.example?" readonly":"")+'><span class="muted small">Fichier source : '+esc(CUR.fileName)+'</span></div>'+
+    '<div class="tools">'+
+      '<label class="field" for="site">Ouvrage<select id="site"><option value="">Tout le marché</option>'+d.sites.map(s=>'<option value="'+s.id+'"'+(site===s.id?" selected":"")+">"+esc(s.name)+"</option>").join("")+'</select></label>'+
+      '<label class="field" for="suivi">Situation au<input type="date" id="suivi" value="'+up+'"></label>'+
+      '<label class="field grow" for="q">Rechercher<input type="search" id="q" placeholder="N° ou désignation" value="'+esc(query)+'"></label>'+
+      '<button type="button" class="btn'+(onlyRun?" on":"")+'" id="onlyRun">Articles en cours seulement</button>'+
+      '<button type="button" class="btn" id="html">Télécharger la page (.html)</button>'+
+      '<button type="button" class="btn" id="csv">Exporter vers Excel (.csv)</button>'+
+      '<button type="button" class="btn" id="docx">Description des lots (Word)</button>'+
+      '<button type="button" class="btn'+(armed==="reset"?" warn":"")+'" id="reset">'+(armed==="reset"?"Confirmer : tout effacer (DQE + saisies) ?":"Revenir au DQE d'origine")+'</button>'+
+      '<div class="status" id="st"></div>'+
+    '</div></section>';
+
+  h+='<section class="kpis">'+
+    '<div class="kpi main"><span class="l">Montant total HT</span><span class="v">'+F(T.ht)+'</span><span class="s">'+esc(site?siteName(site):"Tout le marché")+" · "+T.n+' articles</span></div>'+
+    '<div class="kpi"><span class="l">TVA '+Math.round(tva*100)+' %</span><span class="v">'+F(T.ht*tva)+'</span><span class="s">TTC '+F(T.ht*(1+tva))+'</span></div>'+
+    '<div class="kpi good"><span class="l">Réalisé HT au '+fD(up)+'</span><span class="v">'+F(T.ex)+'</span><div class="meter"><i style="width:'+Math.min(100,pct)+'%"></i></div><span class="s">'+P1(pct)+' % du montant</span></div>'+
+    '<div class="kpi"><span class="l">Reste à réaliser HT</span><span class="v">'+F(T.ht-T.ex)+'</span><span class="s">'+T.done+"/"+T.n+' articles soldés</span></div>'+
+    '<div class="kpi '+(T.diff>0?"bad":T.diff<0?"good":"")+'"><span class="l">Écart / DQE d\'origine</span><span class="v">'+(T.diff>0?"+":"")+F(T.diff)+'</span><span class="s">'+(T.diff?"après modifications":"aucune modification")+'</span></div>'+
+  '</section>';
+
+  // Description des lots
+  const desc=DQE.describeAll(d).filter(x=>{const l=d.lots.find(y=>y.id===x.lotId);return l&&(!site||l.site===site);});
+  const catOpts=k=>DQE.CATEGORIES.concat([CAT("divers")]).map(c=>'<option value="'+c.key+'"'+(c.key===k?" selected":"")+">"+esc(c.label)+"</option>").join("");
+  h+='<section class="panel"><div class="sec-head"><h2>Description automatique des lots</h2><button type="button" class="btn" id="tglDesc">'+(openDesc?"Replier":"Déplier")+'</button></div>'+
+    '<p class="muted small" style="margin:4px 0 0">Corps d\'état détecté, poids financier, quantités clés, ratios de contrôle et points de vigilance (BAEL / EC2, sols latéritiques, climat tropical). Le nom et le corps d\'état de chaque lot sont modifiables.</p>';
+  if(openDesc){
+    h+='<div class="cards">'+desc.map(x=>{const l=d.lots.find(y=>y.id===x.lotId);
+      return '<article class="card"><div class="hd"><input data-lotname="'+l.id+'" value="'+esc(l.name)+'" aria-label="Nom du lot"><span class="amt">'+F(x.amount)+' F</span></div>'+
+      '<div class="meta">'+(d.sites.length>1?"<span>"+esc(x.site)+" ·</span>":"")+'<select data-lotcat="'+l.id+'" aria-label="Corps d\'état">'+catOpts(l.category)+'</select><span>'+x.articles+" article"+(x.articles>1?"s":"")+" · "+P1(x.share*100)+' % du marché</span></div>'+
+      '<div class="share"><i style="width:'+Math.min(100,x.share*100)+'%"></i></div>'+
+      "<p>"+esc(x.summary)+"</p>"+
+      (x.quantities.length?"<p><b>Quantités clés :</b> "+esc(x.quantities.join(" · "))+"</p>":"")+
+      (x.mainItems.length>1?"<p><b>Principaux postes :</b> "+esc(x.mainItems.map(m=>(m.n?m.n+" ":"")+m.d+" ("+F(m.amount)+" F)").join(" ; "))+"</p>":"")+
+      x.ratios.map(t=>"<p><b>Contrôle :</b> "+esc(t)+"</p>").join("")+
+      '<p class="vig"><b>Vigilance :</b> '+esc(x.note)+"</p></article>";}).join("")+"</div>";
+  }
+  h+="</section>";
+
+  // Saisie + avancement
+  const sel=d.items.find(i=>i.k===formK)||d.items.find(inSite)||d.items[0]; formK=sel?sel.k:null;
+  let opts="";
+  d.sites.forEach(s=>{if(site&&site!==s.id)return;d.lots.filter(l=>l.site===s.id).forEach(l=>{const its=d.items.filter(i=>i.lot===l.id);if(!its.length)return;
+    opts+='<optgroup label="'+esc((d.sites.length>1?s.name+" · ":"")+l.name)+'">'+its.map(i=>{const done=+i.q>0&&execQ(i.k)>=+i.q;return '<option value="'+i.k+'"'+(i.k===formK?" selected":"")+">"+esc(i.n)+" – "+esc(i.d)+(done?" ✓":"")+"</option>";}).join("")+"</optgroup>";});});
+  h+='<div class="two"><section class="panel"><h2>Saisie des quantités exécutées</h2>'+
+    '<div class="att-grid"><label class="field" for="aDate">Date<input type="date" id="aDate" value="'+(aDate||up)+'"></label>'+
+    '<label class="field" for="aItem">Article du DQE<select id="aItem">'+opts+'</select></label></div>'+
+    '<div class="info" id="aInfo"></div>'+
+    '<div class="att-row"><label class="field q" for="aQ">Quantité exécutée <span id="aU"></span><input id="aQ" inputmode="decimal" autocomplete="off"></label>'+
+    '<button type="button" class="btn" id="aAll">Solder le reste</button>'+
+    '<label class="field o" for="aObs">Observation<input id="aObs" autocomplete="off"></label>'+
+    '<button type="button" class="btn pri" id="aSave">Enregistrer la quantité</button></div>'+
+    '<p class="muted small" style="margin:8px 0 0">Chaque saisie s\'ajoute au cumul de l\'article : % exécuté, montant réalisé, avancement par lot et situation se calculent seuls.</p></section>';
+  const rows=d.lots.filter(l=>!site||l.site===site).map(l=>{let ht=0,ex=0;d.items.filter(i=>i.lot===l.id).forEach(i=>{ht+=mt(i);ex+=Math.min(execQ(i.k,up),Math.max(+i.q||0,0))*(+i.pu||0);});return{l,ht,ex};});
+  const mx=Math.max(1,...rows.map(x=>x.ht));
+  const short=id=>siteName(id).replace(/^\d+\.\s*/,"").split(/\s+/).slice(0,2).join(" ");
+  h+='<section class="panel"><h2>Avancement par lot</h2><p class="muted small" style="margin:2px 0 0">montant exécuté / montant DQE · longueur de barre = poids du lot</p><div class="lots">'+
+    rows.map(x=>'<div class="lb"><span class="nm" title="'+esc(x.l.name)+'">'+(d.sites.length>1?"<small>"+esc(short(x.l.site))+" · </small>":"")+esc(x.l.name)+'</span><span class="track" style="width:'+Math.max(6,x.ht/mx*100)+'%" title="'+F(x.ex)+" / "+F(x.ht)+'"><i style="width:'+(x.ht?Math.min(100,x.ex/x.ht*100):0)+'%"></i></span><span class="v">'+(x.ht?Math.round(x.ex/x.ht*100):0)+" % · "+F(x.ht/1000)+" k</span></div>").join("")+
+    "</div></section></div>";
+
+  // Courbe + journal
+  const attTot=d.att.reduce((s,a)=>{const i=d.items.find(x=>x.k===a.k);return s+(i?a.q*i.pu:0);},0);
+  h+='<div class="two"><section class="panel"><div class="sec-head"><h2>Montant réalisé cumulé</h2><span class="muted small">'+F(T.ht)+' F HT</span></div>'+curve(T.ht)+'</section>'+
+    '<section class="panel"><div class="sec-head"><h2>Journal des attachements</h2><span class="muted small">'+d.att.length+" saisie"+(d.att.length>1?"s":"")+" · "+F(attTot)+' F HT</span></div><div class="jr"><table class="tbl"><thead><tr><th>Date</th><th>Article</th><th class="r">Quantité</th><th class="r">Montant</th><th>Observation</th><th></th></tr></thead><tbody>'+
+    (d.att.length?[...d.att.keys()].reverse().map(ix=>{const a=d.att[ix];const i=d.items.find(x=>x.k===a.k);
+      return "<tr><td>"+fD(a.d)+"</td><td>"+(i?esc(i.n)+" – "+esc(i.d):"(article supprimé)")+'</td><td class="r">'+Q(+a.q)+" "+(i?esc(i.u):"")+'</td><td class="r">'+(i?F(a.q*i.pu):"")+"</td><td>"+esc(a.o||"")+'</td><td class="r"><button type="button" class="x'+(armed==="att"+ix?" warn":"")+'" data-adel="'+ix+'" aria-label="Supprimer cette saisie">'+(armed==="att"+ix?"Suppr. ?":"✕")+"</button></td></tr>";}).join("")
+    :'<tr><td colspan="6" class="muted">Aucune quantité saisie. Choisissez un article, indiquez la quantité exécutée du jour et cliquez « Enregistrer la quantité ».</td></tr>')+
+    "</tbody></table></div></section></div>";
+
+  // DQE complet
+  const qs=query.trim().toLowerCase(); const OBY={}; d.orig.items.forEach(i=>OBY[i.k]=i);
+  let t='<thead><tr><th>N°</th><th>Désignation des ouvrages</th><th>U</th><th class="r">Quantité</th><th class="r">P.U.</th><th class="r">Montant HT</th><th class="r">Qté exécutée</th><th>% exéc.</th><th class="r">Montant réalisé</th><th class="r">Reste HT</th><th></th></tr></thead><tbody>';
+  let gHT=0,gEX=0;
+  d.sites.forEach(s=>{if(site&&site!==s.id)return;let sHT=0,sEX=0;
+    if(d.sites.length>1)t+='<tr class="site"><td colspan="11">'+esc(s.name)+"</td></tr>";
+    d.lots.filter(l=>l.site===s.id).forEach(l=>{const its=d.items.filter(i=>i.lot===l.id);let lHT=0,lEX=0,rowsH="",lastSec;
+      its.forEach(i=>{const e=execQ(i.k,up),m=mt(i),ex=Math.min(e,Math.max(+i.q||0,0))*(+i.pu||0);lHT+=m;lEX+=ex;
+        if(qs&&!(i.d.toLowerCase().includes(qs)||String(i.n).toLowerCase().includes(qs)))return;
+        if(onlyRun&&!(e>0&&e<+i.q))return;
+        const p=+i.q>0?e/+i.q*100:0,o=OBY[i.k];
+        if(i.sec&&i.sec!==lastSec)rowsH+='<tr class="secrow"><td></td><td colspan="10">'+esc(i.sec)+"</td></tr>"; lastSec=i.sec;
+        rowsH+='<tr><td class="num">'+esc(i.n)+'</td><td><input class="d" id="d'+i.k+'" data-k="'+i.k+'" data-f="d" value="'+esc(i.d)+'" aria-label="Désignation '+esc(i.n)+'"></td>'+
+          '<td><input class="u" id="u'+i.k+'" data-k="'+i.k+'" data-f="u" value="'+esc(i.u)+'" aria-label="Unité '+esc(i.n)+'"></td>'+
+          '<td class="r"><input class="q'+(o&&+o.q!==+i.q?" chg":"")+'" id="q'+i.k+'" data-k="'+i.k+'" data-f="q" inputmode="decimal" value="'+i.q+'" aria-label="Quantité '+esc(i.n)+'"></td>'+
+          '<td class="r"><input class="p'+(o&&+o.pu!==+i.pu?" chg":"")+'" id="p'+i.k+'" data-k="'+i.k+'" data-f="pu" inputmode="decimal" value="'+i.pu+'" aria-label="Prix unitaire '+esc(i.n)+'"></td>'+
+          '<td class="r">'+F(m)+'</td><td class="r">'+(e?Q(e):"")+'</td><td><div class="pbar'+(p>100.001?" over":"")+'"><span><i style="width:'+Math.min(100,p)+'%"></i></span><b>'+(e?Math.round(p)+" %":"")+'</b></div></td>'+
+          '<td class="r">'+(ex?F(ex):"")+'</td><td class="r">'+F(m-ex)+'</td><td><button type="button" class="x'+(armed==="it"+i.k?" warn":"")+'" data-del="'+i.k+'" aria-label="Supprimer l\'article '+esc(i.n)+'">'+(armed==="it"+i.k?"Suppr. ?":"✕")+"</button></td></tr>";});
+      sHT+=lHT;sEX+=lEX;const lp=lHT?lEX/lHT*100:0;
+      t+='<tr class="lot" data-lot="'+l.id+'" tabindex="0"><td colspan="5"><span class="caret">'+(collapsed[l.id]?"▸":"▾")+"</span>"+esc(l.name)+'<span class="cat">'+esc(CAT(l.category).label)+'</span></td><td class="r">'+F(lHT)+'</td><td></td><td><div class="pbar"><span><i style="width:'+Math.min(100,lp)+'%"></i></span><b>'+Math.round(lp)+' %</b></div></td><td class="r">'+F(lEX)+'</td><td class="r">'+F(lHT-lEX)+'</td><td><button type="button" class="add" data-add="'+l.id+'" aria-label="Ajouter un article au '+esc(l.name)+'">+</button></td></tr>';
+      if(!collapsed[l.id])t+=rowsH;});
+    gHT+=sHT;gEX+=sEX;
+    if(d.sites.length>1)t+='<tr class="tot"><td colspan="5">Total '+esc(s.name)+' (HT)</td><td class="r">'+F(sHT)+"</td><td></td><td>"+(sHT?Math.round(sEX/sHT*100)+" %":"")+'</td><td class="r">'+F(sEX)+'</td><td class="r">'+F(sHT-sEX)+"</td><td></td></tr>";});
+  t+='<tr class="grand"><td colspan="5">MONTANT TOTAL HT</td><td class="r">'+F(gHT)+"</td><td></td><td>"+(gHT?Math.round(gEX/gHT*100)+" %":"")+'</td><td class="r">'+F(gEX)+'</td><td class="r">'+F(gHT-gEX)+"</td><td></td></tr>"+
+    '<tr class="sub"><td colspan="5">TVA '+Math.round(tva*100)+' %</td><td class="r">'+F(gHT*tva)+'</td><td></td><td></td><td class="r">'+F(gEX*tva)+'</td><td class="r">'+F((gHT-gEX)*tva)+"</td><td></td></tr>"+
+    '<tr class="grand"><td colspan="5">MONTANT TOTAL TTC</td><td class="r">'+F(gHT*(1+tva))+'</td><td></td><td></td><td class="r">'+F(gEX*(1+tva))+'</td><td class="r">'+F((gHT-gEX)*(1+tva))+"</td><td></td></tr></tbody>";
+  h+='<section class="panel"><h2>Devis quantitatif et estimatif</h2><p class="muted small" style="margin:4px 0 0">Désignation, unité, quantité et prix unitaire modifiables · cliquez sur un lot pour le replier. Case orange = valeur différente du DQE d\'origine. « + » ajoute un article au lot, « ✕ » le supprime (deux clics).</p>'+
+    '<div class="dqe-wrap"><table class="tbl dqe">'+t+"</table></div></section>";
+
+  app.innerHTML=h;
+  info(); paintStatus();
+}
+let formK=null, aDate="";
+function info(){const i=D().items.find(x=>x.k===formK);const el=$("#aInfo");if(!el)return;if(!i){el.textContent="";return;}
+  const e=execQ(i.k),r=Math.max(0,(+i.q||0)-e);$("#aU").textContent="("+i.u+")";
+  el.innerHTML="Quantité DQE <b>"+Q(+i.q)+" "+esc(i.u)+"</b> · déjà exécuté <b>"+Q(e)+"</b> · reste <b>"+Q(r)+" "+esc(i.u)+"</b> · P.U. <b>"+F(+i.pu)+"</b> F";}
+
+function curve(tot){
+  const d=D(),up=d.suivi,by={};d.items.forEach(i=>by[i.k]=i);
+  const ev=d.att.filter(a=>a.d<=up&&by[a.k]&&(!site||(lotOf(by[a.k])||{}).site===site)).sort((a,b)=>a.d<b.d?-1:1);
+  const W=640,H=240;
+  if(!ev.length||!tot)return '<svg class="curve" viewBox="0 0 '+W+" "+H+'" role="img" aria-label="Courbe vide"><text x="320" y="110" text-anchor="middle">Aucune quantité saisie avant le '+fD(up)+'.</text><text x="320" y="132" text-anchor="middle">La courbe se dessine dès la première saisie d\'attachement.</text></svg>';
+  const days=[...new Set(ev.map(a=>a.d))],cumK={},pts=[];
+  days.forEach(dd=>{ev.filter(a=>a.d===dd).forEach(a=>{cumK[a.k]=(cumK[a.k]||0)+(+a.q||0);});const c=Object.keys(cumK).reduce((x,k)=>x+Math.min(cumK[k],Math.max(+by[k].q||0,0))*(+by[k].pu||0),0);pts.push([dd,c]);});
+  const end=up>days[days.length-1]?up:days[days.length-1];const t0=new Date(days[0]),t1=new Date(end),span=Math.max(1,(t1-t0)/864e5);
+  const Lm=62,R=16,Tp=16,B=34,xs=x=>Lm+((new Date(x)-t0)/864e5)/span*(W-Lm-R),ys=v=>H-B-v/tot*(H-B-Tp);
+  let g="";[0,.25,.5,.75,1].forEach(f=>{const y=ys(tot*f);g+='<line x1="'+Lm+'" x2="'+(W-R)+'" y1="'+y+'" y2="'+y+'" style="stroke:var(--line)"/><text x="'+(Lm-6)+'" y="'+(y+3)+'" text-anchor="end">'+P1(tot*f/1e6)+" M</text>";});
+  g+='<line x1="'+Lm+'" x2="'+(W-R)+'" y1="'+ys(tot)+'" y2="'+ys(tot)+'" style="stroke:var(--navy)" stroke-dasharray="4 3"/>';
+  g+='<text x="'+Lm+'" y="'+(H-B+16)+'">'+fD(days[0])+'</text><text x="'+(W-R)+'" y="'+(H-B+16)+'" text-anchor="end">'+fD(end)+"</text>";
+  let p="M"+xs(days[0])+","+ys(0);pts.forEach(([x,v])=>{p+=" H"+xs(x)+" V"+ys(v);});p+=" H"+xs(end);
+  g+='<path d="'+p+" V"+ys(0)+' Z" style="fill:var(--good);opacity:.15"/><path d="'+p+'" style="fill:none;stroke:var(--good);stroke-width:2"/><line x1="'+Lm+'" x2="'+(W-R)+'" y1="'+(H-B)+'" y2="'+(H-B)+'" style="stroke:var(--line-2)"/>';
+  pts.forEach(([x,v])=>{g+='<circle cx="'+xs(x)+'" cy="'+ys(v)+'" r="3.5" style="fill:var(--good)"><title>'+fD(x)+" – cumul "+F(v)+" F HT</title></circle>";});
+  const lv=pts[pts.length-1][1];g+='<text x="'+(W-R)+'" y="'+Math.max(12,ys(lv)-8)+'" text-anchor="end" style="fill:var(--ink);font-weight:600">'+F(lv)+" F ("+P1(lv/tot*100)+" %)</text>";
+  return '<svg class="curve" viewBox="0 0 '+W+" "+H+'" role="img" aria-label="Montant réalisé cumulé">'+g+"</svg>";
+}
+
+/* ── Événements ──────────────────────────────────────── */
+function arm(key,ms){armed=key;setTimeout(()=>{if(armed===key){armed=null;render();}},ms||3000);}
+function changed(msg){if(msg!==undefined)lastMsg=msg;render();persist();}
+document.addEventListener("change",e=>{const el=e.target;if(!CUR)return;const d=D();
+  if(el.dataset.f){const i=d.items.find(x=>x.k==el.dataset.k);if(!i)return;const f=el.dataset.f;
+    if(f==="q"||f==="pu"){const v=parseFloat(String(el.value).replace(/\s/g,"").replace(",","."));i[f]=isNaN(v)||v<0?0:v;}else{i[f]=el.value.trim()||i[f];}
+    const id=el.id;changed("");const n=document.getElementById(id);if(n)n.focus();return;}
+  if(el.dataset.lotname){const l=d.lots.find(x=>x.id===el.dataset.lotname);if(l&&el.value.trim()){l.name=el.value.trim();changed("Lot renommé.");}return;}
+  if(el.dataset.lotcat){const l=d.lots.find(x=>x.id===el.dataset.lotcat);if(l){l.category=el.value;changed("Corps d'état modifié.");}return;}
+  if(el.id==="dqeName"){if(el.value.trim()&&!CUR.example){CUR.name=el.value.trim();renderLib();persist();}return;}
+  if(el.id==="site"){site=el.value;formK=null;render();return;}
+  if(el.id==="suivi"){d.suivi=el.value||todayISO();aDate=d.suivi;changed();return;}
+  if(el.id==="aItem"){formK=+el.value;info();return;}
+  if(el.id==="aDate"){aDate=el.value;return;}
+});
+document.addEventListener("input",e=>{if(e.target.id==="q"){query=e.target.value;const pos=e.target.selectionStart;render();const n=$("#q");n.focus();try{n.setSelectionRange(pos,pos);}catch(_){}}});
+document.addEventListener("keydown",e=>{const lot=e.target.closest&&e.target.closest("tr.lot");if(lot&&e.target===lot&&(e.key==="Enter"||e.key===" ")){e.preventDefault();collapsed[lot.dataset.lot]=!collapsed[lot.dataset.lot];render();}
+  if(e.key==="Enter"&&e.target.matches&&e.target.matches("table.dqe input"))e.target.blur();});
+document.addEventListener("click",async e=>{if(!CUR)return;const d=D();const tg=e.target;
+  if(tg.closest("#tglDesc")){openDesc=!openDesc;render();return;}
+  if(tg.closest("#onlyRun")){onlyRun=!onlyRun;render();return;}
+  const lot=tg.closest("tr.lot");if(lot&&!tg.closest("button")){collapsed[lot.dataset.lot]=!collapsed[lot.dataset.lot];render();return;}
+  const add=tg.closest("[data-add]");if(add){const k=Math.max(0,...d.items.map(i=>i.k),...d.orig.items.map(i=>i.k))+1;const lid=add.dataset.add;
+    const its=d.items.filter(i=>i.lot===lid);const idx=its.length?d.items.indexOf(its[its.length-1])+1:d.items.length;
+    d.items.splice(idx,0,{k,lot:lid,n:"nouv.",d:"Nouvel article",u:"u",q:1,pu:0});collapsed[lid]=false;
+    changed("<b>Article ajouté.</b> Saisissez sa désignation, son unité, sa quantité et son prix.");const n=document.getElementById("d"+k);if(n){n.focus();n.select();}return;}
+  const del=tg.closest("[data-del]");if(del){const k=+del.dataset.del;if(armed!=="it"+k){arm("it"+k);render();return;}
+    armed=null;d.items=d.items.filter(i=>i.k!==k);d.att=d.att.filter(a=>a.k!==k);changed("<b>Article supprimé</b> (et ses quantités exécutées).");return;}
+  const ad=tg.closest("[data-adel]");if(ad){const ix=+ad.dataset.adel;if(armed!=="att"+ix){arm("att"+ix);render();return;}
+    armed=null;d.att.splice(ix,1);changed("<b>Saisie supprimée.</b> Cumuls recalculés.");return;}
+  if(tg.closest("#reset")){if(armed!=="reset"){arm("reset",4000);render();return;}
+    armed=null;d.lots=clone(d.orig.lots);d.items=clone(d.orig.items);d.att=[];collapsed={};changed("<b>DQE d'origine rétabli</b>, saisies effacées.");return;}
+  if(tg.closest("#aAll")){const i=d.items.find(x=>x.k===formK);if(!i)return;$("#aQ").value=String(Math.round(Math.max(0,(+i.q||0)-execQ(i.k))*1000)/1000).replace(".",",");$("#aQ").focus();return;}
+  if(tg.closest("#aSave")){const i=d.items.find(x=>x.k===formK);const q=parseFloat(String($("#aQ").value).replace(/\s/g,"").replace(",","."));const dt=$("#aDate").value;
+    if(!i){lastMsg="<b>Choisissez un article.</b>";paintStatus();return;}
+    if(!dt){lastMsg="<b>Indiquez la date</b> de l'attachement.";paintStatus();return;}
+    if(isNaN(q)||q<=0){lastMsg="<b>Indiquez une quantité</b> supérieure à 0.";paintStatus();$("#aQ").focus();return;}
+    const a={d:dt,k:i.k,q};const o=$("#aObs").value.trim();if(o)a.o=o;d.att.push(a);d.att.sort((x,y)=>x.d<y.d?-1:x.d>y.d?1:0);aDate=dt;
+    if(d.suivi<dt)d.suivi=dt;const c=execQ(i.k);
+    changed("<b>Enregistré :</b> "+Q(q)+" "+esc(i.u)+" sur l'article "+esc(i.n)+" le "+fD(dt)+" → cumul "+Q(c)+" / "+Q(+i.q)+" ("+(+i.q?Math.round(c/+i.q*100):0)+" %)."+(c>+i.q?' <b style="color:var(--bad)">Attention : quantité DQE dépassée.</b>':""));return;}
+  if(tg.closest("#csv")){exportCsv();return;}
+  if(tg.closest("#html")){exportHtml();return;}
+  if(tg.closest("#docx")){exportDocx(tg.closest("#docx"));return;}
+});
+
+/* ── Exports ─────────────────────────────────────────── */
+const safeName=()=>CUR.name.replace(/[^\p{L}\p{N}]+/gu,"_").slice(0,60);
+const inViewer=!!(window.claude&&window.claude.use);
+async function offer(filename,data){
+  if(!downloads&&!inViewer){
+    // Copie ouverte dans un navigateur ordinaire : téléchargement direct.
+    const a=document.createElement("a");a.href=URL.createObjectURL(data instanceof Blob?data:new Blob([data]));a.download=filename;document.body.appendChild(a);a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},800);lastMsg="<b>Fichier téléchargé :</b> "+esc(filename)+".";paintStatus();return;}
+  if(!downloads){lastMsg="<b>Téléchargement bloqué dans cet affichage.</b> Ouvrez la page dans un navigateur (Chrome, Edge…) depuis claude.ai, puis autorisez les téléchargements quand la demande apparaît.";paintStatus();return;}
+  try{await downloads.save({filename,data});lastMsg="<b>Fichier proposé au téléchargement :</b> "+esc(filename)+".";}
+  catch(e){lastMsg=e&&e.code==="declined"?"Téléchargement annulé.":e&&e.code==="rate_limited"?"Une demande de téléchargement est déjà ouverte.":"Téléchargement indisponible ici.";}
+  paintStatus();
+}
+function exportCsv(){const d=D(),up=d.suivi,num=v=>String(Math.round(v*1000)/1000).replace(".",",");
+  const R=[["Ouvrage","Lot","Corps d'état","N°","Désignation","U","Quantité","P.U.","Montant HT","Qté exécutée","% exécuté","Montant réalisé HT","Reste HT"]];let g=0,gx=0;
+  d.sites.forEach(s=>d.lots.filter(l=>l.site===s.id).forEach(l=>d.items.filter(i=>i.lot===l.id).forEach(i=>{const e=execQ(i.k,up),m=mt(i),x=Math.min(e,+i.q)*(+i.pu);g+=m;gx+=x;
+    R.push([s.name,l.name,CAT(l.category).label,i.n,i.d,i.u,num(+i.q),Math.round(+i.pu),m,num(e),+i.q?Math.round(e/+i.q*100):0,Math.round(x),Math.round(m-x)]);})));
+  R.push([]);R.push(["","","","","TOTAL HT","","","",g,"","",Math.round(gx),Math.round(g-gx)]);R.push(["","","","","TVA "+Math.round(d.tva*100)+" %","","","",Math.round(g*d.tva)]);R.push(["","","","","TOTAL TTC","","","",Math.round(g*(1+d.tva))]);
+  R.push([]);R.push(["JOURNAL DES ATTACHEMENTS"]);R.push(["Date","N°","Désignation","U","Quantité","Montant HT","Observation"]);
+  d.att.forEach(a=>{const i=d.items.find(x=>x.k===a.k);R.push([fD(a.d),i?i.n:"",i?i.d:"",i?i.u:"",num(+a.q),i?Math.round(a.q*i.pu):"",a.o||""]);});
+  R.push([]);R.push(["Établi par : Moulo Jean Claude","","","","Situation au "+fD(up)]);
+  const csv="﻿"+R.map(r=>r.map(v=>{v=String(v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}).join(";")).join("\r\n");
+  offer("DQE_Suivi_"+safeName()+"_"+todayISO()+".csv",csv);}
+async function exportDocx(btn){
+  btn.disabled=true;const old=btn.textContent;btn.textContent="Préparation du Word…";
+  try{await needDocx();}catch(e){btn.disabled=false;btn.textContent=old;lastMsg="Le module Word n'a pas pu être chargé. Vérifiez la connexion.";paintStatus();return;}
+  const X=window.docx,d=D(),desc=DQE.describeAll(d),ht=d.items.reduce((s,i)=>s+i.q*i.pu,0),author="Moulo Jean Claude",today=new Date().toLocaleDateString("fr-FR"),BLUE="1D3557";
+  const run=(text,o)=>new X.TextRun(Object.assign({text,size:20},o||{}));
+  const line=(l,t)=>new X.Paragraph({spacing:{after:60},children:[run(l+" : ",{bold:true}),run(t)]});
+  const cell=(t,o)=>{o=o||{};return new X.TableCell({width:o.w?{size:o.w,type:X.WidthType.PERCENTAGE}:undefined,shading:o.fill?{type:X.ShadingType.CLEAR,color:"auto",fill:o.fill}:undefined,margins:{top:40,bottom:40,left:80,right:80},children:[new X.Paragraph({alignment:o.right?X.AlignmentType.RIGHT:X.AlignmentType.LEFT,children:[new X.TextRun({text:t,bold:o.b,color:o.c,size:18})]})]});};
+  const head=["Ouvrage","Lot","Corps d'état","Art.","Montant HT (F)","%"],ws=[24,30,20,6,14,6];
+  const rows=[new X.TableRow({tableHeader:true,children:head.map((t,i)=>cell(t,{b:true,fill:BLUE,c:"FFFFFF",w:ws[i],right:i>=3}))})]
+    .concat(desc.map(x=>new X.TableRow({children:[cell(x.site),cell(x.title),cell(x.category),cell(String(x.articles),{right:true}),cell(F(x.amount),{right:true}),cell(P1(x.share*100),{right:true})]})))
+    .concat([new X.TableRow({children:[cell("TOTAL HT",{b:true,fill:"E8EEF5"}),cell("",{fill:"E8EEF5"}),cell("",{fill:"E8EEF5"}),cell(String(d.items.length),{b:true,right:true,fill:"E8EEF5"}),cell(F(ht),{b:true,right:true,fill:"E8EEF5"}),cell("100",{b:true,right:true,fill:"E8EEF5"})]})]);
+  const lots=[];desc.forEach(x=>{lots.push(new X.Paragraph({heading:X.HeadingLevel.HEADING_2,spacing:{before:240,after:80},children:[new X.TextRun({text:x.title,color:BLUE})]}));
+    if(d.sites.length>1)lots.push(line("Ouvrage",x.site)); lots.push(line("Corps d'état",x.category));
+    lots.push(new X.Paragraph({spacing:{after:80},children:[run(x.summary)]}));
+    if(x.quantities.length)lots.push(line("Quantités clés",x.quantities.join(" · ")));
+    if(x.mainItems.length)lots.push(line("Principaux postes",x.mainItems.map(m=>(m.n?m.n+" ":"")+m.d+" ("+F(m.amount)+" F)").join(" ; ")));
+    x.ratios.forEach(t=>lots.push(line("Contrôle",t)));
+    lots.push(new X.Paragraph({shading:{type:X.ShadingType.CLEAR,color:"auto",fill:"FFF4DC"},spacing:{after:120},children:[run("Vigilance : ",{bold:true}),run(x.note)]}));});
+  const doc=new X.Document({creator:author,lastModifiedBy:author,title:CUR.name+" — Description des lots",styles:{default:{document:{run:{font:"Calibri"}}}},
+    sections:[{properties:{page:{margin:{top:1300,bottom:1000,left:1100,right:1100}}},
+      headers:{default:new X.Header({children:[
+        new X.Paragraph({border:{bottom:{style:X.BorderStyle.SINGLE,size:6,color:BLUE,space:4}},tabStops:[{type:"right",position:9638}],children:[new X.TextRun({text:"Moulo Jean Claude · Technicien génie civil BTP · Abidjan",bold:true,color:BLUE,size:18}),new X.TextRun({text:"\t"+CUR.name+" — Description des lots",size:16,color:"555555"})]}),
+        new X.Paragraph({children:[new X.TextRun({text:"Auteur : "+author+" · Normes de référence : BAEL 91 mod. 99 / Eurocode 2 · "+today,size:14,color:"777777"})]})]})},
+      footers:{default:new X.Footer({children:[new X.Paragraph({alignment:X.AlignmentType.CENTER,children:[new X.TextRun({text:"Page ",size:16,color:"777777"}),new X.TextRun({children:[X.PageNumber.CURRENT],size:16,color:"777777"}),new X.TextRun({text:" / ",size:16,color:"777777"}),new X.TextRun({children:[X.PageNumber.TOTAL_PAGES],size:16,color:"777777"})]})]})},
+      children:[
+        new X.Paragraph({heading:X.HeadingLevel.TITLE,alignment:X.AlignmentType.CENTER,children:[new X.TextRun({text:"DESCRIPTION DES LOTS DU DQE",bold:true,color:BLUE})]}),
+        new X.Paragraph({alignment:X.AlignmentType.CENTER,spacing:{after:240},children:[run(CUR.name,{size:26})]}),
+        line("Fichier source",CUR.fileName),line("Établi par",author),line("Date",today),
+        line("Composition",d.sites.length+" ouvrage(s), "+d.lots.length+" lots, "+d.items.length+" articles"),
+        line("Montant total HT",F(ht)+" F CFA"),line("TVA "+Math.round(d.tva*100)+" %",F(ht*d.tva)+" F CFA"),line("Montant total TTC",F(ht*(1+d.tva))+" F CFA"),
+        new X.Paragraph({heading:X.HeadingLevel.HEADING_1,spacing:{before:240,after:120},children:[new X.TextRun({text:"1. Récapitulatif par lot",color:BLUE})]}),
+        new X.Table({width:{size:100,type:X.WidthType.PERCENTAGE},rows}),
+        new X.Paragraph({heading:X.HeadingLevel.HEADING_1,spacing:{before:360,after:120},children:[new X.TextRun({text:"2. Description détaillée des lots",color:BLUE})]}),
+        ...lots,
+        new X.Paragraph({spacing:{before:240},children:[new X.TextRun({text:"Description générée automatiquement à partir du DQE importé. Ratios et points de vigilance indicatifs (BAEL 91 mod. 99 / EC2, contexte ivoirien : sols latéritiques, climat tropical chaud et humide) ; ils ne remplacent pas les notes de calcul d'exécution.",italics:true,size:16,color:"777777"})]})]}]});
+  try{const blob=await X.Packer.toBlob(doc);await offer("Description_lots_"+safeName()+".docx",blob);}
+  catch(e){console.error(e);lastMsg="Génération du Word impossible.";paintStatus();}
+  btn.disabled=false;btn.textContent=old;
+}
+
+function exportHtml(){
+  const c=document.documentElement.cloneNode(true);
+  c.querySelectorAll("script[src]").forEach(n=>n.remove());
+  const emb=c.querySelector("#embedded-dqe");
+  if(emb) emb.textContent=CUR.example?"null":JSON.stringify({id:CUR.id,name:CUR.name,fileName:CUR.fileName,updatedAt:Date.now(),data:CUR.data}).replace(/</g,"\\u003c");
+  const app=c.querySelector("#app");if(app)app.innerHTML="";
+  const im=c.querySelector("#importMsg");if(im){im.innerHTML="";im.setAttribute("hidden","");}
+  const html="<!doctype html>\n"+c.outerHTML;
+  offer("DQE_"+safeName()+"_"+todayISO()+".html",new Blob([html],{type:"text/html"}));
+}
+
+/* ── Démarrage ───────────────────────────────────────── */
+async function start(){
+  // Affichage immédiat : DQE de cet appareil, sinon l'exemple.
+  try{LIB=(await store.list()).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));}catch(e){LIB=[];}
+  let emb=null;try{emb=JSON.parse(document.getElementById("embedded-dqe").textContent);}catch(e){}
+  if(emb&&emb.data){const have=LIB.find(r=>r.id===emb.id);if(have){if((have.updatedAt||0)<(emb.updatedAt||0))Object.assign(have,emb);}else{LIB.unshift(emb);try{await store.put(emb);}catch(e){}}}
+  CUR=(emb&&LIB.find(r=>r.id===emb.id))||LIB[0]||exampleRec(); renderLib(); render();
+  if(!window.claude||!window.claude.use) return;
+  claude.use("downloads").then(x=>{downloads=x;if(CUR)render();});
+  try{
+    const [db,user]=await Promise.all([claude.use("db"),claude.use("user")]);
+    if(!db||!user) return;
+    const uid=await user.id(); if(!uid) return;
+    const col=db.collection("data/users/"+uid);
+    const timer=new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")),10000));
+    const snap=await Promise.race([col.get(),timer]);
+    const online=snap.docs.map(dd=>Object.assign({id:dd.id},dd.data()));
+    const local=LIB.filter(r=>!online.some(o=>o.id===r.id));
+    store.mode="db"; store.col=col;
+    // Les DQE gardés jusque-là sur cet appareil rejoignent l'espace en ligne.
+    for(const r of local){try{await store.put(r);}catch(e){}}
+    LIB=online.concat(local).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+    const keep=CUR&&!CUR.example?LIB.find(r=>r.id===CUR.id):null;
+    CUR=keep||LIB[0]||(CUR&&CUR.example?CUR:exampleRec());
+    saveState=LIB.length?"Vos DQE sont enregistrés dans votre espace personnel.":"";
+    renderLib(); render();
+  }catch(e){ /* reste sur l'enregistrement local */ }
+}
+start();
+})();
+</script>
+
+</body>
+</html>

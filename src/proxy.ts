@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifySessionToken } from "@/lib/jwt";
 
-const PUBLIC_PATHS = ["/login", "/signup"];
+const PUBLIC_PATHS = ["/login", "/signup", "/mot-de-passe-oublie"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
