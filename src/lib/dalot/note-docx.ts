@@ -409,6 +409,7 @@ export async function buildNoteDocx(study: Study, images: NoteImages, kind: Note
     H1("20. Dispositions constructives"), checksTable(by("Dispositions constructives")),
     H1("21. Contrôle Eurocode 2"),
     FORMULA("MRd = As·fyd·(d − 0,4x), x = As·fyd/(0,8·b·fcd) ; VRd,c = max(CRd,c·k·(100·ρl·fck)^(1/3) ; 0,035·k^1,5·fck^0,5)·b·d", "EC2 6.1 / 6.2.2"),
+    P("ρl est la section de la nappe extérieure, tendue au droit des appuis (moments d'encastrement du cadre) et prolongée par les retours d'angle. Lorsque VEd dépasse VRd,c, cette nappe est renforcée jusqu'au ρl requis (≤ 2 %) plutôt que de prévoir des armatures d'effort tranchant dans les dalles."),
     FORMULA("wk = sr,max·(εsm − εcm) ; sr,max = 3,4·c + 0,425·k1·k2·Ø/ρp,eff", "EC2 7.3.4"),
     checksTable(by("Contrôle Eurocode 2")),
     H2("Contrôles internes du modèle de calcul"),
@@ -439,9 +440,12 @@ export async function buildNoteDocx(study: Study, images: NoteImages, kind: Note
     FORMULA(`Mur de tête (h = ${f(hw.H)} m, e = ${f(hw.e)} m) : Mu = 1,35·Ka·γ·h³/6 + 1,5·Ka·q·h²/2 = ${f(hw.M, 1)} kN·m/m → HA${hw.bars.phi} e = ${f(hw.bars.s * 100, 1)} cm`),
     ...(w ? [
       FORMULA(`Mur en aile à l'enracinement (H = ${f(w.Htot)} m, extrémité ${f(w.Hend)} m) : Mu = ${f(w.M, 1)} kN·m/m → HA${w.bars.phi} e = ${f(w.bars.s * 100, 1)} cm`),
-      table(["Stabilité du mur en aile", "Valeur", "Limite"], [
+      P("Les deux ailes sont encastrées dans le radier de tête continu : la tête forme un U. Les composantes transversales des poussées (P·cos α) sont égales et opposées et s'équilibrent dans le radier de tête, dont la nappe inférieure transversale reprend le moment d'encastrement des voiles. La stabilité est vérifiée sur la tête complète (ailes, talons, radier de tête et bêche d'extrémité) sous la résultante longitudinale 2·P·sin α, sans compter la liaison avec le radier du corps."),
+      FORMULA(`P = ∫ (Ka·γ·H²/2 + Ka·q·H) ds = ${f(w.Pw, 1)} kN par aile ; résultante 2·P·sin α = ${f(w.Fx, 1)} kN ; poids de la tête N = ${f(w.N, 1)} kN`),
+      FORMULA(`Radier de tête — encastrement : As requise ${f(w.encAsReq, 2)} cm²/m → HA${w.footBars.phi} e = ${f(w.footBars.s * 100, 1)} cm (nappe inférieure transversale)`),
+      table(["Stabilité de la tête (ailes + radier de tête)", "Valeur", "Limite"], [
         ["Renversement FS", f(w.FSr), "≥ 1,50"], ["Glissement FS", f(w.FSg), "≥ 1,50"],
-        ["Excentricité |e|", `${f(Math.abs(w.e0))} m`, `≤ B/6 = ${f(w.B / 6)} m`], ["Contrainte maximale", `${f(w.sigmaMax, 0)} kPa`, `≤ ${f(w.qAllow, 0)} kPa`],
+        ["Excentricité |e|", `${f(Math.abs(w.e0))} m`, `≤ L/6 = ${f(w.B / 6)} m`], ["Contrainte maximale", `${f(w.sigmaMax, 0)} kPa`, `≤ ${f(w.qAllow, 0)} kPa`],
       ], [0.5, 0.25, 0.25]),
     ] : []),
     checksTable(by("Ouvrages de tête")));

@@ -7,7 +7,7 @@
 import type { Analysis } from "./analysis";
 import {
   asELS, asELU, asMinBAEL, asMinEC2, barArea, chooseBars, crackWidthEC2, materials, mRdEC2, muCapacity,
-  sMax, stressesELS, vRdcEC2, type BarChoice, type Materials,
+  sMax, stressesELS, vRdcEC2, asForVRdc, type BarChoice, type Materials,
 } from "./ba";
 import type { Check } from "./checks";
 import type { DalotInput } from "./fields";
@@ -67,6 +67,8 @@ export type ShearDesign = {
   tau: number; // MPa
   VRdc: number; // kN/m
   combo: string;
+  /** Nappe dont la section entre dans ρl. */
+  asGroup: GroupId;
 };
 
 export type Design = { mat: Materials; groups: GroupDesign[]; shear: ShearDesign[]; checks: Check[] };
@@ -93,69 +95,86 @@ export function designSections(inp: DalotInput, an: Analysis): Design {
   });
 
   const comboName = (ci: number) => combos[ci]?.id ?? "—";
-  const checks: Check[] = [];
-  const out: GroupDesign[] = [];
-
-  for (const id of Object.keys(GROUP_LABELS) as GroupId[]) {
-    const faces = groups.get(id);
-    if (!faces) continue;
-    let Mu = 0, Ms = 0, MEd = 0, cu = -1, cs = -1, gov = "", h = 0;
-    for (const { member, face } of faces) {
-      const m = model.members[member];
-      h = Math.max(h, m.thickness);
-      const sign = m.faces[face].sign;
-      m.nodes.forEach((_, k) => {
-        const s = m.s[k];
-        if (s < m.supportStart - 1e-9 || s > m.length - m.supportEnd + 1e-9) return; // au nu des appuis
-        const q = m.station0 + k;
-        const u = sign > 0 ? elu.max[q] : -elu.min[q];
-        const v = sign > 0 ? els.max[q] : -els.min[q];
-        if (u > Mu) { Mu = u; cu = sign > 0 ? elu.cMax[q] : elu.cMin[q]; gov = `${m.label}, face ${m.faces[face].label}, x = ${s.toFixed(2)} m`; }
-        if (v > Ms) { Ms = v; cs = sign > 0 ? els.cMax[q] : els.cMin[q]; }
-        MEd = Math.max(MEd, sign > 0 ? ec2.max[q] : -ec2.min[q]);
-      });
-    }
-    const imposed = inp.imposed[id];
-    // Hauteur utile : itération sur le diamètre retenu.
-    let phi = imposed?.phi ?? 12;
-    let d = h - mat.cover - phi / 2000;
-    let res = computeGroup(Mu, Ms, d, mat);
-    let bars = imposed ? { phi: imposed.phi, s: imposed.s, As: barArea(imposed.phi) / imposed.s } : chooseBars(res.AsReq, h, mat);
-    if (!imposed && bars.phi !== phi) {
-      phi = bars.phi;
-      d = h - mat.cover - phi / 2000;
-      res = computeGroup(Mu, Ms, d, mat);
-      bars = chooseBars(res.AsReq, h, mat);
-      d = h - mat.cover - bars.phi / 2000;
-    }
-    // Maîtrise de la fissuration (EC2 §7.3.4) : on renforce la nappe tant que wk > wmax.
-    if (!imposed && Ms > 0) {
-      let target = bars.As;
-      for (let k = 0; k < 20 && crackWidthEC2(Ms / 1000, bars.As, h - mat.cover - bars.phi / 2000, h, bars.phi / 1000, mat) > inp.wkMax; k++) {
-        target *= 1.06;
-        bars = chooseBars(target, h, mat);
+  // `floor` : section minimale imposée par l'effort tranchant EC2 (aciers tendus au droit des appuis).
+  const designGroups = (floor: Partial<Record<GroupId, number>>) => {
+    const checks: Check[] = [];
+    const out: GroupDesign[] = [];
+    for (const id of Object.keys(GROUP_LABELS) as GroupId[]) {
+      const faces = groups.get(id);
+      if (!faces) continue;
+      let Mu = 0, Ms = 0, MEd = 0, cu = -1, cs = -1, gov = "", h = 0;
+      for (const { member, face } of faces) {
+        const m = model.members[member];
+        h = Math.max(h, m.thickness);
+        const sign = m.faces[face].sign;
+        m.nodes.forEach((_, k) => {
+          const s = m.s[k];
+          if (s < m.supportStart - 1e-9 || s > m.length - m.supportEnd + 1e-9) return; // au nu des appuis
+          const q = m.station0 + k;
+          const u = sign > 0 ? elu.max[q] : -elu.min[q];
+          const v = sign > 0 ? els.max[q] : -els.min[q];
+          if (u > Mu) { Mu = u; cu = sign > 0 ? elu.cMax[q] : elu.cMin[q]; gov = `${m.label}, face ${m.faces[face].label}, x = ${s.toFixed(2)} m`; }
+          if (v > Ms) { Ms = v; cs = sign > 0 ? els.cMax[q] : els.cMin[q]; }
+          MEd = Math.max(MEd, sign > 0 ? ec2.max[q] : -ec2.min[q]);
+        });
       }
-      d = h - mat.cover - bars.phi / 2000;
+      const imposed = inp.imposed[id];
+      // Hauteur utile : itération sur le diamètre retenu.
+      let phi = imposed?.phi ?? 12;
+      let d = h - mat.cover - phi / 2000;
+      const asFloor = floor[id] ?? 0;
+      let res = computeGroup(Mu, Ms, d, mat);
+      let bars = imposed ? { phi: imposed.phi, s: imposed.s, As: barArea(imposed.phi) / imposed.s } : chooseBars(Math.max(res.AsReq, asFloor), h, mat);
+      if (!imposed && bars.phi !== phi) {
+        phi = bars.phi;
+        d = h - mat.cover - phi / 2000;
+        res = computeGroup(Mu, Ms, d, mat);
+        bars = chooseBars(Math.max(res.AsReq, asFloor), h, mat);
+        d = h - mat.cover - bars.phi / 2000;
+      }
+      // Maîtrise de la fissuration (EC2 §7.3.4) : on renforce la nappe tant que wk > wmax.
+      if (!imposed && Ms > 0) {
+        let target = bars.As;
+        for (let k = 0; k < 20 && crackWidthEC2(Ms / 1000, bars.As, h - mat.cover - bars.phi / 2000, h, bars.phi / 1000, mat) > inp.wkMax; k++) {
+          target *= 1.06;
+          bars = chooseBars(target, h, mat);
+        }
+        d = h - mat.cover - bars.phi / 2000;
+      }
+      // Répartition : A/4 (BAEL A.8.2,41) avec un minimum constructif HA8 e = 25 cm.
+      const rep = chooseBars(Math.max(bars.As / 4, barArea(8) / 0.25), h, mat, 8);
+      const st = stressesELS(Ms / 1000, bars.As, d);
+      const g: GroupDesign = {
+        id, label: GROUP_LABELS[id], h, d, faces, Mu, Ms, MEd,
+        comboU: cu >= 0 ? comboName(cu) : "—", comboS: cs >= 0 ? comboName(cs) : "—", governing: gov || "—",
+        AsELU: res.AsELU * 1e4, AsELS: res.AsELS * 1e4, AsMin: res.AsMin * 1e4, AsReq: res.AsReq * 1e4,
+        overLimit: res.overLimit, concreteLimited: res.concreteLimited,
+        bars, imposed: !!imposed, rep,
+        sigmaBc: st.sigmaBc, sigmaS: st.sigmaS,
+        MuCap: muCapacity(bars.As, d, mat) * 1000,
+        MRd: mRdEC2(bars.As, d, mat).MRd * 1000,
+        wk: crackWidthEC2(Ms / 1000, bars.As, d, h, bars.phi / 1000, mat),
+      };
+      out.push(g);
+      checks.push(...groupChecks(g, mat, inp));
     }
-    // Répartition : A/4 (BAEL A.8.2,41) avec un minimum constructif HA8 e = 25 cm.
-    const rep = chooseBars(Math.max(bars.As / 4, barArea(8) / 0.25), h, mat, 8);
-    const st = stressesELS(Ms / 1000, bars.As, d);
-    const g: GroupDesign = {
-      id, label: GROUP_LABELS[id], h, d, faces, Mu, Ms, MEd,
-      comboU: cu >= 0 ? comboName(cu) : "—", comboS: cs >= 0 ? comboName(cs) : "—", governing: gov || "—",
-      AsELU: res.AsELU * 1e4, AsELS: res.AsELS * 1e4, AsMin: res.AsMin * 1e4, AsReq: res.AsReq * 1e4,
-      overLimit: res.overLimit, concreteLimited: res.concreteLimited,
-      bars, imposed: !!imposed, rep,
-      sigmaBc: st.sigmaBc, sigmaS: st.sigmaS,
-      MuCap: muCapacity(bars.As, d, mat) * 1000,
-      MRd: mRdEC2(bars.As, d, mat).MRd * 1000,
-      wk: crackWidthEC2(Ms / 1000, bars.As, d, h, bars.phi / 1000, mat),
-    };
-    out.push(g);
-    checks.push(...groupChecks(g, mat, inp));
-  }
+    return { checks, out };
+  };
 
-  const shear = shearDesign(an, mat, out);
+  let { checks, out } = designGroups({});
+  let shear = shearDesign(an, mat, out);
+  // EC2 §6.2.2 : VRd,c croît avec ρl. Si VEd > VRd,c, on renforce la nappe tendue au droit des
+  // appuis (ρl ≤ 2 %) plutôt que de prévoir des armatures d'effort tranchant dans les dalles.
+  const floor: Partial<Record<GroupId, number>> = {};
+  for (const sd of shear) {
+    if (sd.VEd <= sd.VRdc) continue;
+    const As = asForVRdc(sd.VEd / 1000, sd.d, mat);
+    if (As !== null) floor[sd.asGroup] = Math.max(floor[sd.asGroup] ?? 0, As);
+  }
+  if (Object.keys(floor).length > 0) {
+    ({ checks, out } = designGroups(floor));
+    shear = shearDesign(an, mat, out);
+  }
   for (const s of shear) {
     checks.push({
       id: `V-BAEL-${s.member}`, domain: "Effort tranchant", element: s.member,
@@ -284,10 +303,11 @@ function groupChecks(g: GroupDesign, mat: Materials, inp: DalotInput): Check[] {
 function shearDesign(an: Analysis, mat: Materials, groups: GroupDesign[]): ShearDesign[] {
   const { model, elu, ec2, combos } = an;
   const ns = an.quantities.ns;
-  const asFor = (m: Member) => {
-    const ids: GroupId[] = m.kind === "dalle" ? ["dalle_int", "dalle_ext"] : m.kind === "radier" ? ["radier_int", "radier_ext"] : m.kind === "piedroit_int" ? ["pint"] : ["pext_int", "pext_ext"];
-    return Math.min(...groups.filter((g) => ids.includes(g.id)).map((g) => g.bars.As));
-  };
+  // ρl de l'EC2 §6.2.2 : aciers tendus au voisinage des appuis, c'est-à-dire la nappe extérieure
+  // (moments d'encastrement du cadre), prolongés au-delà de la section par les retours d'angle.
+  const groupFor = (m: Member): GroupId =>
+    m.kind === "dalle" ? "dalle_ext" : m.kind === "radier" ? "radier_ext" : m.kind === "piedroit_int" ? "pint" : "pext_ext";
+  const asFor = (m: Member) => groups.find((g) => g.id === groupFor(m))?.bars.As ?? 0;
   const out: ShearDesign[] = [];
   model.members.forEach((m) => {
     const d = m.thickness - mat.cover - 0.006;
@@ -313,7 +333,7 @@ function shearDesign(an: Analysis, mat: Materials, groups: GroupDesign[]): Shear
     }
     out.push({
       member: m.label, h: m.thickness, d, VuFace: vFace, VuD: vD, VEd: vEc,
-      tau: vFace / 1000 / d, VRdc: vRdcEC2(asFor(m), d, mat) * 1000, combo: ci >= 0 ? combos[ci].id : "—",
+      tau: vFace / 1000 / d, VRdc: vRdcEC2(asFor(m), d, mat) * 1000, combo: ci >= 0 ? combos[ci].id : "—", asGroup: groupFor(m),
     });
   });
   return out;

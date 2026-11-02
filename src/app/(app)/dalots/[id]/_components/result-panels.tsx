@@ -471,15 +471,16 @@ export function HeadsPanel({ study }: { study: Study }) {
         <Card title="Murs en aile">
           <dl className="grid grid-cols-2 gap-y-1 text-sm">
             <dt className="text-slate-500">Hauteur enracinement / extrémité</dt><dd className="text-right">{fr(w.Htot)} / {fr(w.Hend)} m</dd>
-            <dt className="text-slate-500">Semelle B</dt><dd className="text-right">{fr(w.B)} m</dd>
+            <dt className="text-slate-500">Radier de tête L</dt><dd className="text-right">{fr(w.B)} m</dd>
+            <dt className="text-slate-500">Poussée par aile / résultante axiale</dt><dd className="text-right">{fr(w.Pw, 0)} / {fr(w.Fx, 0)} kN</dd>
             <dt className="text-slate-500">Renversement</dt><dd className={`text-right font-medium ${w.FSr < 1.5 ? "text-red-600" : "text-green-700"}`}>FS = {fr(w.FSr)}</dd>
             <dt className="text-slate-500">Glissement</dt><dd className={`text-right font-medium ${w.FSg < 1.5 ? "text-red-600" : "text-green-700"}`}>FS = {fr(w.FSg)}</dd>
-            <dt className="text-slate-500">Excentricité</dt><dd className="text-right">{fr(Math.abs(w.e0))} m (B/6 = {fr(w.B / 6)})</dd>
+            <dt className="text-slate-500">Excentricité</dt><dd className="text-right">{fr(Math.abs(w.e0))} m (L/6 = {fr(w.B / 6)})</dd>
             <dt className="text-slate-500">σmax / admissible</dt><dd className="text-right">{fr(w.sigmaMax, 0)} / {fr(w.qAllow, 0)} kPa</dd>
             <dt className="text-slate-500">Voile</dt><dd className="text-right font-medium">HA{w.bars.phi} e = {fr(w.bars.s * 100, 1)} cm</dd>
-            <dt className="text-slate-500">Semelle</dt><dd className="text-right font-medium">HA{w.footBars.phi} e = {fr(w.footBars.s * 100, 1)} cm</dd>
+            <dt className="text-slate-500">Radier de tête (encastrement)</dt><dd className="text-right font-medium">HA{w.footBars.phi} e = {fr(w.footBars.s * 100, 1)} cm</dd>
           </dl>
-          <p className="mt-2 text-xs text-slate-500">En cas de glissement insuffisant : approfondir la bêche sous semelle, élargir le talon ou fonder les murs sur le radier de tête.</p>
+          <p className="mt-2 text-xs text-slate-500">Les ailes sont encastrées dans le radier de tête (tête en U) : les poussées transversales s&apos;équilibrent ; la stabilité porte sur la résultante le long de l&apos;axe. En cas de glissement insuffisant : approfondir la bêche d&apos;extrémité ou allonger le radier de tête.</p>
         </Card>
       ) : <Card title="Murs en aile"><p className="text-sm text-slate-500">Pas de murs en aile.</p></Card>}
       <div className="lg:col-span-2"><ChecksPanelMini study={study} domain="Ouvrages de tête" /></div>

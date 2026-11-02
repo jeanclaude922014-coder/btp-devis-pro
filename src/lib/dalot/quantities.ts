@@ -174,7 +174,7 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
     const wMin = B + 2 * t.debord - 2 * c, wMax = B + 2 * t.debord + 2 * t.radierLong * tanA * (t.murs ? 1 : 0) - 2 * c;
     const vl = `var (${cm(wMin)}/${cm(wMax)})`;
     const rows = nAcross(t.radierLong - 2 * c, 0.2);
-    add(TETE, "RADIER DE TÊTE", "Nappe inférieure — barres transversales", { phi: 10, s: 0.2 }, "crochets", [hook, (wMin + wMax) / 2, hook], 2 * rows, { nElem: 2, varLabel: vl });
+    add(TETE, "RADIER DE TÊTE", "Nappe inférieure — barres transversales", heads.wing?.footBars ?? { phi: 10, s: 0.2 }, "crochets", [hook, (wMin + wMax) / 2, hook], 2 * nAcross(t.radierLong - 2 * c, heads.wing?.footBars.s ?? 0.2), { nElem: 2, varLabel: vl });
     add(TETE, "RADIER DE TÊTE", "Nappe supérieure — barres transversales", { phi: 10, s: 0.2 }, "crochets", [hook, (wMin + wMax) / 2, hook], 2 * rows, { nElem: 2, varLabel: vl });
     add(TETE, "RADIER DE TÊTE", "Barres longitudinales deux nappes", { phi: 10, s: 0.2 }, "droite", [t.radierLong - 2 * c], 2 * 2 * nAcross(Wrt - 2 * c, 0.2), { nElem: 2 });
     add(TETE, "RADIER DE TÊTE", "Chaises", chaise, "chaise", [0.24, 0.25, 0.2], perM2(2 * Wrt * t.radierLong, 3), { spacingLabel: "3/m²" });

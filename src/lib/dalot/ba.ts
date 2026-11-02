@@ -107,6 +107,15 @@ export function vRdcEC2(As: number, d: number, m: Materials) {
   return v * d; // MN/m
 }
 
+/** Section As (m²/m) donnant VRd,c ≥ VEd (MN/m) ; null si ρl > 2 % ne suffit pas. */
+export function asForVRdc(VEd: number, d: number, m: Materials) {
+  const k = Math.min(2, 1 + Math.sqrt(0.2 / d));
+  const v = VEd / d;
+  if (v <= 0.035 * k ** 1.5 * Math.sqrt(m.fck)) return 0;
+  const rho = (v / (0.12 * k)) ** 3 / (100 * m.fck);
+  return rho <= 0.02 ? rho * d * 1.001 : null;
+}
+
 /** Ouverture de fissure wk (EC2 §7.3.4), en mm. */
 export function crackWidthEC2(Ms: number, As: number, d: number, h: number, phi: number, m: Materials) {
   if (Ms <= 0 || As <= 0) return 0;

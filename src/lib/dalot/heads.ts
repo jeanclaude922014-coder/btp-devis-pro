@@ -7,6 +7,7 @@ import { asELS, asELU, asMinBAEL, barArea, chooseBars, stressesELS, type BarChoi
 import type { Check } from "./checks";
 import type { DalotInput } from "./fields";
 import { qLimit } from "./geotech";
+import { headDimensions } from "./head-dims";
 
 const rad = (d: number) => (d * Math.PI) / 180;
 
@@ -34,6 +35,11 @@ export type WingResult = WallDesign & {
   sigmaMax: number;
   qAllow: number;
   footBars: BarChoice;
+  /** Poussée sur une aile (kN), résultante longitudinale des deux ailes (kN), poids de la tête (kN). */
+  Pw: number;
+  Fx: number;
+  N: number;
+  encAsReq: number; // cm²/m
 };
 
 export type HeadsResult = { wing: WingResult | null; headWall: WallDesign; checks: Check[] };
@@ -92,56 +98,86 @@ export function designHeads(inp: DalotInput, mat: Materials): HeadsResult {
     // reste vérifiée à l'enracinement, à la hauteur maximale.
     const Hd = Htot - (Htot - Hend) / 3;
     const base = { ...cantilever("Mur en aile (tiers de la longueur)", Hd, t.ep, Ka, inp.gammaR, inp.qRemblai, mat), H: Htot };
-    // Stabilité du mur en aile au droit de l'enracinement (sécuritaire), par mètre. Comme sur la
-    // section 2-2 des plans types, la semelle est le radier de tête (épaisseur er du radier du corps) :
-    // elle s'étend côté ouvrage (patin intérieur) et déborde un peu côté remblai (talon = « patin » saisi).
-    // Renversement autour de l'arête intérieure ; Htot est compté depuis la sous-face du radier.
-    const Bf = t.semelle, hs = t.semEp, heel = Math.max(0, t.patin);
-    const toe = Math.max(0, Bf - heel - t.ep);
-    const Ht = Htot;
-    const Hw = Math.max(0, Htot - hs);
-    const Pa = 0.5 * Ka * inp.gammaR * Ht ** 2;
-    const Pq = Ka * inp.qRemblai * Ht;
-    const Mo = (Pa * Ht) / 3 + (Pq * Ht) / 2;
-    const Wst = inp.gammaBA * t.ep * Hw, xst = toe + t.ep / 2;
-    const Wf = inp.gammaBA * Bf * hs, xf = Bf / 2;
-    const Ws = inp.gammaR * Hw * heel, xs = toe + t.ep + heel / 2;
-    const N = Wst + Wf + Ws;
-    const Mr = Wst * xst + Wf * xf + Ws * xs;
-    const FSr = Mr / Mo;
-    // Frottement sol/béton δ = 2φ'/3, adhérence c'/2 sur la semelle, butée devant la bêche à 50 %.
+    // Les deux ailes sont encastrées dans le radier de tête continu (plans types, section 2-2) :
+    // la tête forme un U. Les composantes transversales des poussées (P·cos α) sont égales et
+    // opposées et s'équilibrent dans le radier de tête, qui reprend le moment d'encastrement des
+    // voiles. Seule la résultante le long de l'axe (2·P·sin α), qui pousse la tête vers l'aval,
+    // sollicite le sol : stabilité vérifiée sur la tête complète (ailes + radier de tête + bêche
+    // d'extrémité), sans compter la liaison avec le radier du corps (sécuritaire).
+    const hd = headDimensions(inp);
+    const hs = t.semEp, heel = Math.max(0, t.patin);
+    const a = rad(t.angle), sinA = Math.sin(a), cosA = Math.cos(a);
+    const Lr = t.radierLong;
+    const Hat = (sAl: number) => Math.max(hd.Hend, Htot - (sAl * cosA) / inp.talus.pente);
+    // Intégration le long de chaque aile (moments pris autour de l'arête aval du radier de tête).
+    const nSeg = 40, ds = t.long / nSeg;
+    let Pw = 0, Fx = 0, Mo = 0, N = 0, Mr = 0;
+    const weight = (W: number, x: number) => { N += W; Mr += W * (Lr - x); };
+    for (let i = 0; i < nSeg; i++) {
+      const sAl = (i + 0.5) * ds, H = Hat(sAl), x = sAl * cosA, Hw = Math.max(0, H - hs);
+      const pa = 0.5 * Ka * inp.gammaR * H ** 2, pq = Ka * inp.qRemblai * H;
+      Pw += (pa + pq) * ds;
+      Fx += 2 * (pa + pq) * sinA * ds;
+      Mo += 2 * (pa * H / 3 + pq * H / 2) * sinA * ds;
+      weight(2 * inp.gammaBA * t.ep * Hw * ds, x); // voiles
+      weight(2 * (inp.gammaBA * hs + inp.gammaR * Hw) * heel * ds, x); // talons et remblai sur talons
+    }
+    const S = hd.surfaceRadier;
+    const xg = Lr > 0 ? (Lr * (hd.pb + 2 * hd.gb)) / (3 * (hd.pb + hd.gb)) : 0; // centre du trapèze depuis l'about
+    weight(inp.gammaBA * hs * S, xg);
+    weight(inp.gammaBA * t.becheEp * t.becheProf * hd.gb, Lr);
+    const FSr = Mo > 0 ? Mr / Mo : Infinity;
+    // Frottement sol/béton δ = 2φ'/3, adhérence c'/2 sous le radier de tête, butée devant la bêche
+    // d'extrémité prise à 50 %.
     const Kp = Math.tan(rad(45 + inp.phiSol / 2)) ** 2;
-    const hp = hs + t.beche;
-    const Pp = 0.5 * Kp * inp.gammaSol * hp ** 2 + 2 * inp.cSol * Math.sqrt(Kp) * hp;
-    const resist = N * Math.tan(rad((2 / 3) * inp.phiSol)) + (inp.cSol / 2) * Bf + (t.beche > 0 ? 0.5 * Pp : 0);
-    const FSg = resist / (Pa + Pq);
-    const xR = (Mr - Mo) / N;
-    const e0 = Bf / 2 - xR;
-    const sigmaMax = Math.abs(e0) <= Bf / 6 ? (N / Bf) * (1 + (6 * Math.abs(e0)) / Bf) : (2 * N) / (3 * Math.max(xR, 0.01));
-    const ql = qLimit(Bf, Math.max(Bf, t.long), inp.phiSol, inp.cSol, inp.gammaSol, Math.max(inp.Df, hs), inp.nappe);
+    const hp = hs + t.becheProf;
+    const Pp = (0.5 * Kp * inp.gammaSol * hp ** 2 + 2 * inp.cSol * Math.sqrt(Kp) * hp) * hd.gb;
+    const resist = N * Math.tan(rad((2 / 3) * inp.phiSol)) + (inp.cSol / 2) * S + (t.becheProf > 0 ? 0.5 * Pp : 0);
+    const FSg = Fx > 0 ? resist / Fx : Infinity;
+    // Contrainte sous le radier de tête (trapèze assimilé à un rectangle de largeur moyenne).
+    const bm = Lr > 0 ? S / Lr : 1;
+    const xR = (Mr - Mo) / N; // depuis l'arête aval
+    const e0 = (Lr - xg) - xR;
+    const sigmaMax = Math.abs(e0) <= Lr / 6 ? (N / S) * (1 + (6 * Math.abs(e0)) / Lr) : (2 * N) / (3 * Math.max(xR, 0.01) * bm);
+    const ql = qLimit(Math.min(Lr, bm), Math.max(Lr, bm), inp.phiSol, inp.cSol, inp.gammaSol, Math.max(inp.Df, hs), inp.nappe);
     const qAllow = Math.min(ql.q0 + (ql.qu - ql.q0) / 3, inp.qadm !== null ? inp.qadm * 1000 : Infinity);
-    const footBars = chooseBars(Math.max(base.bars.As, asMinBAEL(hs - mat.cover - 0.006, mat)), hs, mat);
-    wing = { ...base, Htot, Hend, B: Bf, FSr, FSg, e0, sigmaMax, qAllow, footBars };
+    // Radier de tête : nappe inférieure transversale dimensionnée pour le moment d'encastrement des voiles.
+    const enc = cantilever("Radier de tête — encastrement des ailes", Hd, hs, Ka, inp.gammaR, inp.qRemblai, mat);
+    const footBars = enc.bars;
+    wing = { ...base, Htot, Hend, B: Lr, FSr, FSg, e0, sigmaMax, qAllow, footBars, Pw, Fx, N, encAsReq: enc.AsReq };
 
     checks.push({
-      id: "T-MA-RENV", domain: dom, element: "Mur en aile",
-      label: "Renversement : FS = Ms/Mr ≥ 1,5", value: FSr, limit: 1.5, status: st(FSr >= 1.5),
+      id: "T-RT-L", domain: dom, element: "Radier de tête",
+      label: "Le radier de tête porte les ailes sur toute leur projection : L ≥ longueur d'aile × cos α", value: Lr, limit: hd.along, unit: "m",
+      status: st(Lr >= hd.along - 0.05), ref: "Dispositions des plans types (section 2-2)",
+      detail: Lr >= hd.along - 0.05 ? undefined : `Allonger le radier de tête à ${(Math.ceil(hd.along * 10) / 10).toFixed(2).replace(".", ",")} m : au-delà, l'aile n'est plus portée que par son talon.`,
+    });
+    checks.push({
+      id: "T-MA-RENV", domain: dom, element: "Tête (ailes + radier de tête)",
+      label: "Renversement de la tête vers l'aval : FS = Ms/Mr ≥ 1,5", value: FSr, limit: 1.5, status: st(FSr >= 1.5),
       ref: "Stabilité des murs de soutènement (Fascicule 62 titre V)",
+      detail: "Poussées transversales équilibrées dans le radier de tête ; moment de la résultante 2·P·sin α autour de l'arête aval.",
     });
     checks.push({
-      id: "T-MA-GLIS", domain: dom, element: "Mur en aile",
-      label: "Glissement : FS = (N·tan(2φ'/3) + c'·B/2 + Pp/2)/(Pa + Pq) ≥ 1,5", value: FSg, limit: 1.5, status: st(FSg >= 1.5),
-      ref: "Fascicule 62 titre V", detail: FSg < 1.5 ? "Approfondir la bêche sous semelle ou élargir le talon." : undefined,
+      id: "T-MA-GLIS", domain: dom, element: "Tête (ailes + radier de tête)",
+      label: "Glissement : FS = (N·tan(2φ'/3) + c'·S/2 + Pp/2)/(2·P·sin α) ≥ 1,5", value: FSg, limit: 1.5, status: st(FSg >= 1.5),
+      ref: "Fascicule 62 titre V", detail: FSg < 1.5 ? "Approfondir la bêche d'extrémité ou allonger le radier de tête." : undefined,
     });
     checks.push({
-      id: "T-MA-EXC", domain: dom, element: "Mur en aile",
-      label: "Résultante dans le tiers central : |e| ≤ B/6", value: Math.abs(e0), limit: Bf / 6, unit: "m", status: st(Math.abs(e0) <= Bf / 6),
+      id: "T-MA-EXC", domain: dom, element: "Tête (ailes + radier de tête)",
+      label: "Résultante dans le tiers central du radier de tête : |e| ≤ L/6", value: Math.abs(e0), limit: Lr / 6, unit: "m", status: st(Math.abs(e0) <= Lr / 6),
       ref: "Règle du tiers central (ELS)",
     });
     checks.push({
-      id: "T-MA-PORT", domain: dom, element: "Semelle du mur en aile",
-      label: "Contrainte maximale sous semelle ≤ contrainte admissible", value: sigmaMax, limit: qAllow, unit: "kPa", status: st(sigmaMax <= qAllow),
+      id: "T-MA-PORT", domain: dom, element: "Radier de tête",
+      label: "Contrainte maximale sous le radier de tête ≤ contrainte admissible", value: sigmaMax, limit: qAllow, unit: "kPa", status: st(sigmaMax <= qAllow),
       ref: "Fascicule 62 titre V / rapport géotechnique",
+    });
+    checks.push({
+      id: "T-MA-ENC", domain: dom, element: "Radier de tête",
+      label: `Encastrement des ailes dans le radier de tête (nappe inférieure transversale) : As fournie ≥ As requise`,
+      value: footBars.As * 1e4, limit: enc.AsReq, unit: "cm²/m", status: st(footBars.As * 1e4 >= enc.AsReq - 1e-6),
+      ref: "BAEL 91 A.4.3 / A.4.5",
     });
     checks.push({
       id: "T-MA-F", domain: dom, element: "Voile du mur en aile",
@@ -168,7 +204,9 @@ export function designHeads(inp: DalotInput, mat: Materials): HeadsResult {
   checks.push({
     id: "T-RT", domain: dom, element: "Radiers de tête",
     label: "Radiers de tête : dalle sur sol hors passage des véhicules", status: "non_applicable", ref: "Dispositions constructives",
-    detail: "Élément non sollicité en flexion : ferraillage minimal HA10 e = 20 cm en deux nappes.",
+    detail: t.murs
+      ? "Nappe inférieure transversale dimensionnée pour l'encastrement des ailes (T-MA-ENC) ; autres nappes HA10 e = 20 cm."
+      : "Élément non sollicité en flexion : ferraillage minimal HA10 e = 20 cm en deux nappes.",
   });
   checks.push({
     id: "T-BECHE", domain: dom, element: "Bêches parafouilles",
