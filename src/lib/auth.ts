@@ -4,6 +4,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { ensureAppSchema } from "@/lib/schema";
 import { signSession, verifySessionToken, type SessionPayload } from "@/lib/jwt";
 
 const SESSION_COOKIE = "session";
@@ -52,6 +53,8 @@ export async function getSession(): Promise<SessionPayload | null> {
 export const requireSessionWithContext = cache(async function requireSessionWithContext() {
   const session = await getSession();
   if (!session) redirect("/login");
+
+  await ensureAppSchema();
 
   const membership = await prisma.membership.findUnique({
     where: {
