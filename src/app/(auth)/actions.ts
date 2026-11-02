@@ -113,3 +113,64 @@ export async function loginAction(
   await setSessionCookie({ userId: user.id, organizationId: membership.organizationId });
   redirect("/dashboard");
 }
+
+// ── Mot de passe oublié ───────────────────────────────────────
+// Sans service d'e-mail : la réinitialisation exige le code de récupération
+// défini par l'administrateur dans la variable d'environnement PASSWORD_RESET_CODE.
+
+const resetSchema = z
+  .object({
+    email: z.string().email("Adresse email invalide."),
+    code: z.string().min(1, "Code de récupération requis."),
+    password: z.string().min(8, "Le nouveau mot de passe doit contenir au moins 8 caractères."),
+    confirm: z.string(),
+  })
+  .refine((v) => v.password === v.confirm, { message: "Les deux mots de passe ne sont pas identiques." });
+
+function sameSecret(a: string, b: string): boolean {
+  // Comparaison à durée constante.
+  const len = Math.max(a.length, b.length);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < len; i++) diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  return diff === 0;
+}
+
+export async function resetPasswordAction(
+  _prevState: FormState,
+  formData: FormData
+): Promise<FormState> {
+  const expected = process.env.PASSWORD_RESET_CODE ?? "";
+  if (expected.length < 12) {
+    return {
+      error:
+        "La récupération n'est pas activée sur ce serveur : l'administrateur doit définir la variable PASSWORD_RESET_CODE (12 caractères minimum).",
+    };
+  }
+
+  const parsed = resetSchema.safeParse({
+    email: formData.get("email"),
+    code: formData.get("code"),
+    password: formData.get("password"),
+    confirm: formData.get("confirm"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide." };
+  }
+
+  const { email, code, password } = parsed.data;
+  // Ralentit les essais répétés.
+  await new Promise((r) => setTimeout(r, 800));
+
+  const user = await prisma.user.findUnique({ where: { email }, include: { memberships: true } });
+  if (!sameSecret(code.trim(), expected) || !user) {
+    return { error: "Email ou code de récupération incorrect." };
+  }
+  const membership = user.memberships[0];
+  if (!membership) {
+    return { error: "Aucun cabinet associé à ce compte." };
+  }
+
+  await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(password) } });
+  await setSessionCookie({ userId: user.id, organizationId: membership.organizationId });
+  redirect("/dashboard");
+}
