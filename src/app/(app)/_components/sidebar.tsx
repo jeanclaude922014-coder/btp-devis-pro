@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Tableau de bord", icon: "◧" },
   { href: "/projects", label: "Projets", icon: "▤" },
   { href: "/dqe", label: "Import DQE & suivi", icon: "⇪" },
+  { href: "/gestion-projet", label: "Gestion projet et suivi", icon: "▥" },
   { href: "/plans", label: "Générateur de plan IA", icon: "▦" },
   { href: "/contacts", label: "Contacts", icon: "☺" },
   { href: "/price-library", label: "Bibliothèque de prix", icon: "≡" },
