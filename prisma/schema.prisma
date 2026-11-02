@@ -41,6 +41,7 @@ model Organization {
   exchangeRates ExchangeRate[]
   floorPlans    FloorPlan[]
   dqeImports    DqeImport[]
+  projectTasks  ProjectTask[]
 }
 
 model User {
@@ -101,6 +102,7 @@ model Project {
   updatedAt        DateTime @updatedAt
 
   quotes Quote[]
+  tasks  ProjectTask[]
 }
 
 // ── Bibliothèque de prix (par lot / corps d'état) ────────────
@@ -235,4 +237,32 @@ model DqeImport {
   updatedAt      DateTime @updatedAt
 
   @@index([organizationId])
+}
+
+// ── Gestion projet et suivi (tableau À faire / En cours / Terminé) ──
+
+model ProjectTask {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projectId      String?
+  project        Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title          String
+  lot            String?  // lot / corps d'état
+  status         String   @default("a_faire") // a_faire, en_cours, termine
+  progress       Int      @default(0) // 0-100
+  priority       String   @default("normale") // haute, normale, basse
+  assignee       String?  // ressource : équipe, chef d'équipe, sous-traitant
+  workers        Int      @default(0) // effectif affecté
+  equipment      String?  // matériel
+  startDate      DateTime?
+  dueDate        DateTime?
+  notes          String?
+  position       Int      @default(0)
+  completedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId, status])
+  @@index([projectId])
 }
