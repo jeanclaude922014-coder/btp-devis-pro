@@ -202,6 +202,12 @@ export function designHeads(inp: DalotInput, mat: Materials): HeadsResult {
     });
   }
   checks.push({
+    id: "T-GC", domain: dom, element: "Garde-corps",
+    label: "Garde-corps de 1,00 m sur les deux rives de la dalle", status: t.gardeCorps ? "conforme" : "non_verifie",
+    ref: "Sécurité des usagers — pratique des marchés AGEROUTE / BNETD",
+    detail: t.gardeCorps ? "Garde-corps en béton armé posé sur le guide-roue (poteaux 20 × 20, lisse 20 × 15)." : "Garde-corps supprimé : à justifier (dispositif de retenue de remplacement).",
+  });
+  checks.push({
     id: "T-RT", domain: dom, element: "Radiers de tête",
     label: "Radiers de tête : dalle sur sol hors passage des véhicules", status: "non_applicable", ref: "Dispositions constructives",
     detail: t.murs
