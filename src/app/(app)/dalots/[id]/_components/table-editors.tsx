@@ -152,7 +152,9 @@ export function AnnexesEditor({ api }: { api: SpecApi }) {
                     <td className="px-2 py-1"><NumCell label={`Hauteur guide-roue ${h}`} value={o.grH} placeholder={fr(t.grH)} min={0.1} max={2} onChange={(x) => setHead(h, { grH: x })} /></td>
                     <td className="px-2 py-1"><NumCell label={`Largeur guide-roue ${h}`} value={o.grL} placeholder={fr(t.grL)} min={0.15} max={0.8} onChange={(x) => setHead(h, { grL: x })} /></td>
                     <td className="px-2 py-1"><NumCell label={`Épaisseur mur de tête ${h}`} value={o.murTeteEp} placeholder={fr(t.murTeteEp)} min={0.15} max={0.6} onChange={(x) => setHead(h, { murTeteEp: x })} /></td>
-                    <td className="px-2 py-1"><NumCell label={`Longueur radier de tête ${h}`} value={o.radierLong} placeholder={fr(t.radierLong)} min={0} max={12} onChange={(x) => setHead(h, { radierLong: x })} /></td>
+                    <td className="px-2 py-1">{layout.heads.find((x) => x.id === h)!.sides.some((sd) => sd.tv.murs)
+                      ? <span title="Radier et bêche arrêtés au bout des ailes" className="block text-right text-xs text-slate-600">{fr(layout.heads.find((x) => x.id === h)!.tv.radierLong)} (ailes)</span>
+                      : <NumCell label={`Longueur radier de tête ${h}`} value={o.radierLong} placeholder={fr(t.radierSaisi)} min={0} max={12} onChange={(x) => setHead(h, { radierLong: x })} />}</td>
                     <td className="px-2 py-1"><NumCell label={`Profondeur bêche ${h}`} value={o.becheProf} placeholder={fr(t.becheProf)} min={0} max={3} onChange={(x) => setHead(h, { becheProf: x })} /></td>
                     <td className="px-2 py-1"><NumCell label={`Épaisseur bêche ${h}`} value={o.becheEp} placeholder={fr(t.becheEp)} min={0.15} max={0.6} onChange={(x) => setHead(h, { becheEp: x })} /></td>
                   </tr>

@@ -170,18 +170,36 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
   const yWing = 0; // les ailes prolongent les voiles : le mur de tête reste sur la largeur de l'ouvrage
   const xMt0 = -t.debord - yWing, wMt = B + 2 * (t.debord + yWing);
   const ends = [{ z0: 0, s: -1 }, { z0: L, s: 1 }] as const;
-  type EndGeo = { z0: number; s: number; th: Tetes; hr: HeadResult; hHead: number; murT: boolean; gcBase: number; tanD: number; tanG: number };
+  // Par rive : aile posée sur le radier de tête, épaisseur côté remblai. Le contour du radier suit la face
+  // extérieure de l'aile puis son about : ni débord du radier au-delà des ailes, ni talon de semelle.
+  type SideGeo = { tan: number; e: number; along: number; outX: number; outZ: number };
+  type EndGeo = { z0: number; s: number; th: Tetes; hr: HeadResult; hHead: number; murT: boolean; gcBase: number; tanD: number; tanG: number; D: SideGeo; G: SideGeo };
+  const sideGeo = (hr: HeadResult, side: "g" | "d"): SideGeo => {
+    const w = hr.wings.find((x) => x.side === side);
+    if (!w || !w.tv.murs) return { tan: 0, e: 0, along: 0, outX: 0, outZ: 0 };
+    const a = (w.tv.angle * Math.PI) / 180;
+    return { tan: Math.tan(a), e: w.tv.ep / Math.cos(a), along: w.tv.long * Math.cos(a), outX: w.tv.long * Math.sin(a) + w.tv.ep * Math.cos(a), outZ: w.tv.long * Math.cos(a) - w.tv.ep * Math.sin(a) };
+  };
   const endGeo: EndGeo[] = ends.map(({ z0, s }, i) => {
     const hr = study.heads.perHead[i];
     const th = hr.tv;
     const hHead = hr.headWall.H;
     const murT = hHead > 0.3;
-    const tanW = (side: "g" | "d") => {
-      const w = hr.wings.find((x) => x.side === side);
-      return w && w.tv.murs ? Math.tan((w.tv.angle * Math.PI) / 180) : 0;
-    };
-    return { z0, s, th, hr, hHead, murT, gcBase: H + (murT ? hHead : th.guideRoues ? th.grH : 0), tanD: tanW("d"), tanG: tanW("g") };
+    const D = sideGeo(hr, "d"), G = sideGeo(hr, "g");
+    return { z0, s, th, hr, hHead, murT, gcBase: H + (murT ? hHead : th.guideRoues ? th.grH : 0), tanD: D.tan, tanG: G.tan, D, G };
   });
+  /** Contour du radier de tête (x en travers, y = distance au nu de l'ouvrage), de la rive droite à la rive gauche. */
+  const radierOutline = (e: EndGeo): [number, number][] => {
+    const dB = e.th.debord, Lr = e.th.radierLong;
+    const side = (g: SideGeo, sgn: 1 | -1, x0: number): [number, number][] => {
+      if (g.along <= 0) return [[x0, 0], [x0, Lr]];
+      const pts: [number, number][] = [[x0 + sgn * g.e, 0], [x0 + sgn * g.outX, g.outZ], [x0 + sgn * g.along * g.tan, g.along]];
+      if (g.along < Lr - 1e-6) pts.push([x0 + sgn * g.along * g.tan, Lr]);
+      return pts;
+    };
+    const right = side(e.D, -1, -dB), left = side(e.G, 1, B + dB);
+    return [...right.slice(0, 1), ...left, ...right.slice(1).reverse()];
+  };
   const gcZ = (e: EndGeo) => (e.murT ? e.z0 - (e.s * e.th.murTeteEp) / 2 : e.th.guideRoues ? e.z0 - (e.s * e.th.grL) / 2 : e.z0 - (e.s * GARDE_CORPS.post) / 2);
   for (const e of endGeo) {
     const { z0, s, th } = e;
@@ -190,29 +208,24 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
     if (th.guideRoues && !e.murT) addConcrete(new THREE.BoxGeometry(wMt, th.grH, th.grL), V(xMt0 + wMt / 2, H + th.grH / 2, z0 - s * th.grL / 2), "GUIDE_ROUES");
     if (th.radierLong > 0) {
       const dB = th.debord, Lr = th.radierLong;
-      // Radier de tête trapézoïdal : petite base B + 2·débord, grande base B + 2·débord + L·(tan αd + tan αg).
-      const sh = new THREE.Shape([new THREE.Vector2(-dB, 0), new THREE.Vector2(B + dB, 0), new THREE.Vector2(B + dB + Lr * e.tanG, Lr), new THREE.Vector2(-dB - Lr * e.tanD, Lr)]);
+      // Bêche sous l'about du radier, d'un about d'aile à l'autre (grande base).
+      const xb0 = -dB - Math.min(e.D.along, Lr) * e.tanD, xb1 = B + dB + Math.min(e.G.along, Lr) * e.tanG;
+      const w = xb1 - xb0;
+      // Radier de tête : petite base B + 2·débord + ailes, s'évase entre les faces extérieures des ailes jusqu'à leur about.
+      const pts = radierOutline(e).filter((p, k, arr) => k === 0 || Math.hypot(p[0] - arr[k - 1][0], p[1] - arr[k - 1][1]) > 1e-6);
+      const sh = new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, y)));
       const geo = new THREE.ExtrudeGeometry(sh, { depth: inp.er, bevelEnabled: false });
       geo.rotateX(Math.PI / 2);
       geo.translate(0, inp.er, 0);
       if (s < 0) geo.scale(1, 1, -1);
       geo.translate(0, 0, z0);
       addConcrete(geo, undefined, "RADIER_TETE");
-      if (th.becheProf > 0) {
-        // Bêche sous l'about du radier de tête, alignée sur ses bords évasés (pas de débord).
-        const zi = Math.max(0, Lr - th.becheEp);
-        const shb = new THREE.Shape([new THREE.Vector2(-dB - zi * e.tanD, zi), new THREE.Vector2(B + dB + zi * e.tanG, zi), new THREE.Vector2(B + dB + Lr * e.tanG, Lr), new THREE.Vector2(-dB - Lr * e.tanD, Lr)]);
-        const gb = new THREE.ExtrudeGeometry(shb, { depth: th.becheProf, bevelEnabled: false });
-        gb.rotateX(Math.PI / 2);
-        if (s < 0) gb.scale(1, 1, -1);
-        gb.translate(0, 0, z0);
-        addConcrete(gb, undefined, "BECHES");
-      }
+      if (th.becheProf > 0) addConcrete(new THREE.BoxGeometry(w, th.becheProf, th.becheEp), V(xb0 + w / 2, -th.becheProf / 2, z0 + s * (Lr - th.becheEp / 2)), "BECHES");
     }
   }
 
-  // ── Murs en aile (voile + semelle), dans le repère local de chaque aile ──
-  type WingGeo = { grp: THREE.Group; hwg: HeadWing; e: EndGeo; sx: number; zr: number; root: number };
+  // ── Murs en aile : voile posé sur le radier de tête, épaisseur côté remblai, sans talon ──
+  type WingGeo = { grp: THREE.Group; hwg: HeadWing; e: EndGeo; sx: number; zr: number; root: number; zo: 1 | -1 };
   const wingGroups: WingGeo[] = [];
   for (const [sx, xr] of [[-1, -t.debord], [1, B + t.debord]] as const) for (const [sz, zr] of [[-1, 0], [1, L]] as const) {
     const e = endGeo[sz < 0 ? 0 : 1];
@@ -222,22 +235,20 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
     // Les ailes montent jusqu'au sommet du mur de tête / guide-roue : pas de marche au raccord.
     const root = Math.max(res.Htot, e.gcBase);
     const aw = (tw.angle * Math.PI) / 180;
-    const ws = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(tw.long, 0), new THREE.Vector2(tw.long, res.Hend), new THREE.Vector2(0, root)]);
-    const geo = new THREE.ExtrudeGeometry(ws, { depth: tw.ep, bevelEnabled: false });
     const dx = sx * Math.sin(aw), dz = sz * Math.cos(aw);
     const grp = new THREE.Group();
     grp.position.set(xr, 0, zr);
     grp.rotation.y = Math.atan2(-dz, dx);
-    // Repère local : z vers le remblai (extérieur), pour que le voile et la semelle restent hors du radier de tête.
-    if (sx !== sz) grp.scale.z = -1;
     scene.add(grp);
-    wingGroups.push({ grp, hwg, e, sx, zr, root });
+    grp.updateMatrixWorld(true);
+    // Sens du z local vers le remblai (extérieur) : l'épaisseur du voile est toujours de ce côté.
+    const probe = grp.localToWorld(V(0, 0, 1));
+    const zo: 1 | -1 = (probe.x - xr) * sx > 0 ? 1 : -1;
+    const ws = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(tw.long, 0), new THREE.Vector2(tw.long, res.Hend), new THREE.Vector2(0, root)]);
+    const geo = new THREE.ExtrudeGeometry(ws, { depth: tw.ep, bevelEnabled: false });
+    if (zo < 0) geo.translate(0, 0, -tw.ep);
+    wingGroups.push({ grp, hwg, e, sx, zr, root, zo });
     addConcrete(geo, undefined, "MURS_AILE", grp);
-    // Semelle = radier de tête sous l'aile (même épaisseur que le radier du corps), patin côté ouvrage.
-    // Seule la partie propre à l'aile (talon côté remblai + pied du voile) : le reste se confond avec le radier de tête.
-    const zf = -tw.patin;
-    const wOwn = Math.min(tw.semelle, tw.patin + tw.ep);
-    addConcrete(new THREE.BoxGeometry(tw.long, tw.semEp, wOwn), V(tw.long / 2, tw.semEp / 2, zf + wOwn / 2), "SEMELLES", grp);
   }
 
   // ── Pli voile / aile : prisme triangulaire entre le bout du voile, la racine de l'aile et sa face intérieure ──
@@ -245,7 +256,7 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
     scene.updateMatrixWorld(true);
     for (const wg of wingGroups) {
       const xr = wg.sx < 0 ? 0 : B, zr = wg.zr;
-      const Ri = wg.grp.localToWorld(V(0, 0, wg.hwg.tv.ep));
+      const Ri = wg.grp.localToWorld(V(0, 0, wg.zo * wg.hwg.tv.ep));
       const pts = [[xr, zr], [Ri.x, Ri.z], [xr - wg.sx * inp.eExt, zr]];
       const pos: number[] = [];
       const y0 = 0, y1 = wg.root;
@@ -473,52 +484,54 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
             for (let py = H + 0.05; py <= H + hHead - c + 1e-9; py += hw.rep.s) bars.seg(V(xMt0 + c, py, z), V(xMt0 + wMt - c, py, z), false);
           }
         }
-        // Radier de tête : deux nappes de barres transversales, barres longitudinales.
+        // Radier de tête : deux nappes de barres transversales, barres longitudinales, jusqu'aux faces extérieures des ailes.
         if (th.radierLong > 0) {
           const Lr = th.radierLong, dB = th.debord;
+          const edge = (g: SideGeo, d: number) => {
+            if (g.along <= 0) return 0;
+            if (d <= g.outZ) return g.e + d * g.tan;
+            if (d <= g.along) return g.outX + ((g.along * g.tan - g.outX) * (d - g.outZ)) / Math.max(1e-6, g.along - g.outZ);
+            return g.along * g.tan;
+          };
           for (let d = c; d <= Lr - c + 1e-9; d += 0.2) {
             const z = z0 + s * d;
-            for (const py of [c, inp.er - c]) bars.seg(V(-dB - d * e.tanD + c, py, z), V(B + dB + d * e.tanG - c, py, z));
+            for (const py of [c, inp.er - c]) bars.seg(V(-dB - edge(e.D, d) + c, py, z), V(B + dB + edge(e.G, d) - c, py, z));
           }
-          const xa = -dB - Lr * e.tanD + c, xb = B + dB + Lr * e.tanG - c;
+          const xa = -dB - Math.max(e.D.outX, e.D.e) + c, xb = B + dB + Math.max(e.G.outX, e.G.e) - c;
           for (let px = xa; px <= xb + 1e-9; px += 0.2) {
-            const d0 = px < -dB ? (e.tanD > 0 ? (-dB - px) / e.tanD : Lr) : px > B + dB ? (e.tanG > 0 ? (px - B - dB) / e.tanG : Lr) : 0;
-            if (d0 >= Lr - c) continue;
-            for (const py of [c + 0.012, inp.er - c - 0.012]) bars.seg(V(px, py, z0 + s * Math.max(c, d0 + c)), V(px, py, z0 + s * (Lr - c)), false);
+            // Profondeur du premier point du radier sur cette ligne longitudinale.
+            let d0 = 0;
+            if (px < -dB - e.D.e) d0 = e.D.tan > 0 ? (-dB - e.D.e - px) / e.D.tan : Lr;
+            if (px > B + dB + e.G.e) d0 = e.G.tan > 0 ? (px - B - dB - e.G.e) / e.G.tan : Lr;
+            let d1 = Lr;
+            for (const [g, out] of [[e.D, -dB - px], [e.G, px - B - dB]] as const) if (g.along > 0 && out > g.along * g.tan) d1 = Math.min(d1, g.outZ);
+            if (d0 >= d1 - c) continue;
+            for (const py of [c + 0.012, inp.er - c - 0.012]) bars.seg(V(px, py, z0 + s * Math.max(c, d0 + c)), V(px, py, z0 + s * (d1 - c)), false);
           }
-          // Bêche : cadres verticaux et filants.
+          // Bêche : cadres verticaux et filants, d'un about d'aile à l'autre.
           if (th.becheProf > 0) {
-            const di = Lr - th.becheEp + c, de = Lr - c;
-            const zb0 = z0 + s * di, zb1 = z0 + s * de;
-            // Bêche alignée sur les bords évasés du radier de tête : largeurs sur ses deux faces.
-            const xl = (d: number) => -dB - d * e.tanD + c, xr = (d: number) => B + dB + d * e.tanG - c;
-            for (let px = xl(di); px <= xr(di) + 1e-9; px += 0.2) {
+            const zb0 = z0 + s * (Lr - th.becheEp + c), zb1 = z0 + s * (Lr - c);
+            const xw = -dB - Math.min(e.D.along, Lr) * e.tanD;
+            const w = B + dB + Math.min(e.G.along, Lr) * e.tanG - xw;
+            for (let px = xw + c; px <= xw + w - c + 1e-9; px += 0.2) {
               bars.poly([V(px, inp.er - c, zb0), V(px, -th.becheProf + c, zb0), V(px, -th.becheProf + c, zb1), V(px, inp.er - c, zb1)]);
             }
-            for (let py = -th.becheProf + c; py <= 0; py += 0.25) {
-              bars.seg(V(xl(di), py, zb0), V(xr(di), py, zb0), false);
-              bars.seg(V(xl(de), py, zb1), V(xr(de), py, zb1), false);
-            }
+            for (let py = -th.becheProf + c; py <= 0; py += 0.25) for (const zz of [zb0, zb1]) bars.seg(V(xw + c, py, zz), V(xw + w - c, py, zz), false);
           }
         }
       }
-      // Murs en aile : barres verticales et horizontales sur les deux faces, cadres de semelle.
+      // Murs en aile : barres verticales (ancrées dans le radier de tête) et horizontales sur les deux faces.
       for (const wg of wingGroups) {
         const wing = wg.hwg.res, tw = wg.hwg.tv, hRoot = wg.root;
         const topAt = (u: number) => hRoot + ((wing.Hend - hRoot) * u) / tw.long;
-        const zf = -tw.patin; // semelle côté ouvrage, sous le radier de tête (section 2-2 des plans types)
         const wb = new Bars();
-        for (const zz of [c, tw.ep - c]) {
+        for (const zz of [wg.zo * c, wg.zo * (tw.ep - c)]) {
           for (let u = c; u <= tw.long - c + 1e-9; u += wing.bars.s) wb.seg(V(u, c, zz), V(u, topAt(u) - c, zz));
           for (let v = c; v <= hRoot - c + 1e-9; v += wing.rep.s) {
             const uMax = v <= wing.Hend ? tw.long - c : (tw.long * (hRoot - v)) / (hRoot - wing.Hend) - c;
             if (uMax > c) wb.seg(V(c, v, zz), V(uMax, v, zz), false);
           }
         }
-        for (let u = c; u <= tw.long - c + 1e-9; u += wing.footBars.s) {
-          wb.poly([V(u, tw.semEp - c, zf + c), V(u, c, zf + c), V(u, c, zf + tw.semelle - c), V(u, tw.semEp - c, zf + tw.semelle - c), V(u, tw.semEp - c, zf + c)]);
-        }
-        for (let w = zf + c; w <= zf + tw.semelle - c + 1e-9; w += 0.2) for (const py of [tw.semEp - c, c]) wb.seg(V(c, py, w), V(tw.long - c, py, w), false);
         wb.addTo(wg.grp, clip);
       }
       // Garde-corps : 4 barres par poteau, 4 filants de lisse.

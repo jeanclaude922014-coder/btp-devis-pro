@@ -163,3 +163,12 @@ et ces cotes.
   effective pour chaque situation (G-SIT-FLOT-n, G-SIT-PORT-n).
 - **Cartouche République de Côte d'Ivoire** : État, devise, drapeau orange – blanc – vert (calques DRAPEAU_ORANGE /
   DRAPEAU_VERT, surfaces SOLID dans le DXF), phase (APS, APD, DAO, EXE, DOE), édité / vérifié / approuvé par.
+
+### Correctif 21.1 — têtes alignées, sans débords
+
+- Avec des murs en aile, le radier de tête et la bêche s'arrêtent exactement au bout des ailes : longueur du radier =
+  longueur d'aile × cos α (la plus longue des deux ailes de la tête), le champ « Longueur des radiers de tête » ne sert
+  plus que sans murs en aile.
+- Les ailes reposent sur le radier de tête, épaisseur côté remblai ; le contour du radier suit leur face extérieure puis
+  leur about ; la bêche va d'un about d'aile à l'autre (grande base) — quantités et maquette 3D.
+- Plus de talon de semelle débordant côté remblai (champ « Débord de la semelle côté remblai » supprimé, débord nul).

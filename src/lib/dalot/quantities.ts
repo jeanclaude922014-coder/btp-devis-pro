@@ -213,8 +213,6 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
     const ts = tanSum(hp);
     // Radier de tête trapézoïdal : petite base B + 2·débord, grande base + L·Σ tan(angle) ; Wrt = largeur moyenne.
     const Wrt = B + 2 * tv.debord + tv.radierLong * ts / 2;
-    // Bêche sous l'about du radier de tête, alignée sur ses bords évasés : largeur moyenne sur son épaisseur.
-    const Wbe = B + 2 * tv.debord + Math.max(0, tv.radierLong - tv.becheEp / 2) * ts;
     if (hw.H > 0.3) {
       add(TETE, "MUR DE TÊTE", `Face côté remblai — barres en attente dans la dalle${tag}`, hw.bars, "L", [hw.H - c, anchor(hw.bars.phi)], k * nAcross(Bmt - 2 * c, hw.bars.s), { nElem: k });
       add(TETE, "MUR DE TÊTE", `Face vue — barres verticales${tag}`, { phi: 10, s: 0.2 }, "L", [hw.H - c, anchor(10)], k * nAcross(Bmt - 2 * c, 0.2), { nElem: k });
@@ -247,17 +245,19 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
       propHeads += 0.05 * kw * wt.long * (wt.semelle + 0.2);
       coffHeads += kw * (2 * wt.long * Havg + 2 * (wt.long + wt.semelle) * wt.semEp);
     }
+    // Bêche sous l'about du radier de tête, d'un about d'aile à l'autre (grande base).
+    const Wb = B + 2 * tv.debord + tv.radierLong * ts;
     if (tv.becheProf > 0) {
-      const nb = nAcross(Wbe - 2 * c, 0.2);
+      const nb = nAcross(Wb - 2 * c, 0.2);
       add(TETE, "BÊCHE", `Cadres verticaux${tag}`, { phi: 8, s: 0.2 }, "U", [tv.becheEp - 2 * c, tv.becheProf + inp.er - 2 * c, tv.becheEp - 2 * c], k * nb, { nElem: k });
-      add(TETE, "BÊCHE", `Filants horizontaux${tag}`, { phi: 10, s: 0.2 }, "droite", [Wbe - 2 * c], k * 2 * nAcross(tv.becheProf, 0.25), { nElem: k });
+      add(TETE, "BÊCHE", `Filants horizontaux${tag}`, { phi: 10, s: 0.2 }, "droite", [Wb - 2 * c], k * 2 * nAcross(tv.becheProf, 0.25), { nElem: k });
       add(TETE, "BÊCHE", `Épingles${tag}`, { phi: 8, s: 0.2 }, "epingle", [0.05, tv.becheEp - 2 * c, 0.05], k * nb, { nElem: k });
     }
     vHead += k * Bmt * hw.H * tv.murTeteEp + (tv.guideRoues && !(hw.H > 0.3) ? k * Bmt * tv.grL * tv.grH : 0);
     vRad += k * Wrt * tv.radierLong * inp.er;
-    vBeche += k * Wbe * tv.becheProf * tv.becheEp;
+    vBeche += k * Wb * tv.becheProf * tv.becheEp;
     propHeads += 0.05 * k * Wrt * tv.radierLong;
-    coffHeads += k * 2 * B * hw.H + k * 2 * Wbe * tv.becheProf;
+    coffHeads += k * 2 * B * hw.H + k * 2 * Wb * tv.becheProf;
     radLong += k * tv.radierLong;
   }
 

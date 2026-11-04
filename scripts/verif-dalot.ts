@@ -70,7 +70,8 @@ for (const [id, model, ids] of [
   const sheets = buildSheets(res.study);
   const okIds = sheets.length === ids.length && ids.every((x, i) => sheets[i].id.startsWith(x));
   const txt = sheets[1].prims.filter((p) => p.t === "text").map((p) => (p.t === "text" ? p.s : ""));
-  const cotes = id === "r200x200" ? ["340", "650", "381"] : ["660", "850", "741"];
+  // Radier de tête arrêté au bout des ailes (v21) : 3,81 × cos 27° = 3,39 m (le plan d'origine portait 3,40 m, 1 cm de décalage).
+  const cotes = id === "r200x200" ? ["339", "650", "381"] : ["660", "850", "741"];
   const okCotes = cotes.every((c) => txt.includes(c));
   if (!okIds || !okCotes) { failed++; console.log(`ÉCHEC  modèle ${model} (${id}) : ${sheets.map((s) => s.id).join(", ")}`); }
   else console.log(`OK   modèle ${model} (${id}) : ${sheets.length} planches, cotes ${cotes.join(" / ")} présentes`);

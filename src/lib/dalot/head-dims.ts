@@ -45,10 +45,17 @@ export function tetesFor(inp: DalotInput, head: HeadId, side: Side = "g"): Tetes
   const t = inp.tetes;
   const ho = inp.annexes.heads[head] ?? {};
   const wo = inp.annexes.wings[`${head}_${side}` as WingPos] ?? {};
+  // Radier de tête et bêche arrêtés au bout de l'aile la plus longue de la tête (projection sur l'axe).
+  const along = (["g", "d"] as Side[]).map((sd) => {
+    const w = inp.annexes.wings[`${head}_${sd}` as WingPos] ?? {};
+    if (!t.murs || w.actif === false) return 0;
+    return (w.long ?? t.long) * Math.cos(((w.angle ?? t.angle) * Math.PI) / 180);
+  });
+  const radier = Math.max(...along) > 0 ? Math.max(...along) : ho.radierLong ?? t.radierSaisi;
   return {
     ...t,
     murTeteEp: ho.murTeteEp ?? t.murTeteEp, grH: ho.grH ?? t.grH, grL: ho.grL ?? t.grL,
-    radierLong: ho.radierLong ?? t.radierLong, becheProf: ho.becheProf ?? t.becheProf, becheEp: ho.becheEp ?? t.becheEp,
+    radierLong: radier, becheProf: ho.becheProf ?? t.becheProf, becheEp: ho.becheEp ?? t.becheEp,
     murs: t.murs && wo.actif !== false,
     angle: wo.angle ?? t.angle, long: wo.long ?? t.long, ep: wo.ep ?? t.ep,
     hEnd: wo.hEnd ?? t.hEnd,

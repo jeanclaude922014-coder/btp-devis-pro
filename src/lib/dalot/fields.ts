@@ -232,11 +232,10 @@ export const FIELDS: FieldDef[] = [
   { key: "aileLong", section: "tetes", group: "Murs en aile", label: "Longueur d'un mur en aile", unit: "m", kind: "number", default: 2.5, min: 0.5, max: 10, step: 0.1, visibleIf: yes("teteMurs") },
   { key: "aileEp", section: "tetes", group: "Murs en aile", label: "Épaisseur du voile", unit: "m", kind: "number", default: 0.25, min: 0.15, max: 0.6, step: 0.01, visibleIf: yes("teteMurs") },
   { key: "aileSemelle", section: "tetes", group: "Murs en aile", label: "Largeur de la semelle (radier de tête sous l'aile, épaisseur = radier du corps)", unit: "m", kind: "number", default: 2.4, min: 0.5, max: 5, step: 0.05, visibleIf: yes("teteMurs") },
-  { key: "aileTalon", section: "tetes", group: "Murs en aile", label: "Débord de la semelle côté remblai (talon)", unit: "m", kind: "number", default: 0, min: 0, max: 2, step: 0.05, visibleIf: yes("teteMurs"), help: "0 = voile aligné sur le bord du radier de tête et de la bêche, comme la section 2-2 des plans types (pas de débord)." },
   { key: "aileBeche", section: "tetes", group: "Murs en aile", label: "Bêche d'ancrage sous semelle (hauteur)", unit: "m", kind: "number", default: 0.4, min: 0, max: 1.5, step: 0.05, visibleIf: yes("teteMurs"), help: "Mobilise la butée devant la semelle (prise à 50 %). 0 = pas de bêche." },
   { key: "murTeteEp", section: "tetes", group: "Mur de tête", label: "Épaisseur du mur de tête", unit: "m", kind: "number", default: 0.2, min: 0.15, max: 0.5, step: 0.01 },
   { key: "murTeteRevanche", section: "tetes", group: "Mur de tête", label: "Revanche au-dessus de la chaussée", unit: "m", kind: "number", default: 0.2, min: 0, max: 1, step: 0.05 },
-  { key: "radierTeteLong", section: "tetes", group: "Radiers de tête et bêches", label: "Longueur des radiers de tête", unit: "m", kind: "number", default: 2.2, min: 0, max: 10, step: 0.1, help: "Au moins la projection des ailes le long de l'axe (longueur × cos α) : les ailes sont encastrées dans le radier de tête." },
+  { key: "radierTeteLong", section: "tetes", group: "Radiers de tête et bêches", label: "Longueur des radiers de tête (sans murs en aile)", unit: "m", kind: "number", default: 2.2, min: 0, max: 10, step: 0.1, visibleIf: (v) => v.teteMurs !== true, help: "Avec des murs en aile, le radier de tête et la bêche s'arrêtent exactement au bout des ailes (longueur × cos α) : la longueur est alors calculée." },
   { key: "radierDebord", section: "tetes", group: "Radiers de tête et bêches", label: "Débord latéral du radier de tête au droit de l'ouvrage (chaque côté)", unit: "m", kind: "number", default: 0, min: 0, max: 3, step: 0.05, help: "Petite base du radier de tête = largeur de l'ouvrage + 2 × débord. Grande base = petite base + 2 × longueur × tan(angle des ailes)." },
   { key: "becheProf", section: "tetes", group: "Radiers de tête et bêches", label: "Profondeur des bêches parafouilles", unit: "m", kind: "number", default: 0.8, min: 0, max: 3, step: 0.05 },
   { key: "becheEp", section: "tetes", group: "Radiers de tête et bêches", label: "Épaisseur des bêches", unit: "m", kind: "number", default: 0.25, min: 0.15, max: 0.6, step: 0.01 },
@@ -426,7 +425,11 @@ export type DalotInput = {
   custom: { name: string; axles: { P: number; d: number }[]; voie: number; roue: number; gU: number; gS: number };
   tanDiff: number; pas: number;
   tetes: {
-    murs: boolean; angle: number; long: number; ep: number; semelle: number; semEp: number; patin: number; beche: number;
+    murs: boolean; angle: number; long: number; ep: number; semelle: number; semEp: number;
+    /** Débord de semelle côté remblai : nul (les ailes reposent sur le radier de tête, sans débord). */
+    patin: number; beche: number;
+    /** Longueur saisie du radier de tête, retenue seulement sans murs en aile. */
+    radierSaisi: number;
     murTeteEp: number; revanche: number; radierLong: number; debord: number; becheProf: number; becheEp: number; guideRoues: boolean; gardeCorps: boolean; gcCover: number; grH: number; grL: number;
     /** Hauteur imposée en bout d'aile (null = déduite du talus). */
     hEnd: number | null;
@@ -526,9 +529,11 @@ export function toInput(spec: DalotSpec): DalotInput {
     tanDiff: num(v.tanDiff, 1), pas: Math.max(0.05, num(v.pas, 0.1)),
     tetes: {
       murs: v.teteMurs === true, angle: num(v.aileAngle, 30), long: num(v.aileLong, 2.5), ep: num(v.aileEp, 0.25),
-      semelle: num(v.aileSemelle, 2.4), semEp: v.radierEgalDalle === false ? num(v.er, 0.25) : num(v.es, 0.3), patin: num(v.aileTalon, 0), beche: num(v.aileBeche, 0),
+      semelle: num(v.aileSemelle, 2.4), semEp: v.radierEgalDalle === false ? num(v.er, 0.25) : num(v.es, 0.3), patin: 0, beche: num(v.aileBeche, 0),
       murTeteEp: num(v.murTeteEp, 0.2), revanche: num(v.murTeteRevanche, 0.2),
-      radierLong: num(v.radierTeteLong, 2.2), debord: Math.max(0, num(v.radierDebord, 0)), becheProf: num(v.becheProf, 0.8), becheEp: num(v.becheEp, 0.25),
+      // Radier de tête (et bêche) arrêté au bout des ailes : longueur = projection des ailes sur l'axe.
+      radierLong: v.teteMurs === true ? num(v.aileLong, 2.5) * Math.cos((num(v.aileAngle, 30) * Math.PI) / 180) : num(v.radierTeteLong, 2.2),
+      radierSaisi: num(v.radierTeteLong, 2.2), debord: Math.max(0, num(v.radierDebord, 0)), becheProf: num(v.becheProf, 0.8), becheEp: num(v.becheEp, 0.25),
       // Avec des murs en aile, un guide-roue (ou le mur de tête) est toujours présent : il fait le raccord voile / aile.
       guideRoues: v.guideRoues === true || v.teteMurs === true, gardeCorps: v.gardeCorps !== false, gcCover: num(v.gcCover, 0.025),
       grH: num(v.guideRoueH, 0.2), grL: num(v.guideRoueL, 0.25), hEnd: null,
@@ -599,7 +604,7 @@ export const DALOT_PRESETS: DalotPreset[] = [
     id: "r2x300x300", label: "Dalot double 2 × 3,00 × 3,00 — plan type D07",
     description: "D'après le plan D07 : piédroits 25 cm, dalle et radier 30 cm, L = 7,00 m, murs en aile de 4,00 m à 30°, bêches 20 × 120, guide-roues 25 × 40, chaussée sur la dalle.",
     values: { ...RURAL, projet: "Dalot double 2 × 3,00 × 3,00", nCells: 2, opening: 3, hInt: 3, es: 0.3, er: 0.3, eExt: 0.25, eInt: 0.25, L: 7,
-      hr: 0, ech: 0, aileLong: 4, aileEp: 0.2, becheProf: 1.2, becheEp: 0.2, radierTeteLong: 3.6, guideRoues: true, guideRoueH: 0.4, hyActif: false,
+      hr: 0, ech: 0, aileLong: 4, aileEp: 0.2, becheProf: 1.2, becheEp: 0.2, radierTeteLong: 3.5, guideRoues: true, guideRoueH: 0.4, hyActif: false,
       maitreOuvrage: "", localisation: "Côte d'Ivoire", numPlan: "D07", modelePlans: "engc" },
   },
   {

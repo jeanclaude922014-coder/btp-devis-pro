@@ -276,7 +276,9 @@ export function HeadsAside({ api }: { api: SpecApi }) {
     { label: "Longueur des ailes", value: fr(long), unit: "m", steps: [["−0,25", () => set("aileLong", long - 0.25, 0.5, 10)], ["−0,05", () => set("aileLong", long - 0.05, 0.5, 10)], ["+0,05", () => set("aileLong", long + 0.05, 0.5, 10)], ["+0,25", () => set("aileLong", long + 0.25, 0.5, 10)]], edit: { val: long, on: (x) => set("aileLong", x, 0.5, 10), min: 0.5, max: 10 } },
     { label: "Épaisseur des ailes", value: fr(ep), unit: "m", steps: [["−0,05", () => set("aileEp", ep - 0.05, 0.15, 0.6)], ["−0,01", () => set("aileEp", ep - 0.01, 0.15, 0.6)], ["+0,01", () => set("aileEp", ep + 0.01, 0.15, 0.6)], ["+0,05", () => set("aileEp", ep + 0.05, 0.15, 0.6)]], edit: { val: ep, on: (x) => set("aileEp", x, 0.15, 0.6), min: 0.15, max: 0.6 } },
     { label: `Angle des ailes / axe (${fr(gr, 1)} gr)`, value: fr(ang, 1), unit: "°", steps: [["−5°", () => setAngle(ang - 5)], ["−1°", () => setAngle(ang - 1)], ["+1°", () => setAngle(ang + 1)], ["+5°", () => setAngle(ang + 5)], ["30 gr", () => setAngle(27)], ["45°", () => setAngle(45)]], edit: { val: ang, on: (x) => setAngle(x), min: 0, max: 75 } },
-    { label: "Longueur du radier de tête", value: fr(radL), unit: "m", steps: [["−0,25", () => set("radierTeteLong", radL - 0.25, 0, 10)], ["−0,05", () => set("radierTeteLong", radL - 0.05, 0, 10)], ["+0,05", () => set("radierTeteLong", radL + 0.05, 0, 10)], ["+0,25", () => set("radierTeteLong", radL + 0.25, 0, 10)]], edit: { val: radL, on: (x) => set("radierTeteLong", x, 0, 10), min: 0, max: 10 } },
+    murs
+      ? { label: "Longueur du radier de tête (= projection des ailes, bêche au bout des ailes)", value: fr(radL), unit: "m", steps: [], note: "calculée : longueur d'aile × cos α ; se règle par la longueur ou l'angle des ailes" }
+      : { label: "Longueur du radier de tête", value: fr(radL), unit: "m", steps: [["−0,25", () => set("radierTeteLong", radL - 0.25, 0, 10)], ["−0,05", () => set("radierTeteLong", radL - 0.05, 0, 10)], ["+0,05", () => set("radierTeteLong", radL + 0.05, 0, 10)], ["+0,25", () => set("radierTeteLong", radL + 0.25, 0, 10)]], edit: { val: radL, on: (x) => set("radierTeteLong", x, 0, 10), min: 0, max: 10 } },
     { label: "Petite base du radier (au droit de l'ouvrage)", value: fr(pb), unit: "m", steps: [["−0,10", () => setPB(pb - 0.1)], ["+0,10", () => setPB(pb + 0.1)], ["+0,50", () => setPB(pb + 0.5)], ["= largeur ouvrage", () => setPB(B)]], edit: { val: pb, on: setPB, min: B, max: B + 6 }, note: `minimum = largeur extérieure de l'ouvrage (${fr(B)} m) ; débord ${fr(deb)} m de chaque côté` },
     { label: "Grande base du radier (extrémité)", value: fr(gb), unit: "m", steps: murs && radL > 0 ? [["−0,50", () => setGB(gb - 0.5)], ["−0,10", () => setGB(gb - 0.1)], ["+0,10", () => setGB(gb + 0.1)], ["+0,50", () => setGB(gb + 0.5)]] : [], edit: murs && radL > 0 ? { val: gb, on: setGB, min: pb, max: pb + 2 * radL * Math.tan((75 * Math.PI) / 180) } : undefined, note: murs ? "réglée par l'angle des ailes (longueur du radier fixée)" : "murs en aile désactivés : grande base = petite base" },
   ];
@@ -297,7 +299,9 @@ export function HeadsAside({ api }: { api: SpecApi }) {
   const svg = `<svg viewBox="0 0 380 ${hgt.toFixed(0)}" width="100%" font-family="Arial">
     <rect x="${X(-cx)}" y="${Y(-0.9)}" width="${B * k}" height="${0.9 * k}" fill="#cbd5e1" stroke="#0f172a"/>
     ${txt(cx, -0.35, `Ouvrage ${fr(B)} m`, "middle", "#0f172a")}
-    ${radL > 0 ? `<polygon points="${P([[-deb, 0], [B + deb, 0], [B + deb + (murs ? radL * Math.tan(a) : 0), radL], [-deb - (murs ? radL * Math.tan(a) : 0), radL]])}" fill="#e2e8f0" stroke="#0f172a"/>` : ""}
+    ${radL > 0 ? `<polygon points="${P(murs
+      ? [[-deb - ep / Math.cos(a), 0], [B + deb + ep / Math.cos(a), 0], [B + deb + long * Math.sin(a) + ep * Math.cos(a), along - ep * Math.sin(a)], [B + deb + radL * Math.tan(a), radL], [-deb - radL * Math.tan(a), radL], [-deb - long * Math.sin(a) - ep * Math.cos(a), along - ep * Math.sin(a)]]
+      : [[-deb, 0], [B + deb, 0], [B + deb, radL], [-deb, radL]])}" fill="#e2e8f0" stroke="#0f172a"/>` : ""}
     ${murs ? `<polygon points="${wing(-1)}" fill="#94a3b8" stroke="#0f172a"/><polygon points="${wing(1)}" fill="#94a3b8" stroke="#0f172a"/>` : ""}
     ${txt(cx, 0.35, `petite base ${fr(pb)} m`)}
     ${radL > 0 ? txt(cx, radL + 0.45, `grande base ${fr(gb)} m`) : ""}
@@ -305,7 +309,7 @@ export function HeadsAside({ api }: { api: SpecApi }) {
     ${murs ? txt(B + deb + Math.sin(a) * long * 0.5 + 0.35, Math.cos(a) * long * 0.5, `aile ${fr(long)} m`, "start") : ""}
     ${murs ? txt(-deb - Math.sin(a) * long * 0.5 - 0.35, Math.cos(a) * long * 0.5, `${fr(ang, 1)}° · ép. ${fr(ep)}`, "end") : ""}
   </svg>`;
-  const applyRec = () => api.setValues({ aileLong: r2(Math.ceil(dims.longRec / 0.05) * 0.05), radierTeteLong: r2(Math.ceil(dims.alongRec / 0.05) * 0.05) });
+  const applyRec = () => api.setValues({ aileLong: r2(Math.ceil(dims.longRec / 0.05) * 0.05) });
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-4">
@@ -325,7 +329,7 @@ export function HeadsAside({ api }: { api: SpecApi }) {
         </table>
         {murs && (
           <button type="button" onClick={applyRec} className="mt-2 w-full rounded-md bg-blue-800 px-2 py-1.5 text-xs font-semibold text-white hover:bg-blue-900">
-            Appliquer les dimensions calculées (ailes {fr(Math.ceil(dims.longRec / 0.05) * 0.05)} m, radier {fr(Math.ceil(dims.alongRec / 0.05) * 0.05)} m)
+            Appliquer la longueur d&apos;aile calculée ({fr(Math.ceil(dims.longRec / 0.05) * 0.05)} m) — le radier de tête suit
           </button>
         )}
         {murs && dims.Hend > H_END_MIN + 0.01 && <p className="mt-2 text-xs text-amber-800">Les ailes actuelles sont trop courtes : le talus arrive à {fr(dims.Hend)} m de hauteur en bout d&apos;aile (au lieu de {fr(H_END_MIN)} m).</p>}
