@@ -1794,6 +1794,65 @@ function ficheCroquis(){
   telecharger(new TextEncoder().encode(JSON.stringify(fiche,null,2)),"fiche_projet_croquis.json","application/json");
 }
 
+// ============================================================ EXPORT IFC2X3 (maquette BIM)
+function ifcTexte(mod){
+  const L=[]; let n=0; const E=s=>{n++; L.push(`#${n}=${s};`); return `#${n}`;};
+  const CH="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$";
+  const guid=()=>{let s=CH[Math.floor(Math.random()*4)]; for(let i=1;i<22;i++) s+=CH[Math.floor(Math.random()*64)]; return `'${s}'`;};
+  const str=t=>"'"+String(t).replace(/'/g,"''").replace(/[^\x20-\x7E]/g,c=>"\\X2\\"+c.charCodeAt(0).toString(16).toUpperCase().padStart(4,"0")+"\\X0\\")+"'";
+  const r=x=>{let s=(+x).toFixed(5).replace(/0+$/,""); return s.endsWith(".")?s:s;};
+  const pt=p=>E(`IFCCARTESIANPOINT((${p.map(r).join(",")}))`), dirE=d=>E(`IFCDIRECTION((${d.map(r).join(",")}))`);
+  const pers=E(`IFCPERSON($,${str(P.auteur||"Moulo Jean Claude")},$,$,$,$,$,$)`), org=E(`IFCORGANIZATION($,${str(P.auteur||"Bureau d'études")},$,$,$)`);
+  const po=E(`IFCPERSONANDORGANIZATION(${pers},${org},$)`), app=E(`IFCAPPLICATION(${org},'1.0',${str("Générateur de plans – charpente métallique")},'GENPLANS')`);
+  const oh=E(`IFCOWNERHISTORY(${po},${app},$,.ADDED.,$,$,$,${Math.floor(Date.now()/1000)})`);
+  const u1=E("IFCSIUNIT(*,.LENGTHUNIT.,$,.METRE.)"), u2=E("IFCSIUNIT(*,.AREAUNIT.,$,.SQUARE_METRE.)"), u3=E("IFCSIUNIT(*,.VOLUMEUNIT.,$,.CUBIC_METRE.)"), u4=E("IFCSIUNIT(*,.PLANEANGLEUNIT.,$,.RADIAN.)");
+  const units=E(`IFCUNITASSIGNMENT((${u1},${u2},${u3},${u4}))`);
+  const O=pt([0,0,0]), Z=dirE([0,0,1]), X=dirE([1,0,0]), ax0=E(`IFCAXIS2PLACEMENT3D(${O},${Z},${X})`);
+  const ctx=E(`IFCGEOMETRICREPRESENTATIONCONTEXT($,'Model',3,1.E-05,${ax0},$)`);
+  const proj=E(`IFCPROJECT(${guid()},${oh},${str(P.projet||"Projet")},${str("Bâtiment industriel en charpente métallique")},$,$,$,(${ctx}),${units})`);
+  const lp=(rel,ax)=>E(`IFCLOCALPLACEMENT(${rel},${ax})`);
+  const lpSite=lp("$",E(`IFCAXIS2PLACEMENT3D(${pt([0,0,0])},$,$)`)), site=E(`IFCSITE(${guid()},${oh},${str(P.lieu||"Site")},$,$,${lpSite},$,$,.ELEMENT.,$,$,$,$,$)`);
+  const lpBat=lp(lpSite,E(`IFCAXIS2PLACEMENT3D(${pt([0,0,0])},$,$)`)), bat=E(`IFCBUILDING(${guid()},${oh},${str(P.projet||"Bâtiment")},$,$,${lpBat},$,$,.ELEMENT.,$,$,$)`);
+  const lpNiv=lp(lpBat,E(`IFCAXIS2PLACEMENT3D(${pt([0,0,0])},$,$)`)), niv=E(`IFCBUILDINGSTOREY(${guid()},${oh},${str("Rez-de-chaussée")},$,$,${lpNiv},$,$,.ELEMENT.,0.)`);
+  E(`IFCRELAGGREGATES(${guid()},${oh},$,$,${proj},(${site}))`); E(`IFCRELAGGREGATES(${guid()},${oh},$,$,${site},(${bat}))`); E(`IFCRELAGGREGATES(${guid()},${oh},$,$,${bat},(${niv}))`);
+  const pos2d=E(`IFCAXIS2PLACEMENT2D(${pt([0,0])},$)`), profils={}, acier=[], beton=[], toles=[], tous=[], psets=[];
+  const profil=(e)=>{const D=e.dim, k=e.prof; if(profils[k]) return profils[k];
+    if(D.I) profils[k]=E(`IFCISHAPEPROFILEDEF(.AREA.,${str(k)},${pos2d},${r(D.b)},${r(D.h)},${r(D.tw)},${r(D.tf)},$)`);
+    else if(/^Rond/.test(k)) profils[k]=E(`IFCCIRCLEPROFILEDEF(.AREA.,${str(k)},${pos2d},${r(D.h/2)})`);
+    else profils[k]=E(`IFCRECTANGLEPROFILEDEF(.AREA.,${str(k)},${pos2d},${r(Math.max(D.b,0.004))},${r(Math.max(D.h,0.004))})`);
+    return profils[k];};
+  const corps=(prof,len)=>{const sol=E(`IFCEXTRUDEDAREASOLID(${prof},${E(`IFCAXIS2PLACEMENT3D(${pt([0,0,0])},$,$)`)},${Z},${r(len)})`);
+    return E(`IFCPRODUCTDEFINITIONSHAPE($,$,(${E(`IFCSHAPEREPRESENTATION(${ctx},'Body','SweptSolid',(${sol}))`)}))`);};
+  mod.M.forEach(e=>{
+    let pl, shape, nom=e.nom||e.prof;
+    if(e.box){const [x0,y0,z0,x1,y1,z1]=e.box;
+      pl=lp(lpNiv,E(`IFCAXIS2PLACEMENT3D(${pt([(x0+x1)/2,(y0+y1)/2,z0])},${Z},${X})`));
+      shape=corps(E(`IFCRECTANGLEPROFILEDEF(.AREA.,$,${pos2d},${r(x1-x0)},${r(y1-y0)})`),z1-z0);
+      const f=E(`IFCFOOTING(${guid()},${oh},${str(nom)},$,$,${pl},${shape},$,.PAD_FOOTING.)`); beton.push(f); tous.push(f); return;}
+    const {dir,wv}=reperesBarre(e), len=Math.hypot(...v3.sub(e.b,e.a));
+    pl=lp(lpNiv,E(`IFCAXIS2PLACEMENT3D(${pt(e.a)},${dirE(dir)},${dirE(wv)})`)); shape=corps(profil(e),len);
+    const cls=e.ifc==="IfcColumn"?"IFCCOLUMN":(e.ifc==="IfcBeam"?"IFCBEAM":"IFCMEMBER");
+    const el=E(`${cls}(${guid()},${oh},${str(nom)},${str(e.prof)},${str(e.prof)},${pl},${shape},$)`); acier.push(el); tous.push(el);
+    if(e.grp&&CALC) psets.push([el,e.prof,CALC.ratios[e.grp]||0]); else psets.push([el,e.prof,null]);});
+  mod.PAN.forEach(pn=>{ if(pn.pts.length<3) return;
+    const p0=pn.pts[0], xa=v3.norm(v3.sub(pn.pts[1],p0)), nz=v3.norm(v3.cross(v3.sub(pn.pts[1],p0),v3.sub(pn.pts[pn.pts.length-1],p0))), ya=v3.cross(nz,xa);
+    const loc=pn.pts.map(q=>{const d_=v3.sub(q,p0); return [v3.dot(d_,xa),v3.dot(d_,ya)];}); loc.push(loc[0]);
+    const poly=E(`IFCPOLYLINE((${loc.map(q=>pt(q)).join(",")}))`), prof=E(`IFCARBITRARYCLOSEDPROFILEDEF(.AREA.,$,${poly})`);
+    const pl=lp(lpNiv,E(`IFCAXIS2PLACEMENT3D(${pt(p0)},${dirE(nz)},${dirE(xa)})`)), shape=corps(prof,pn.nom==="Maçonnerie agglos"?0.15:0.0045);
+    const type=pn.calque==="couverture"?".ROOFING.":".CLADDING.";
+    const c=E(`IFCCOVERING(${guid()},${oh},${str(pn.nom)},$,$,${pl},${shape},$,${type})`); toles.push(c); tous.push(c);});
+  E(`IFCRELCONTAINEDINSPATIALSTRUCTURE(${guid()},${oh},$,$,(${tous.join(",")}),${niv})`);
+  const mA=E(`IFCMATERIAL(${str("Acier S"+(CALC_PR?CALC_PR.fy:235))})`), mB=E(`IFCMATERIAL(${str("Béton C"+(P.ab_fck||25))})`), mT=E(`IFCMATERIAL(${str("Tôle d'acier / maçonnerie")})`);
+  if(acier.length) E(`IFCRELASSOCIATESMATERIAL(${guid()},${oh},$,$,(${acier.join(",")}),${mA})`);
+  if(beton.length) E(`IFCRELASSOCIATESMATERIAL(${guid()},${oh},$,$,(${beton.join(",")}),${mB})`);
+  if(toles.length) E(`IFCRELASSOCIATESMATERIAL(${guid()},${oh},$,$,(${toles.join(",")}),${mT})`);
+  psets.forEach(([el,prof,ratio])=>{const props=[E(`IFCPROPERTYSINGLEVALUE('Profil',$,IFCLABEL(${str(prof)}),$)`)];
+    if(ratio!=null) props.push(E(`IFCPROPERTYSINGLEVALUE('TauxTravailEC3',$,IFCREAL(${r(ratio)}),$)`));
+    const ps=E(`IFCPROPERTYSET(${guid()},${oh},'Pset_CharpenteMetallique',$,(${props.join(",")}))`);
+    E(`IFCRELDEFINESBYPROPERTIES(${guid()},${oh},$,$,(${el}),${ps})`);});
+  const date=new Date().toISOString().slice(0,19);
+  return `ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION(('ViewDefinition [CoordinationView]'),'2;1');\nFILE_NAME('Maquette_BIM.ifc','${date}',(${str(P.auteur||"")}),(''),'Generateur de plans','Generateur de plans','');\nFILE_SCHEMA(('IFC2X3'));\nENDSEC;\nDATA;\n${L.join("\n")}\nENDSEC;\nEND-ISO-10303-21;\n`;
+}
 // ============================================================ planches + cartouches
 const LEG="Couleurs : charpente en bleu · contreventements en orange · béton en gris · aciers en rouge · maçonnerie en marron clair · cotes et baies en noir · translucides hachurés en bleu clair · remblai en latérite";
 function legende(k,g){

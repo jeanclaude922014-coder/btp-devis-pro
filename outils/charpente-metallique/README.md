@@ -202,6 +202,40 @@ Livrables d'exemple dans `exemples/` : notes de calcul Word, plans DXF, rapports
 
 > Limites : vent EC1 simplifié (coefficients de pression moyens) ; assemblages, bracons et fondations à justifier séparément (rapport de vérification du classeur pour les fondations) ; pas de liaison directe avec AutoCAD, Robot ou IDEA StatiCa. Le DXF s'ouvre dans AutoCAD, et un export vers Robot pourra être étudié.
 
+## De l'esquisse au plan 2D, à la maquette 3D et au BIM (dans `Generateur_Plans.html`)
+
+Tout se fait dans le navigateur, sans connexion :
+
+1. **Mode croquis.** Dessiner la coupe à main levée, à la souris ou au doigt : poteaux, puis versants. Le bouton *Reconnaître* identifie :
+   - les poteaux de rive et de noue ;
+   - les faîtages et les poteaux de faîtage ;
+   - la portée et la pente de chaque nef.
+
+   Saisir ensuite la largeur totale et les hauteurs, puis cliquer sur *Appliquer* : la fiche du formulaire est remplie (nefs, portées, pentes, H), et les planches 2D et le calcul EC3 se régénèrent.
+2. **Maquette 3D navigable.** Le modèle contient :
+   - les portiques, pannes, lisses et contreventements ;
+   - les semelles et fûts ;
+   - la couverture, le bardage et la maçonnerie.
+
+   Navigation : orbite à la souris, zoom à la molette, pincement au doigt. Les barres sont colorées selon le taux de travail EC3, et le cadrage est automatique.
+3. **Exports 3D.**
+   - *Image* : PNG.
+   - *OBJ* : SketchUp, Blender.
+   - *DXF 3D* : faces 3DFACE pour AutoCAD.
+   - *IFC* : maquette BIM IFC2X3, ouvrable dans Revit, ArchiCAD, Tekla, BIMvision ou BlenderBIM.
+
+Contenu du fichier IFC :
+- **Hiérarchie spatiale :** projet, site, bâtiment, rez-de-chaussée.
+- **Charpente :**
+  - IfcColumn pour les poteaux, IfcBeam pour les traverses et sablières, IfcMember pour les pannes, lisses et contreventements ;
+  - chaque barre est une extrusion de son vrai profil (IfcIShapeProfileDef pour IPE et HEA, rond ou plat).
+- **Fondations :** IfcFooting (semelles et fûts en béton armé).
+- **Enveloppe :** IfcCovering ROOFING pour la couverture, CLADDING pour le bardage et la maçonnerie.
+- **Matériaux :** acier S235/S275/S355, béton C25 et tôle.
+- **Propriétés :** chaque barre porte le jeu `Pset_CharpenteMetallique`, avec le profil et le taux de travail EC3.
+
+Contrôle : le fichier du gabarit 20 × 40 m a été relu avec ifcopenshell, et les 202 éléments sont géométriquement valides.
+
 ## Régénérer le classeur
 
 ```bash
