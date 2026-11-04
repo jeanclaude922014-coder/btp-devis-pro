@@ -219,7 +219,7 @@ export const FIELDS: FieldDef[] = [
   { key: "aileLong", section: "tetes", group: "Murs en aile", label: "Longueur d'un mur en aile", unit: "m", kind: "number", default: 2.5, min: 0.5, max: 10, step: 0.1, visibleIf: yes("teteMurs") },
   { key: "aileEp", section: "tetes", group: "Murs en aile", label: "Épaisseur du voile", unit: "m", kind: "number", default: 0.25, min: 0.15, max: 0.6, step: 0.01, visibleIf: yes("teteMurs") },
   { key: "aileSemelle", section: "tetes", group: "Murs en aile", label: "Largeur de la semelle (radier de tête sous l'aile, épaisseur = radier du corps)", unit: "m", kind: "number", default: 2.4, min: 0.5, max: 5, step: 0.05, visibleIf: yes("teteMurs") },
-  { key: "aileTalon", section: "tetes", group: "Murs en aile", label: "Débord de la semelle côté remblai (talon)", unit: "m", kind: "number", default: 0.4, min: 0, max: 2, step: 0.05, visibleIf: yes("teteMurs") },
+  { key: "aileTalon", section: "tetes", group: "Murs en aile", label: "Débord de la semelle côté remblai (talon)", unit: "m", kind: "number", default: 0, min: 0, max: 2, step: 0.05, visibleIf: yes("teteMurs"), help: "0 = voile aligné sur le bord du radier de tête et de la bêche, comme la section 2-2 des plans types (pas de débord)." },
   { key: "aileBeche", section: "tetes", group: "Murs en aile", label: "Bêche d'ancrage sous semelle (hauteur)", unit: "m", kind: "number", default: 0.4, min: 0, max: 1.5, step: 0.05, visibleIf: yes("teteMurs"), help: "Mobilise la butée devant la semelle (prise à 50 %). 0 = pas de bêche." },
   { key: "murTeteEp", section: "tetes", group: "Mur de tête", label: "Épaisseur du mur de tête", unit: "m", kind: "number", default: 0.2, min: 0.15, max: 0.5, step: 0.01 },
   { key: "murTeteRevanche", section: "tetes", group: "Mur de tête", label: "Revanche au-dessus de la chaussée", unit: "m", kind: "number", default: 0.2, min: 0, max: 1, step: 0.05 },
@@ -415,7 +415,7 @@ export function toInput(spec: DalotSpec): DalotInput {
     tanDiff: num(v.tanDiff, 1), pas: Math.max(0.05, num(v.pas, 0.1)),
     tetes: {
       murs: v.teteMurs === true, angle: num(v.aileAngle, 30), long: num(v.aileLong, 2.5), ep: num(v.aileEp, 0.25),
-      semelle: num(v.aileSemelle, 2.4), semEp: v.radierEgalDalle === false ? num(v.er, 0.25) : num(v.es, 0.3), patin: num(v.aileTalon, 0.4), beche: num(v.aileBeche, 0),
+      semelle: num(v.aileSemelle, 2.4), semEp: v.radierEgalDalle === false ? num(v.er, 0.25) : num(v.es, 0.3), patin: num(v.aileTalon, 0), beche: num(v.aileBeche, 0),
       murTeteEp: num(v.murTeteEp, 0.2), revanche: num(v.murTeteRevanche, 0.2),
       radierLong: num(v.radierTeteLong, 2.2), debord: Math.max(0, num(v.radierDebord, 0)), becheProf: num(v.becheProf, 0.8), becheEp: num(v.becheEp, 0.25),
       // Avec des murs en aile, un guide-roue (ou le mur de tête) est toujours présent : il fait le raccord voile / aile.
@@ -486,7 +486,7 @@ export const DALOT_PRESETS: DalotPreset[] = [
     id: "r2x300x300", label: "Dalot double 2 × 3,00 × 3,00 — plan type D07",
     description: "D'après le plan D07 : piédroits 25 cm, dalle et radier 30 cm, L = 7,00 m, murs en aile de 4,00 m à 30°, bêches 20 × 120, guide-roues 25 × 40, chaussée sur la dalle.",
     values: { ...RURAL, projet: "Dalot double 2 × 3,00 × 3,00", nCells: 2, opening: 3, hInt: 3, es: 0.3, er: 0.3, eExt: 0.25, eInt: 0.25, L: 7,
-      hr: 0, ech: 0, aileLong: 4, aileEp: 0.2, becheProf: 1.2, becheEp: 0.2, radierTeteLong: 3.5, guideRoues: true, guideRoueH: 0.4, hyActif: false,
+      hr: 0, ech: 0, aileLong: 4, aileEp: 0.2, becheProf: 1.2, becheEp: 0.2, radierTeteLong: 3.6, guideRoues: true, guideRoueH: 0.4, hyActif: false,
       maitreOuvrage: "", localisation: "Côte d'Ivoire", numPlan: "D07", modelePlans: "engc" },
   },
   {

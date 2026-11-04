@@ -603,15 +603,18 @@ function elevationTete(study: Study): View {
   const g = geo(study);
   const { inp, B, cells, hg, t, yTop } = g;
   const acr = hg.across + g.d;
+  // Radier de tête et bêche vus de face : grande base du radier (alignée sur la bêche), indépendante des ailes.
+  const gbH = g.d + (t.murs ? t.radierLong * g.tanA : 0);
+  const xm = Math.max(acr, gbH);
   return {
-    ext: { x0: -acr, y0: -t.becheProf, w: B + 2 * acr, h: yTop + t.becheProf },
+    ext: { x0: -xm, y0: -t.becheProf, w: B + 2 * xm, h: yTop + t.becheProf },
     pad: { l: 22, r: 10, b: 14, t: 18 },
     draw: (p) => {
       p.rect(0, inp.er, B, yTop - inp.er, "COFFRAGE");
       for (const c of cells) p.rect(c.x0, inp.er, c.x1 - c.x0, inp.hInt, "COFFRAGE");
-      p.rect(-acr, 0, B + 2 * acr, inp.er, "COFFRAGE");
+      p.rect(-gbH, 0, B + 2 * gbH, inp.er, "COFFRAGE");
       if (t.becheProf > 0) {
-        p.rect(-acr, -t.becheProf, B + 2 * acr, t.becheProf, "AXES");
+        p.rect(-gbH, -t.becheProf, B + 2 * gbH, t.becheProf, "AXES");
         leader(p, [B / 2, -t.becheProf / 2], [B / 2 + p.th(4), -t.becheProf - p.th(6)], `BÊCHE ${cmTxt(t.becheEp)} × ${cmTxt(t.becheProf)}`, 2.2);
       }
       if (t.murs) {
@@ -626,7 +629,7 @@ function elevationTete(study: Study): View {
       }
       p.chainH([-acr, 0, B, B + acr].filter((v, i, a) => i === 0 || v - a[i - 1] > 1e-6), yTop, yTop + p.th(8), false);
       const ys = [-t.becheProf, 0, inp.er, ...(t.murs ? [inp.er + hg.Hend] : [])].filter((v, i, a) => i === 0 || v - a[i - 1] > 1e-6);
-      p.chainV(ys, -acr, -acr - p.th(8), false);
+      p.chainV(ys, -xm, -xm - p.th(8), false);
     },
   };
 }

@@ -79,13 +79,11 @@ function candidates(spec: DalotSpec, c: Check): Candidate[] {
   } else if (id === "G-TALUS") {
     out.push({ kind: "num", key: "talusPente", label: "Fruit du talus (H/V)", step: 0.25, max: 4, unit: "" });
   } else if (id === "T-MA-GLIS") {
-    out.push({ kind: "num", key: "aileBeche", label: "Bêche d'ancrage sous la semelle des murs en aile", step: 0.05, max: 1.5, unit: "m" });
-    out.push({ kind: "num", key: "aileSemelle", label: "Largeur de la semelle des murs en aile", step: 0.1, max: 6, unit: "m" });
-  } else if (id === "T-MA-RENV" || id === "T-MA-EXC") {
-    out.push({ kind: "num", key: "aileSemelle", label: "Largeur de la semelle des murs en aile", step: 0.1, max: 6, unit: "m" });
-    out.push({ kind: "num", key: "aileTalon", label: "Patin avant de la semelle", step: 0.05, max: 2, unit: "m" });
-  } else if (id === "T-MA-PORT") {
-    out.push({ kind: "num", key: "aileSemelle", label: "Largeur de la semelle des murs en aile", step: 0.1, max: 6, unit: "m" });
+    // Tête en U sur le radier de tête : la butée devant la bêche d'extrémité et le poids du radier résistent.
+    out.push({ kind: "num", key: "becheProf", label: "Profondeur de la bêche d'extrémité", step: 0.1, max: 3, unit: "m" });
+    out.push({ kind: "num", key: "radierTeteLong", label: "Longueur du radier de tête", step: 0.1, max: 10, unit: "m" });
+  } else if (id === "T-MA-RENV" || id === "T-MA-EXC" || id === "T-MA-PORT" || id === "T-RT-L") {
+    out.push({ kind: "num", key: "radierTeteLong", label: "Longueur du radier de tête", step: 0.1, max: 10, unit: "m" });
   } else if (id.startsWith("T-MA-")) {
     out.push({ kind: "num", key: "aileEp", label: "Épaisseur des murs en aile", step: 0.05, max: 0.6, unit: "m" });
   } else if (id.startsWith("T-MT-")) {

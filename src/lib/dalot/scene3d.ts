@@ -185,8 +185,7 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
     if (t.guideRoues && !murT) addConcrete(new THREE.BoxGeometry(wMt, t.grH, t.grL), V(xMt0 + wMt / 2, H + t.grH / 2, z0 - s * t.grL / 2), "GUIDE_ROUES");
     if (t.radierLong > 0) {
       const dB = t.debord;
-      const w = B + 2 * dB + 2 * t.radierLong * tanA;
-      // Radier de tête trapézoïdal : petite base B + 2·débord, grande base w (s'évase entre les murs en aile).
+      // Radier de tête trapézoïdal : petite base B + 2·débord, grande base + 2·L·tan α (s'évase entre les murs en aile).
       const sh = new THREE.Shape([new THREE.Vector2(-dB, 0), new THREE.Vector2(B + dB, 0), new THREE.Vector2(B + dB + t.radierLong * tanA, t.radierLong), new THREE.Vector2(-dB - t.radierLong * tanA, t.radierLong)]);
       const geo = new THREE.ExtrudeGeometry(sh, { depth: inp.er, bevelEnabled: false });
       geo.rotateX(Math.PI / 2);
@@ -194,7 +193,16 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
       if (s < 0) geo.scale(1, 1, -1);
       geo.translate(0, 0, z0);
       addConcrete(geo, undefined, "RADIER_TETE");
-      if (t.becheProf > 0) addConcrete(new THREE.BoxGeometry(w, t.becheProf, t.becheEp), V(B / 2, -t.becheProf / 2, z0 + s * (t.radierLong - t.becheEp / 2)), "BECHES");
+      if (t.becheProf > 0) {
+        // Bêche sous l'about du radier de tête, alignée sur ses bords évasés (pas de débord).
+        const zi = Math.max(0, t.radierLong - t.becheEp), xi = dB + zi * tanA, xo = dB + t.radierLong * tanA;
+        const shb = new THREE.Shape([new THREE.Vector2(-xi, zi), new THREE.Vector2(B + xi, zi), new THREE.Vector2(B + xo, t.radierLong), new THREE.Vector2(-xo, t.radierLong)]);
+        const gb = new THREE.ExtrudeGeometry(shb, { depth: t.becheProf, bevelEnabled: false });
+        gb.rotateX(Math.PI / 2);
+        if (s < 0) gb.scale(1, 1, -1);
+        gb.translate(0, 0, z0);
+        addConcrete(gb, undefined, "BECHES");
+      }
     }
   }
 
@@ -469,13 +477,17 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
           }
           // Bêche : cadres verticaux et filants.
           if (t.becheProf > 0) {
-            const zb0 = z0 + s * (t.radierLong - t.becheEp + c), zb1 = z0 + s * (t.radierLong - c);
-            const w = B + 2 * t.debord + 2 * t.radierLong * tanA;
-            const xw = -t.debord - t.radierLong * tanA;
-            for (let px = xw + c; px <= xw + w - c + 1e-9; px += 0.2) {
+            const di = t.radierLong - t.becheEp + c, de = t.radierLong - c;
+            const zb0 = z0 + s * di, zb1 = z0 + s * de;
+            // Largeurs de la bêche sur ses deux faces (bords évasés du radier de tête).
+            const xi = t.debord + di * tanA, xe = t.debord + de * tanA;
+            for (let px = -xi + c; px <= B + xi - c + 1e-9; px += 0.2) {
               bars.poly([V(px, inp.er - c, zb0), V(px, -t.becheProf + c, zb0), V(px, -t.becheProf + c, zb1), V(px, inp.er - c, zb1)]);
             }
-            for (let py = -t.becheProf + c; py <= 0; py += 0.25) for (const zz of [zb0, zb1]) bars.seg(V(xw + c, py, zz), V(xw + w - c, py, zz), false);
+            for (let py = -t.becheProf + c; py <= 0; py += 0.25) {
+              bars.seg(V(-xi + c, py, zb0), V(B + xi - c, py, zb0), false);
+              bars.seg(V(-xe + c, py, zb1), V(B + xe - c, py, zb1), false);
+            }
           }
         }
       }

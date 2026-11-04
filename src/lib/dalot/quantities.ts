@@ -188,6 +188,8 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
   const tanA = Math.tan((t.angle * Math.PI) / 180);
   // Radier de tête trapézoïdal : petite base B + 2·débord, grande base + 2·L·tan(angle) ; Wrt = largeur moyenne.
   const Wrt = B + 2 * t.debord + (t.murs ? t.radierLong * tanA : 0);
+  // Bêche sous l'about du radier de tête, alignée sur ses bords évasés : largeur moyenne sur son épaisseur.
+  const Wbe = B + 2 * t.debord + (t.murs ? 2 * Math.max(0, t.radierLong - t.becheEp / 2) * tanA : 0);
   const cm = (x: number) => Math.round(x * 100);
   if (hw.H > 0.3) {
     add(TETE, "MUR DE TÊTE", "Face côté remblai — barres en attente dans la dalle", hw.bars, "L", [hw.H - c, anchor(hw.bars.phi)], 2 * nAcross(Bmt - 2 * c, hw.bars.s), { nElem: 2 });
@@ -217,9 +219,9 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
     add(TETE, "MUR EN L", "Semelle — filants deux nappes", { phi: 10, s: 0.2 }, "droite", [t.long - 2 * c], 4 * 2 * nAcross(t.semelle - 2 * c, 0.2), { nElem: 4 });
   }
   if (t.becheProf > 0) {
-    const nb = nAcross(Wrt - 2 * c, 0.2);
+    const nb = nAcross(Wbe - 2 * c, 0.2);
     add(TETE, "BÊCHE", "Cadres verticaux", { phi: 8, s: 0.2 }, "U", [t.becheEp - 2 * c, t.becheProf + inp.er - 2 * c, t.becheEp - 2 * c], 2 * nb, { nElem: 2 });
-    add(TETE, "BÊCHE", "Filants horizontaux", { phi: 10, s: 0.2 }, "droite", [Wrt - 2 * c], 2 * 2 * nAcross(t.becheProf, 0.25), { nElem: 2 });
+    add(TETE, "BÊCHE", "Filants horizontaux", { phi: 10, s: 0.2 }, "droite", [Wbe - 2 * c], 2 * 2 * nAcross(t.becheProf, 0.25), { nElem: 2 });
     add(TETE, "BÊCHE", "Épingles", { phi: 8, s: 0.2 }, "epingle", [0.05, t.becheEp - 2 * c, 0.05], 2 * nb, { nElem: 2 });
   }
 
@@ -233,14 +235,14 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
   // Voile au-dessus du radier ; semelle comptée sur le talon et l'épaisseur du voile (le reste est le radier de tête).
   const vWing = heads.wing ? 4 * t.long * (Math.max(0, Havg - t.semEp) * t.ep + Math.min(t.semelle, t.patin + t.ep) * t.semEp) : 0;
   const vRad = 2 * Wrt * t.radierLong * inp.er;
-  const vBeche = 2 * Wrt * t.becheProf * t.becheEp;
+  const vBeche = 2 * Wbe * t.becheProf * t.becheEp;
   const concrete = vBody + vHead + vWing + vRad + vBeche + vGc;
   const proprete = 0.05 * ((B + 0.2) * (L + 0.2) + 2 * Wrt * t.radierLong + (heads.wing ? 4 * t.long * (t.semelle + 0.2) : 0));
   const coffrage =
     inp.openings.reduce((s, o) => s + 2 * (o + inp.hInt), 0) * L + 2 * Hout * L + 2 * (B * Hout - cells)
     + 2 * 2 * B * hw.H
     + (heads.wing ? 4 * (2 * t.long * Havg + 2 * (t.long + t.semelle) * t.semEp) : 0)
-    + 2 * 2 * Wrt * t.becheProf
+    + 2 * 2 * Wbe * t.becheProf
     + (vGc > 0 ? 2 * (gardeCorpsPosts(B).reduce((s, q) => s + 2 * (q.w + GARDE_CORPS.ep) * q.h, 0) + 2 * B * GARDE_CORPS.lisseH + B * GARDE_CORPS.lisseW) : 0);
   const deblai = (B + 2) * (L + 2 * t.radierLong + 2) * (inp.Df + 0.05 + 0.3);
   const remblai = Math.max(0, (B + 4) * (Hout + inp.hr) * L - B * Hout * L);
