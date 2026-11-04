@@ -32,6 +32,7 @@ Deux possibilités :
    - **Calcul intégré au HTML** : le portique est calculé directement dans le navigateur, hors connexion et sans installation (éléments finis 2D, combinaisons EC0, vérifications EC3, choix automatique des profilés).
      - Les résultats sont identiques au module Python, contrôlé sur 4 bâtiments, écart nul.
      - Les planches 11 et 12 présentent la note de calcul : modèle, moments ELU, déformée, vérifications des barres, ELS, réactions d'appui pour les fondations et poids des portiques.
+     - Le bouton **« Exporter les images (ZIP) »** fait dessiner toutes les planches (plans, perspectives, détails, note de calcul) et les enregistre en images PNG A4 paysage à 200 dpi (2339 × 1654 px), cartouche compris, réunies dans un fichier ZIP. Le bouton **« ⤓ Image PNG »** de chaque planche exporte celle-ci seule. Les images se partagent par WhatsApp ou par courriel, et s'insèrent dans un rapport Word ou une présentation.
      - Le bouton **« Note de calcul Word »** télécharge un vrai fichier .docx avec en-tête (champ « Établi par »), pied de page numéroté, diagrammes et tableaux.
      - Les plans reprennent automatiquement les profilés calculés, sauf profilé imposé dans le panneau.
      - Les paramètres de calcul (appuis, jarrets, charges, vent, acier, bracons) se règlent dans la section « Calcul EC3 du portique ». Le CODE PLANS d'Excel transmet aussi le vent, les charges et l'acier.

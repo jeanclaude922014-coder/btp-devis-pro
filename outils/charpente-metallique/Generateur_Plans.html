@@ -11,6 +11,7 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--fond);colo
 header.app{background:var(--bleu);color:#fff;padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
 header.app h1{font-size:17px;margin:0}
 .btn{background:var(--orange);color:#fff;border:0;border-radius:4px;padding:9px 14px;font-weight:bold;font-size:13px;cursor:pointer}
+.mini{float:right;background:#fff;color:#1F4E79;border:0;border-radius:3px;font-size:11px;font-weight:bold;padding:1px 8px;cursor:pointer}
 .btn.sec{background:#fff;color:var(--bleu);border:1px solid #fff}
 .layout{display:flex;gap:14px;padding:14px;align-items:flex-start}
 aside{width:340px;flex:0 0 340px;background:#fff;border:1px solid var(--bord);border-radius:6px;padding:10px;max-height:calc(100vh - 90px);overflow:auto;position:sticky;top:10px}
@@ -58,6 +59,8 @@ table.cart td{border:1px solid #000;padding:2px 4px;vertical-align:middle}
   <div>
     <button class="btn" onclick="window.print()">Enregistrer en PDF / Imprimer</button>
     <button class="btn sec" onclick="telechargerNote()">Note de calcul Word</button>
+    <button class="btn" onclick="exporterImages()">Exporter les images (ZIP)</button>
+    <span id="etat_export" style="font-size:12px;margin-left:6px"></span>
   </div>
 </header>
 <div class="layout">
@@ -1190,6 +1193,104 @@ async function telechargerNote(){
   }catch(e){ alert("Note Word impossible : "+e.message); }
 }
 
+// ============================================================ EXPORT DES PLANCHES EN IMAGES (PNG, ZIP)
+const DPI_EXPORT=200, PW=297, PH=210;   // A4 paysage en mm
+function vuesCourantes(){
+  const g=calc(); lancerCalcul(g);
+  const vues=[P1,P2,P3,P4,P5,P6,P7,pageEnsemble,pageEclate,pageDetails,pageCalcFigures,pageCalcTableaux].map(f=>f(g));
+  return {g,vues};
+}
+function texteGabarit(g){return `Gabarit ${P.gab}${g.nn>1?" – "+g.nn+" nefs":""} : portée ${f2(g.B)} m × longueur ${f2(g.L)} m – H sablière ${f2(g.H)} m – pente ${f1(P.p)} % – ${g.systeme} – façade : ${P.fac}`;}
+function couper(s,n){const mots=String(s).split(" "), L=[]; let c=""; mots.forEach(m=>{if((c+" "+m).trim().length>n){if(c) L.push(c); c=m;} else c=(c+" "+m).trim();}); if(c) L.push(c); return L;}
+function sTx(x,y,s,o={}){return `<text x="${x}" y="${y}" font-family="Arial" font-size="${o.fs||2.6}"${o.b?' font-weight="bold"':""}${o.i?' font-style="italic"':""} fill="${o.c||"#000"}" text-anchor="${o.a||"start"}">${esc(s)}</text>`;}
+function sRc(x,y,w,h,fill="none",st="#000",sw=0.25){return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${st}" stroke-width="${sw}"/>`;}
+function cartoucheSVG(k,NP,g,x,y,w){
+  const c1=w*0.68, c2=w*0.16, h=[6,6.4,5,5,5.2,4.4], Y=[y]; h.forEach(v=>Y.push(Y[Y.length-1]+v)); let o="";
+  o+=sRc(x,Y[0],c1,h[0])+sTx(x+1.5,Y[0]+4.2,TITRES[k],{fs:3.4,b:true});
+  o+=sRc(x+c1,Y[0],c2,h[0])+sTx(x+c1+c2/2,Y[0]+4,`Planche n° ${k+1} / ${NP}`,{fs:2.8,b:true,a:"middle"});
+  o+=sRc(x+c1+c2,Y[0],c2,h[0])+sTx(x+c1+c2+1.2,Y[0]+4,"Date : "+DATE,{fs:2.6});
+  const l2=couper(`${P.projet} – ${P.lieu} · ${texteGabarit(g)}`,150);
+  o+=sRc(x,Y[1],c1,h[1])+l2.slice(0,2).map((t,i)=>sTx(x+1.5,Y[1]+2.6+i*2.6,t,{fs:2.05})).join("");
+  o+=sRc(x+c1,Y[1],2*c2,h[1],"#fff")+sTx(x+c1+c2,Y[1]+3.7,"ESQUISSE NON CONTRACTUELLE",{fs:2.8,b:true,c:"#C00000",a:"middle"});
+  o+=sRc(x,Y[2],c1,h[2])+couper(LEG,190).slice(0,2).map((t,i)=>sTx(x+1.5,Y[2]+2.1+i*2.2,t,{fs:1.75,i:true})).join("");
+  o+=sRc(x+c1,Y[2],2*c2,h[2],"#FBE5D6")+sTx(x+c1+c2,Y[2]+3.5,"BON POUR ACCORD",{fs:2.8,b:true,a:"middle"});
+  o+=sRc(x,Y[3],c1,h[3]+h[4])+couper(legende(k,g),165).slice(0,4).map((t,i)=>sTx(x+1.5,Y[3]+2.8+i*2.5,t,{fs:2.15})).join("");
+  o+=sRc(x+c1,Y[3],c2,h[3])+sTx(x+c1+1.2,Y[3]+3.4,"Date :",{fs:2.5})+sRc(x+c1+c2,Y[3],c2,h[3]);
+  o+=sRc(x+c1,Y[4],c2,h[4])+sTx(x+c1+1.2,Y[4]+3.8,"Signature :",{fs:2.5})+sRc(x+c1+c2,Y[4],c2,h[4]);
+  const pied=(k>=10?"Note de calcul de prédimensionnement – à viser avant exécution":k>=7?"Perspectives et détails sans échelle":"Échelle automatique (même échelle en X et en Y)")+" – cotes en mètres – EC3 / EC1 / BAEL 91 mod. 99 / EC2 – esquisse de prédimensionnement à confirmer par note de calcul.";
+  o+=sRc(x,Y[5],w,h[5])+sTx(x+1.5,Y[5]+3,pied,{fs:1.9,i:true});
+  return o;
+}
+// tableau SVG : cols = largeurs (mm) ; renvoie {svg, h}
+function svgTab(x,y,cols,entete,lignes,fs=2.1,lh=3.4){
+  let o="", yy=y; const W=cols.reduce((a,b)=>a+b,0);
+  const ligne=(cells,fill,col,b)=>{let cx=x; const nl=Math.max(...cells.map((c,i)=>couper(c,Math.max(4,Math.floor(cols[i]/(fs*0.5)))).length));
+    const hh=lh*nl+0.6; cells.forEach((c,i)=>{const f=fill||(c==="OK"?"#C6EFCE":(c==="NON CONFORME"?"#FFC7CE":"#fff"));
+      o+=sRc(cx,yy,cols[i],hh,f,"#BFC7D1",0.15);
+      couper(c,Math.max(4,Math.floor(cols[i]/(fs*0.5)))).forEach((t,j)=>{o+=sTx(cx+0.8,yy+lh*(j+1)-0.6,t,{fs,b:b||c==="OK"||c==="NON CONFORME",c:col||(c==="OK"?"#006100":(c==="NON CONFORME"?"#9C0006":"#000"))});});
+      cx+=cols[i];}); yy+=hh;};
+  if(entete) ligne(entete,"#1F4E79","#fff",true);
+  lignes.forEach(r=>ligne(r.map(String)));
+  return {svg:o,h:yy-y,w:W};
+}
+function noteSVG(g){
+  if(!CALC) return sTx(10,20,"Calcul indisponible.",{fs:5});
+  const v=CALC, pr=CALC_PR, R=v.R, m=R.modele, okG=[...Object.values(v.barres),...v.els].every(d=>d.ratio<=1);
+  const qp=pr.vent.ce*0.5*1.25*pr.vent.vb**2/1000; let o="", y=1;
+  o+=sRc(0,y,VW,5.5,okG?"#C6EFCE":"#FFC7CE","none")+sTx(2,y+3.9,(okG?"CONCLUSION : toutes les vérifications EC3 sont satisfaites.":"CONCLUSION : des vérifications ne sont pas satisfaites – augmenter les profilés concernés.")+(g.treil?" (Ferme treillis : calcul à âme pleine donné à titre de comparaison.)":""),{fs:2.9,b:true,c:okG?"#006100":"#9C0006"});
+  y+=7.5; const wl=134, wr=VW-wl-5;
+  o+=sTx(0,y,"Hypothèses",{fs:2.8,b:true,c:"#1F4E79"});
+  let t=svgTab(0,y+1,[26,wl-26],null,[["Ouvrage",`${g.nn} nef(s) de ${fmt(g.B)} m – L ${fmt(g.L)} m – H ${fmt(g.H)} m – pente ${fmt(P.p,1)} % – portiques à ${fmt(g.er)} m`],
+    ["Appuis / jarrets",`${pr.appuis} – jarrets ${fmt(pr.jarret_ratio*100,0)} % de la portée, hauteur ${fmt(pr.jarret_hauteur,1)} h`],
+    ["Charges",`G ${fmt(pr.G_couverture)} + ${fmt(pr.G_pannes)} kN/m² + poids propre ; Q ${fmt(pr.Q_toiture)} kN/m²`],
+    ["Vent EC1",`vb ${fmt(pr.vent.vb,1)} m/s, ce ${fmt(pr.vent.ce)} → qp ${fmt(qp,3)} kN/m²`],
+    ["Acier / bracons",`S${pr.fy} ; bracons poteaux ${fmt(pr.maintien_poteau*pr.entraxe_lisses)} m, traverses ${fmt(pr.maintien_traverse*pr.entraxe_pannes)} m`]],1.95,3.1);
+  o+=t.svg; let yl=y+1+t.h+4;
+  o+=sTx(0,yl,"États limites de service",{fs:2.8,b:true,c:"#1F4E79"});
+  t=svgTab(0,yl+1,[58,19,19,12,26],["Vérification","Valeur","Limite","Taux",""],v.els.map(e=>[e.verif,fmt(e.valeur,1)+" mm",fmt(e.limite,1)+" mm",fmt(e.ratio),e.ratio<=1?"OK":"NON CONFORME"]),1.95,3.1);
+  o+=t.svg; yl+=1+t.h+3;
+  o+=sTx(wl+5,y,"Réactions d'appui (fondations)",{fs:2.8,b:true,c:"#1F4E79"});
+  t=svgTab(wl+5,y+1,[wr*0.31,wr*0.23,wr*0.23,wr*0.23],["Appui","V max (kN)","V min (kN)","|H| max (kN)"],m.appuis.map(a=>{let vM=-1e9,vm=1e9,hM=0;
+    for(const r of [...Object.values(R.elu),...Object.values(R.els)]){const q=r.reac[a.nd]; vM=Math.max(vM,q[1]); vm=Math.min(vm,q[1]); hM=Math.max(hM,Math.abs(q[0]));}
+    return ["x = "+fmt(m.X[a.nd][0])+" m",fmt(vM,1),fmt(vm,1),fmt(hM,1)];}),1.95,3.1);
+  o+=t.svg; let yr=y+1+t.h+4;
+  o+=sTx(wl+5,yr,"Poids des portiques",{fs:2.8,b:true,c:"#1F4E79"}); let tot=0;
+  const rows=Object.entries(m.barres).map(([n,b])=>{const kg=SEC[b.sec].kg*b.longueur; tot+=kg; return [n,b.sec,fmt(b.longueur)+" m",fmt(kg,0)+" kg"];});
+  rows.push([`Total ${g.nt+1} portiques`,"","",fmt(tot*(g.nt+1),0)+" kg"]);
+  t=svgTab(wl+5,yr+1,[wr*0.3,wr*0.25,wr*0.2,wr*0.25],null,rows.slice(0,9),1.95,3.1); o+=t.svg; yr+=1+t.h+3;
+  const yv=Math.max(yl,yr)+1;
+  o+=sTx(0,yv,"Vérifications des barres – EN 1993-1-1 (6.2.9.1, 6.2.6, 6.3.3 annexe B, 6.3.2.2)",{fs:2.8,b:true,c:"#1F4E79"});
+  t=svgTab(0,yv+1,[13,17,62,17,19,34,15,14,14,15,27],["Barre","Profilé","Combinaison déterminante","N (kN)","M (kN·m)","χy / χz / χLT","Section","6.61","6.62","Taux",""],
+    Object.entries(v.barres).map(([n,d])=>[n,d.sec,d.combinaison,fmt(d.N,1),fmt(d.M,1),`${fmt(d.chi_y,2)} / ${fmt(d.chi_z,2)} / ${fmt(d.chi_lt,2)}`,fmt(d.r_sec),fmt(d.r61),fmt(d.r62),fmt(d.ratio),d.ratio<=1?"OK":"NON CONFORME"]),1.95,3.1);
+  o+=t.svg;
+  return o;
+}
+function pageCompleteSVG(v,k,NP,g){
+  const m=8, corps=v.html!==undefined?`<svg x="${m+4}" y="16" width="${VW}" height="${VH}" viewBox="0 0 ${VW} ${VH}">${noteSVG(g)}</svg>`
+    :v.svg().replace("<svg ",`<svg x="${m+4}" y="16" width="${VW}" height="${VH}" `);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(PW/25.4*DPI_EXPORT)}" height="${Math.round(PH/25.4*DPI_EXPORT)}" viewBox="0 0 ${PW} ${PH}">
+  <rect width="${PW}" height="${PH}" fill="#fff"/>
+  <rect x="${m}" y="8" width="${PW-2*m}" height="6.5" fill="#1F4E79"/>${sTx(m+2,12.6,`PLANCHE ${k+1} / ${NP} – ${TITRES[k]}`,{fs:3.6,b:true,c:"#fff"})}
+  ${corps}${cartoucheSVG(k,NP,g,m,PH-8-32,PW-2*m)}</svg>`;
+}
+function nomFichier(k){return `Planche_${String(k+1).padStart(2,"0")}_`+TITRES[k].normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^A-Za-z0-9]+/g,"_").replace(/^_|_$/g,"").slice(0,50)+".png";}
+function telecharger(octets,nom,type){const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([octets],{type})); a.download=nom; document.body.appendChild(a); a.click(); a.remove();}
+function etatExport(t){const e=document.getElementById("etat_export"); if(e) e.textContent=t;}
+async function imagesPlanches(indices){
+  const {g,vues}=vuesCourantes(), NP=vues.length, w=Math.round(PW/25.4*DPI_EXPORT), h=Math.round(PH/25.4*DPI_EXPORT), out=[];
+  for(const k of indices){ etatExport(`Dessin de la planche ${k+1} / ${NP}…`); out.push({nom:nomFichier(k),data:await svgVersPng(pageCompleteSVG(vues[k],k,NP,g),w,h)}); }
+  etatExport(""); return out;
+}
+async function exporterImages(){
+  try{ const NP=TITRES.length, imgs=await imagesPlanches([...Array(NP).keys()]);
+    telecharger(zipStore(imgs),`Plans_${String(P.gab).replace(/[^0-9A-Za-z]+/g,"x")}_images.zip`,"application/zip");
+  }catch(e){ etatExport(""); alert("Export des images impossible : "+(e&&e.message)); }
+}
+async function exporterPlanche(k){
+  try{ const [img]=await imagesPlanches([k]); telecharger(img.data,img.nom,"image/png"); }
+  catch(e){ etatExport(""); alert("Export de l'image impossible : "+(e&&e.message)); }
+}
+
 // ============================================================ planches + cartouches
 const LEG="Couleurs : charpente en bleu · contreventements en orange · béton en gris · aciers en rouge · maçonnerie en marron clair · cotes et baies en noir · translucides hachurés en bleu clair · remblai en latérite";
 function legende(k,g){
@@ -1217,7 +1318,7 @@ function dessiner(){
   const gabTxt=`Gabarit ${P.gab}${g.nn>1?" – "+g.nn+" nefs":""} : portée ${f2(g.B)} m × longueur ${f2(g.L)} m – H sablière ${f2(g.H)} m – pente ${f1(P.p)} % – ${g.systeme} – façade : ${P.fac}`;
   document.getElementById("planches").innerHTML=vues.map((v,k)=>`
   <section class="page">
-    <div class="bandeau">PLANCHE ${k+1} / ${NP} – ${TITRES[k]}</div>
+    <div class="bandeau">PLANCHE ${k+1} / ${NP} – ${TITRES[k]}<button class="noprint mini" onclick="exporterPlanche(${k})">⤓ Image PNG</button></div>
     ${v.html!==undefined?`<div class="pagehtml">${v.html}</div>`:v.svg()}
     <table class="cart">
       <tr><td colspan="3" class="t">${TITRES[k]}</td><td style="width:16%;text-align:center"><b>Planche n° ${k+1} / ${NP}</b></td><td style="width:16%">Date : <input value="${DATE}" onchange="DATE=this.value"></td></tr>
