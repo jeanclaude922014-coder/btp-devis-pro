@@ -14,8 +14,8 @@ import {
   bodyBars, cellOutline, cmTxt, fmt, geometry, Pen, repMap, type BarKind, type Pt, type Sheet,
 } from "./drawings";
 import type { Study } from "./engine";
-import { BAR_PARTS, GARDE_CORPS, gardeCorpsPosts, steelSummary, type BarMark } from "./quantities";
-import { buildModelSheets } from "./plans-modeles";
+import { BAR_PARTS, GARDE_CORPS, steelSummary, type BarMark } from "./quantities";
+import { buildModelSheets, drawGardeCorps } from "./plans-modeles";
 
 export const A3: Pt = [0.42, 0.297];
 const A4: Pt = [0.21, 0.297];
@@ -114,7 +114,7 @@ function sheetCoffrage(study: Study, origin: Pt, num: string): Sheet {
   // Gabarits des quatre vues (m), marges de cotation comprises.
   const plan = { w: L + 2 * Math.max(t.radierLong, hg.along) + 1.6, h: B + 2 * hg.across + 1.6 };
   const coupeA = { w: Lt + 1.6, h: yTop + t.becheProf + 1.4 };
-  const coupeB = { w: B + 2 * hg.across + 1.8, h: yTop + 1.4 + (t.gardeCorps ? GARDE_CORPS.h : 0) };
+  const coupeB = { w: B + 2 * hg.across + 1.8, h: yTop + 1.4 + (t.gardeCorps ? GARDE_CORPS.hMain : 0) };
   const scale = pickScale([plan, coupeA, coupeB], 0.19, 0.105);
   const W = A3[0] * scale, H = A3[1] * scale;
   const pen = new Pen(origin[0], origin[1], scale);
@@ -177,16 +177,14 @@ function sheetCoffrage(study: Study, origin: Pt, num: string): Sheet {
 
   // Coupe B-B (transversale) avec les murs en aile vus en arrière-plan.
   {
-    const p = at(1, B + 2 * hg.across, yTop + (t.gardeCorps ? GARDE_CORPS.h : 0), hg.across, pen.th(3));
+    const p = at(1, B + 2 * hg.across, yTop + (t.gardeCorps ? GARDE_CORPS.hMain : 0), hg.across, pen.th(3));
     p.rect(0, 0, B, Hout, "COFFRAGE");
     for (const c of cells) p.poly(cellOutline(c.x0, c.x1, inp.er, inp.er + inp.hInt, inp.gousset), "COFFRAGE", true);
     if (hHead > 0) p.rect(0, Hout, B, hHead, "COFFRAGE");
     if (t.gardeCorps) {
       // Garde-corps posé sur le guide-roue (vue en bout : poteaux et lisse de la rive avant).
-      const G = GARDE_CORPS;
-      for (const x of gardeCorpsPosts(B)) p.rect(x - G.post / 2, yTop, G.post, G.h - G.lisseH, "COFFRAGE");
-      p.rect(0, yTop + G.h - G.lisseH, B, G.lisseH, "COFFRAGE");
-      p.text([B + p.th(2), yTop + G.h / 2], 2.2, hHead > 0 ? "Garde-corps sur guide-roue" : "Garde-corps", "TEXTE");
+      drawGardeCorps(p, B, yTop);
+      p.text([B + p.th(2), yTop + GARDE_CORPS.h / 2], 2.2, hHead > 0 ? "Garde-corps sur guide-roue" : "Garde-corps", "TEXTE");
     }
     if (t.murs) {
       p.poly([[0, yTop], [-hg.across, inp.er + hg.Hend], [-hg.across, 0]], "COFFRAGE");
@@ -243,14 +241,10 @@ function sheetCoffrage(study: Study, origin: Pt, num: string): Sheet {
 
   // Vue de face (tête amont).
   {
-    const p = at(3, B + 2 * hg.across, yTop + (t.gardeCorps ? GARDE_CORPS.h : 0), hg.across, pen.th(6));
+    const p = at(3, B + 2 * hg.across, yTop + (t.gardeCorps ? GARDE_CORPS.hMain : 0), hg.across, pen.th(6));
     p.rect(0, 0, B, yTop, "COFFRAGE");
     for (const c of cells) p.rect(c.x0, inp.er, c.x1 - c.x0, inp.hInt, "COFFRAGE", true);
-    if (t.gardeCorps) {
-      const G = GARDE_CORPS;
-      for (const x of gardeCorpsPosts(B)) p.rect(x - G.post / 2, yTop, G.post, G.h - G.lisseH, "COFFRAGE");
-      p.rect(0, yTop + G.h - G.lisseH, B, G.lisseH, "COFFRAGE");
-    }
+    if (t.gardeCorps) drawGardeCorps(p, B, yTop);
     if (t.murs) {
       p.poly([[0, yTop], [-hg.across, inp.er + hg.Hend], [-hg.across, 0], [0, 0]], "COFFRAGE");
       p.poly([[B, yTop], [B + hg.across, inp.er + hg.Hend], [B + hg.across, 0], [B, 0]], "COFFRAGE");
@@ -259,7 +253,7 @@ function sheetCoffrage(study: Study, origin: Pt, num: string): Sheet {
     }
     p.terrain(-hg.across - 0.8, B + hg.across + 0.8, inp.er);
     p.chainH([-hg.across, 0, ...cells.flatMap((c) => [c.x0, c.x1]), B, B + hg.across], 0, -p.th(8));
-    p.chainV([0, inp.er, inp.er + inp.hInt, yTop, ...(t.gardeCorps ? [yTop + GARDE_CORPS.h] : [])], B + hg.across, B + hg.across + p.th(8));
+    p.chainV([0, inp.er, inp.er + inp.hInt, yTop, ...(t.gardeCorps ? [yTop + GARDE_CORPS.h, yTop + GARDE_CORPS.hMain] : [])], B + hg.across, B + hg.across + p.th(8));
     title(pen, qx(3) + qW / 2, qy(3) + qH - pen.th(3), "VUE DE FACE");
   }
   return { id: "coffrage", title: "Plan de coffrage", role: "coffrage", scale, origin, width: W, height: H, prims: [...pen.prims, ...subs.flatMap((s) => s.prims)] };

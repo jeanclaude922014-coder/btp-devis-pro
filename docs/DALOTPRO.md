@@ -76,12 +76,13 @@ Champ « Modèle de plans » (Données générales › Cartouche des plans) :
   et section 2-2, grille tête. Repères des têtes « 1a, 2a… ». Cartouche en bandeau : République, ministère,
   maître d'ouvrage délégué, marché, itinéraire, entreprise, indice, date, format.
 - **PAIA Damé – Massakro** : titre, ensemble coffrage (coupes AA et BB, vue en plan, détail 1), corps
-  d'ouvrage coté, nomenclature du corps, garde-corps (coupe B-B, coupes 1-1 et 2-2) et sa nomenclature,
+  d'ouvrage coté, nomenclature du corps, garde-corps (coupe B-B, coupes 1-1, 2-2 et 3-3) et sa nomenclature,
   ouvrages de tête (vue en plan, élévation, détail 1, coupe A-A) et leur nomenclature.
 - **ENGC / KKP D07** : dossier précédent (coffrage, ferraillage, nomenclature A4).
 
 Nouveaux champs : ministère, intitulé du marché, itinéraire, département, date des plans ; garde-corps en
-béton armé (poteaux 20 × 20 tous les 1,00 m environ, lisse 20 × 15, h = 1,00 m), métrés et nomenclature.
+béton armé, comme le plan type : poteaux principaux 20 × 20 de 1,20 m alternés avec des poteaux intermédiaires
+15 × 20 de 1,00 m (entraxe ≈ 0,83 m), lisse 20 × 15 entre poteaux principaux, sur tous les dalots ; métrés et nomenclature.
 Les préréglages 2,00 × 2,00 et 3 × 4,00 × 4,00 reprennent les cotes des plans d'origine (ailes à 30 gr,
 radiers de tête 3,40 m et 6,60 m, bêches 25 × 100 et 25 × 130) ; `npm run verif:dalot` vérifie les 8 planches
 et ces cotes.

@@ -43,17 +43,31 @@ export type Quantities = { bars: BarMark[]; lines: QuantityLine[]; steelMass: nu
 const COMMERCIAL = 12;
 
 /** Garde-corps en béton armé : poteaux carrés et lisse, sur les deux rives de la dalle. */
-export const GARDE_CORPS = { h: 1.0, post: 0.2, lisseW: 0.2, lisseH: 0.15, sMax: 1.0, ancrage: 0.35 };
+/**
+ * Garde-corps des plans types (planche « Ferraillage des garde-corps » du dalot 3 × 4,00 × 4,00) :
+ * poteaux principaux 20 × 20 de 1,20 m, dépassant la lisse de 20 cm, alternés avec des poteaux
+ * intermédiaires 15 × 20 de 1,00 m arasés au-dessus de la lisse ; lisse 20 × 15 entre les poteaux
+ * principaux ; entraxe des poteaux ≈ 0,83 m (poteau principal à chaque extrémité).
+ */
+export const GARDE_CORPS = { h: 1.0, hMain: 1.2, post: 0.2, postInt: 0.15, ep: 0.2, lisseW: 0.2, lisseH: 0.15, sMax: 0.85, ancrage: 0.35 };
+
+/** Poteau de garde-corps : abscisse de l'axe, type, largeur le long de la lisse et hauteur. */
+export type GcPost = { x: number; main: boolean; w: number; h: number };
 
 /** Guide-roues sur les rives de la dalle (le garde-corps, s'il existe, est posé dessus). */
 export const GUIDE_ROUE = { w: 0.25, h: 0.2 };
 
 /** Abscisses (axe des poteaux) des poteaux de garde-corps sur la largeur B de l'ouvrage. */
-export function gardeCorpsPosts(B: number) {
+export function gardeCorpsPosts(B: number): GcPost[] {
   const g = GARDE_CORPS;
-  const n = Math.max(2, Math.ceil((B - g.post) / g.sMax) + 1);
-  const sp = (B - g.post) / (n - 1);
-  return Array.from({ length: n }, (_, i) => g.post / 2 + i * sp);
+  // Nombre d'intervalles pair : poteaux principaux aux extrémités, un poteau intermédiaire entre deux.
+  let m = Math.max(2, Math.ceil((B - g.post) / g.sMax));
+  if (m % 2 === 1) m++;
+  const sp = (B - g.post) / m;
+  return Array.from({ length: m + 1 }, (_, i) => {
+    const main = i % 2 === 0;
+    return { x: g.post / 2 + i * sp, main, w: main ? g.post : g.postInt, h: main ? g.hMain : g.h };
+  });
 }
 
 export function computeQuantities(inp: DalotInput, mat: Materials, groups: GroupDesign[], heads: HeadsResult): Quantities {
@@ -147,14 +161,23 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
   if (t.gardeCorps) {
     const gc = GARDE_CORPS;
     const GC: BarPart = "GARDE-CORPS";
-    const nP = gardeCorpsPosts(B).length;
-    const a = gc.post - 2 * c;
-    const hp = gc.h - gc.lisseH;
-    add(GC, "POTEAUX", "Barres verticales des poteaux, ancrées dans la dalle", { phi: 10, s: 0 }, "L", [gc.h - c + gc.ancrage, 0.15], 2 * 4 * nP, { nElem: 2, spacingLabel: "—" });
-    add(GC, "POTEAUX", "Cadres des poteaux", { phi: 6, s: 0.15 }, "cadre", [a, a], 2 * nP * (Math.ceil(hp / 0.15) + 1), { nElem: 2, length: 4 * a + 0.2 });
-    add(GC, "LISSE", "Filants de la lisse", { phi: 10, s: 0 }, "droite", [B - 2 * c], 2 * 4, { nElem: 2, spacingLabel: "—" });
-    add(GC, "LISSE", "Cadres de la lisse", { phi: 6, s: 0.2 }, "cadre", [gc.lisseW - 2 * c, gc.lisseH - 2 * c], 2 * nAcross(B - 2 * c, 0.2), { nElem: 2, length: 2 * (gc.lisseW + gc.lisseH - 4 * c) + 0.2 });
-    vGc = 2 * (nP * gc.post * gc.post * hp + B * gc.lisseW * gc.lisseH);
+    const posts = gardeCorpsPosts(B);
+    const nM = posts.filter((p) => p.main).length, nI = posts.length - nM;
+    const bay = posts.length > 2 ? 2 * (posts[1].x - posts[0].x) - gc.post : B - 2 * gc.post; // lisse entre poteaux principaux
+    const aM = gc.post - 2 * c, aI = gc.postInt - 2 * c, aE = gc.ep - 2 * c;
+    add(GC, "POTEAUX PRINCIPAUX", "Barres verticales, ancrées dans la dalle", { phi: 10, s: 0 }, "L", [gc.hMain - c + gc.ancrage, 0.15], 2 * 4 * nM, { nElem: 2, spacingLabel: "—" });
+    add(GC, "POTEAUX PRINCIPAUX", "Cadres", { phi: 6, s: 0.15 }, "cadre", [aM, aE], 2 * nM * (Math.ceil(gc.hMain / 0.15) + 1), { nElem: 2, length: 2 * (aM + aE) + 0.2 });
+    if (nI > 0) {
+      add(GC, "POTEAUX INTERMÉDIAIRES", "Barres verticales, ancrées dans la dalle", { phi: 10, s: 0 }, "L", [gc.h - c + gc.ancrage, 0.1], 2 * 4 * nI, { nElem: 2, spacingLabel: "—" });
+      add(GC, "POTEAUX INTERMÉDIAIRES", "Cadres", { phi: 6, s: 0.15 }, "cadre", [aI, aE], 2 * nI * (Math.ceil((gc.h - gc.lisseH) / 0.15) + 1), { nElem: 2, length: 2 * (aI + aE) + 0.2 });
+    }
+    // Lisse : filants HA8 par travée entre poteaux principaux, barres de liaison à travers les poteaux principaux.
+    add(GC, "LISSE", "Filants de la lisse, par travée", { phi: 8, s: 0 }, "droite", [bay], 2 * 4 * (nM - 1), { nElem: 2, spacingLabel: "—" });
+    if (nM > 2) add(GC, "LISSE", "Barres de liaison à travers les poteaux principaux", { phi: 8, s: 0 }, "droite", [gc.post + 2 * 0.24], 2 * 4 * (nM - 2), { nElem: 2, spacingLabel: "—" });
+    add(GC, "LISSE", "Barres d'about coudées dans les poteaux d'extrémité", { phi: 8, s: 0 }, "L", [0.41, 0.12], 2 * 4 * 2, { nElem: 2, spacingLabel: "—" });
+    add(GC, "LISSE", "Cadres de la lisse", { phi: 6, s: 0.2 }, "cadre", [gc.lisseW - 2 * c, gc.lisseH - 2 * c], 2 * (nM - 1) * nAcross(bay, 0.2), { nElem: 2, length: 2 * (gc.lisseW + gc.lisseH - 4 * c) + 0.2 });
+    // Béton : poteaux principaux sur toute leur hauteur hors lisse, intermédiaires sous la lisse, lisse entre principaux.
+    vGc = 2 * (nM * gc.post * gc.ep * (gc.hMain - gc.lisseH) + nI * gc.postInt * gc.ep * (gc.h - gc.lisseH) + (nM - 1) * bay * gc.lisseW * gc.lisseH);
   }
 
   // ── OUVRAGE DE TÊTE (deux extrémités) ──
@@ -217,7 +240,7 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
     + 2 * 2 * B * hw.H
     + (heads.wing ? 4 * (2 * t.long * Havg + 2 * (t.long + t.semelle) * t.semEp) : 0)
     + 2 * 2 * Wrt * t.becheProf
-    + (vGc > 0 ? 2 * (gardeCorpsPosts(B).length * 4 * GARDE_CORPS.post * GARDE_CORPS.h + 2 * B * GARDE_CORPS.lisseH + B * GARDE_CORPS.lisseW) : 0);
+    + (vGc > 0 ? 2 * (gardeCorpsPosts(B).reduce((s, q) => s + 2 * (q.w + GARDE_CORPS.ep) * q.h, 0) + 2 * B * GARDE_CORPS.lisseH + B * GARDE_CORPS.lisseW) : 0);
   const deblai = (B + 2) * (L + 2 * t.radierLong + 2) * (inp.Df + 0.05 + 0.3);
   const remblai = Math.max(0, (B + 4) * (Hout + inp.hr) * L - B * Hout * L);
   const etanch = (B + 2 * Hout) * L;

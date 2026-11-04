@@ -573,7 +573,7 @@ function coupeTrans(study: Study): View {
   // Support du garde-corps : couronnement du mur de tête (s'il existe) ou guide-roue en rive.
   const gr = g.hg.hHead;
   const murT = study.heads.headWall.H > 0.3;
-  const hTop = gr + (gc ? GARDE_CORPS.h : 0);
+  const hTop = gr + (gc ? GARDE_CORPS.hMain : 0);
   return {
     ext: { x0: 0, y0: -0.1, w: B, h: Hout + hTop + 0.1 },
     pad: { l: 26, r: 10, b: 14, t: 22 },
@@ -587,8 +587,7 @@ function coupeTrans(study: Study): View {
       if (gc) {
         // Garde-corps posé sur le guide-roue.
         const G = GARDE_CORPS;
-        for (const x of gardeCorpsPosts(B)) p.rect(x - G.post / 2, Hout + gr, G.post, G.h - G.lisseH, "COFFRAGE");
-        p.rect(0, Hout + gr + G.h - G.lisseH, B, G.lisseH, "COFFRAGE");
+        drawGardeCorps(p, B, Hout + gr);
         p.text([B + p.th(2), Hout + gr + G.h / 2], 2.2, murT ? "Garde-corps sur mur de tête (guide-roue)" : gr > 0 ? "Garde-corps sur guide-roue" : "Garde-corps", "TEXTE");
       }
       p.chainH([0, ...cells.flatMap((c) => [c.x0, c.x1]), B], Hout + hTop, Hout + hTop + p.th(8), false);
@@ -1106,6 +1105,19 @@ function section22(ctx: Ctx): View | null {
 
 // ── Garde-corps ────────────────────────────────────────────
 
+/**
+ * Coffrage du garde-corps vu de la rive, posé à la cote y0 : poteaux principaux (1,20 m) sur toute
+ * leur hauteur, poteaux intermédiaires (1,00 m) sous la lisse, lisse entre les poteaux principaux.
+ */
+export function drawGardeCorps(p: Pen, B: number, y0: number) {
+  const G = GARDE_CORPS;
+  const posts = gardeCorpsPosts(B);
+  const yl = y0 + G.h - G.lisseH;
+  for (const q of posts) p.rect(q.x - q.w / 2, y0, q.w, q.main ? q.h : G.h - G.lisseH, "COFFRAGE");
+  const mains = posts.filter((q) => q.main);
+  for (let i = 0; i + 1 < mains.length; i++) p.rect(mains[i].x + G.post / 2, yl, mains[i + 1].x - mains[i].x - G.post, G.lisseH, "COFFRAGE");
+}
+
 function elevationGC(ctx: Ctx): View {
   const g = geo(ctx.study);
   const { inp, B, Hout, cells, t } = g;
@@ -1117,7 +1129,7 @@ function elevationGC(ctx: Ctx): View {
   const posts = gardeCorpsPosts(B);
   const yb = Hout - inp.es - 0.6;
   return {
-    ext: { x0: 0, y0: yb, w: B, h: Hb + G.h - yb },
+    ext: { x0: 0, y0: yb, w: B, h: Hb + G.hMain - yb },
     pad: { l: 22, r: 10, b: 30, t: 22 },
     draw: (p) => {
       p.rect(0, Hout - inp.es, B, inp.es, "COFFRAGE");
@@ -1127,36 +1139,57 @@ function elevationGC(ctx: Ctx): View {
         p.rect(0, Hout, B, gr, "COFFRAGE");
         p.text([B + p.th(2), Hout + gr / 2], 2, murT ? `Mur de tête ép. ${cmTxt(t.murTeteEp)} (guide-roue)` : `Guide-roue ${cmTxt(t.grL)} × ${cmTxt(t.grH)}`, "TEXTE");
       }
-      for (const x of posts) {
-        p.rect(x - G.post / 2, Hb, G.post, G.h - G.lisseH, "COFFRAGE");
-        for (const s of [-1, 1]) p.poly([[x + s * (G.post / 2 - c), Hb - G.ancrage + 0.1], [x + s * (G.post / 2 - c), Hb + G.h - c]], "ACIERS");
-        for (let y = Hb + 0.05; y <= Hb + G.h - G.lisseH; y += 0.15) p.line([x - G.post / 2 + c, y], [x + G.post / 2 - c, y], "REPARTITION");
-      }
+      drawGardeCorps(p, B, Hb);
       const yl = Hb + G.h - G.lisseH;
-      p.rect(0, yl, B, G.lisseH, "COFFRAGE");
-      p.line([c, Hb + G.h - c], [B - c, Hb + G.h - c], "ACIERS");
-      p.line([c, yl + c], [B - c, yl + c], "ACIERS");
-      for (let x = c; x <= B - c + 1e-9; x += 0.2) p.line([x, yl + c], [x, Hb + G.h - c], "REPARTITION");
+      for (const q of posts) {
+        // Barres verticales : sous la tête du poteau principal, ou jusqu'au-dessus de la lisse pour l'intermédiaire.
+        const top = Hb + q.h - c;
+        for (const s of [-1, 1]) p.poly([[q.x + s * (q.w / 2 - c), Hb - G.ancrage + 0.1], [q.x + s * (q.w / 2 - c), top]], "ACIERS");
+        const yc = q.main ? Hb + q.h - 0.05 : yl;
+        for (let y = Hb + 0.05; y <= yc + 1e-9; y += 0.15) p.line([q.x - q.w / 2 + c, y], [q.x + q.w / 2 - c, y], "REPARTITION");
+      }
+      const mains = posts.filter((q) => q.main);
+      for (let i = 0; i + 1 < mains.length; i++) {
+        const xa = mains[i].x + G.post / 2, xb = mains[i + 1].x - G.post / 2;
+        p.line([xa - 0.1, Hb + G.h - c], [xb + 0.1, Hb + G.h - c], "ACIERS");
+        p.line([xa - 0.1, yl + c], [xb + 0.1, yl + c], "ACIERS");
+        for (let x = xa + c; x <= xb - c + 1e-9; x += 0.2) p.line([x, yl + c], [x, Hb + G.h - c], "REPARTITION");
+      }
       const L = (el: string, pre: string) => ctx.bar(el, pre);
-      const x1 = posts[1] ?? posts[0];
-      tag(p, ctx, [x1 - G.post / 2 + c, Hb + 0.4], [x1 - G.post / 2 + c - p.th(3), Hb + G.h + p.th(14)], L("POTEAUX", "Barres verticales"), 6);
-      tag(p, ctx, [x1, Hb + 0.2], [x1 + p.th(10), Hb + G.h + p.th(14)], L("POTEAUX", "Cadres"), 6);
-      tag(p, ctx, [B * 0.5, Hb + G.h - c], [B * 0.5, Hb + G.h + p.th(14)], L("LISSE", "Filants"), 6);
-      tag(p, ctx, [B * 0.5 + 0.3, yl + G.lisseH / 2], [B * 0.5 + 0.3 + p.th(10), Hb + G.h + p.th(14)], L("LISSE", "Cadres"), 6);
-      const xm = (posts[0] + (posts[1] ?? B)) / 2;
-      cutMark(p, [xm, yl + G.lisseH + p.th(3)], [0, -1], "1");
-      cutMark(p, [posts[0] + 0.05, Hb + 0.3], [-1, 0], "2");
+      const pm = posts[0], pi = posts[1] ?? posts[0];
+      const at = (i: number) => posts[Math.max(0, Math.min(posts.length - 1, i))];
+      const n = posts.length;
+      // Repères répartis le long de l'élévation, sur deux rangées pour ne pas se chevaucher.
+      const yt = (row: number) => Hb + G.hMain + p.th(17 + 9 * row);
+      const midBay = (i: number) => (at(i).x + at(i + 2).x) / 2;
+      const callouts: [Pt, number, BarMark | undefined][] = [
+        [[pm.x + pm.w / 2 - c, Hb + 0.4], 0, L("POTEAUX PRINCIPAUX", "Barres verticales")],
+        [[pi.x - pi.w / 2 + c, Hb + 0.4], 1, L("POTEAUX INTERMÉDIAIRES", "Barres verticales")],
+        [[at(2).x, Hb + 0.2], 0, L("POTEAUX PRINCIPAUX", "Cadres")],
+        [[at(3).x, Hb + 0.2], 1, L("POTEAUX INTERMÉDIAIRES", "Cadres")],
+        [[midBay(Math.floor(n / 2) - 1) - 0.1, Hb + G.h - c], 0, L("LISSE", "Filants")],
+        [[midBay(Math.floor(n / 2) - 1) + 0.15, yl + G.lisseH / 2], 1, L("LISSE", "Cadres")],
+        [[at(n - 3).x, Hb + G.h - c], 0, L("LISSE", "Barres de liaison")],
+        [[at(n - 1).x, yl + c], 1, L("LISSE", "Barres d'about")],
+      ];
+      for (const [pt, row, bar] of callouts) tag(p, ctx, pt, [pt[0], yt(row)], bar, 6);
+      cutMark(p, [(pm.x + pi.x) / 2, yl + G.lisseH + p.th(3)], [0, -1], "1");
+      cutMark(p, [pm.x + 0.05, Hb + 0.3], [-1, 0], "2");
+      cutMark(p, [pi.x + pi.w / 2 + 0.05, Hb + 0.3], [-1, 0], "3");
       p.chainH([0, ...cells.flatMap((cl) => [cl.x0, cl.x1]), B], yb, yb - p.th(10), false);
       p.dimH(0, B, yb, yb - p.th(18));
-      p.dimV(Hb, Hb + G.h, 0, -p.th(8));
+      p.chainV([Hb, Hb + G.h, Hb + G.hMain], 0, -p.th(8));
+      if (posts.length > 2) p.chainH([pm.x - pm.w / 2, pm.x + pm.w / 2, pi.x - pi.w / 2, pi.x + pi.w / 2], Hb + G.hMain, Hb + G.hMain + p.th(5));
     },
   };
 }
 
-function coupeGC(ctx: Ctx, which: "lisse" | "poteau"): View {
+function coupeGC(ctx: Ctx, which: "lisse" | "poteau" | "poteauInt"): View {
   const G = GARDE_CORPS;
   const c = ctx.study.input.cover;
-  const w = which === "lisse" ? G.lisseW : G.post, h = which === "lisse" ? G.lisseH : G.post;
+  // Coupe 1-1 : lisse ; 2-2 : poteau principal 20 × 20 ; 3-3 : poteau intermédiaire 15 × 20 (15 le long de la lisse).
+  const w = which === "lisse" ? G.lisseW : which === "poteau" ? G.post : G.postInt;
+  const h = which === "lisse" ? G.lisseH : G.ep;
   const L = (el: string, pre: string) => ctx.bar(el, pre);
   return {
     ext: { x0: 0, y0: 0, w, h },
@@ -1166,7 +1199,7 @@ function coupeGC(ctx: Ctx, which: "lisse" | "poteau"): View {
       p.rect(c, c, w - 2 * c, h - 2 * c, "ACIERS");
       const r = p.th(1.3);
       for (const [x, y] of [[c + 0.012, c + 0.012], [w - c - 0.012, c + 0.012], [c + 0.012, h - c - 0.012], [w - c - 0.012, h - c - 0.012]] as Pt[]) p.circle([x, y], r, "ACIERS");
-      const el = which === "lisse" ? "LISSE" : "POTEAUX";
+      const el = which === "lisse" ? "LISSE" : which === "poteau" ? "POTEAUX PRINCIPAUX" : "POTEAUX INTERMÉDIAIRES";
       tag(p, ctx, [w - c - 0.012, h - c - 0.012], [w + p.th(16), h + p.th(8)], L(el, which === "lisse" ? "Filants" : "Barres verticales"), 7);
       tag(p, ctx, [w / 2, c], [w + p.th(16), -p.th(8)], L(el, "Cadres"), 7);
       p.dimH(0, w, 0, -p.th(5));
@@ -1492,8 +1525,9 @@ export function buildModelSheets(study: Study, model: Model): Sheet[] {
         draw: (pg) => {
           pg.title(area.x + area.w / 2, area.y + area.h - 10, 6, "FERRAILLAGE DES GARDE-CORPS");
           pg.place({ x: area.x, y: area.y + area.h * 0.4, w: area.w, h: area.h * 0.6 - 16 }, elevationGC(ctx), { text: "COUPE B-B", pos: "above" });
-          pg.place({ x: area.x + area.w * 0.1, y: area.y, w: area.w * 0.35, h: area.h * 0.38 }, coupeGC(ctx, "lisse"), { text: "COUPE 1-1", pos: "above" });
-          pg.place({ x: area.x + area.w * 0.55, y: area.y, w: area.w * 0.35, h: area.h * 0.38 }, coupeGC(ctx, "poteau"), { text: "COUPE 2-2", pos: "above" });
+          pg.place({ x: area.x + area.w * 0.04, y: area.y, w: area.w * 0.28, h: area.h * 0.38 }, coupeGC(ctx, "lisse"), { text: "COUPE 1-1", pos: "above" });
+          pg.place({ x: area.x + area.w * 0.36, y: area.y, w: area.w * 0.28, h: area.h * 0.38 }, coupeGC(ctx, "poteau"), { text: "COUPE 2-2", pos: "above" });
+          pg.place({ x: area.x + area.w * 0.68, y: area.y, w: area.w * 0.28, h: area.h * 0.38 }, coupeGC(ctx, "poteauInt"), { text: "COUPE 3-3", pos: "above" });
         },
       });
       for (const f of nomenclaturePages(ctx, "GARDE-CORPS", "NOMENCLATURE DES ACIERS DU GARDE-CORPS")) {
@@ -1524,8 +1558,9 @@ export function buildModelSheets(study: Study, model: Model): Sheet[] {
       id: "garde-corps", title: "Ferraillage des garde-corps",
       draw: (pg) => {
         pg.place({ x: area.x, y: area.y + area.h * 0.4, w: area.w, h: area.h * 0.6 }, elevationGC(ctx), { text: `FERRAILLAGE DES GARDE-CORPS ${nm}`, pos: "below" });
-        pg.place({ x: area.x + area.w * 0.1, y: area.y, w: area.w * 0.35, h: area.h * 0.38 }, coupeGC(ctx, "lisse"), { text: "COUPE 1-1", pos: "below" });
-        pg.place({ x: area.x + area.w * 0.55, y: area.y, w: area.w * 0.35, h: area.h * 0.38 }, coupeGC(ctx, "poteau"), { text: "COUPE 2-2", pos: "below" });
+        pg.place({ x: area.x + area.w * 0.04, y: area.y, w: area.w * 0.28, h: area.h * 0.38 }, coupeGC(ctx, "lisse"), { text: "COUPE 1-1", pos: "below" });
+        pg.place({ x: area.x + area.w * 0.36, y: area.y, w: area.w * 0.28, h: area.h * 0.38 }, coupeGC(ctx, "poteau"), { text: "COUPE 2-2", pos: "below" });
+        pg.place({ x: area.x + area.w * 0.68, y: area.y, w: area.w * 0.28, h: area.h * 0.38 }, coupeGC(ctx, "poteauInt"), { text: "COUPE 3-3", pos: "below" });
       },
     });
     for (const f of nomenclaturePages(ctx, "GARDE-CORPS", `Nomenclature des aciers _ garde-corps du ${nm}`)) {

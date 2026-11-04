@@ -266,8 +266,17 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
     const G = GARDE_CORPS;
     const y0 = gcBase;
     for (const z of ends.map((e) => gcZ(e.z0, e.s))) {
-      for (const px of gardeCorpsPosts(B)) addConcrete(new THREE.BoxGeometry(G.post, G.h - G.lisseH, G.post), V(px, y0 + (G.h - G.lisseH) / 2, z), "GARDE_CORPS");
-      addConcrete(new THREE.BoxGeometry(B, G.lisseH, G.lisseW), V(B / 2, y0 + G.h - G.lisseH / 2, z), "GARDE_CORPS");
+      // Poteaux principaux 20 × 20 de 1,20 m, intermédiaires 15 × 20 sous la lisse, lisse entre principaux.
+      const posts = gardeCorpsPosts(B);
+      for (const q of posts) {
+        const hq = q.main ? q.h : G.h - G.lisseH;
+        addConcrete(new THREE.BoxGeometry(q.w, hq, G.ep), V(q.x, y0 + hq / 2, z), "GARDE_CORPS");
+      }
+      const mains = posts.filter((q) => q.main);
+      for (let i = 0; i + 1 < mains.length; i++) {
+        const xa = mains[i].x + G.post / 2, xb = mains[i + 1].x - G.post / 2;
+        addConcrete(new THREE.BoxGeometry(xb - xa, G.lisseH, G.lisseW), V((xa + xb) / 2, y0 + G.h - G.lisseH / 2, z), "GARDE_CORPS");
+      }
     }
   }
 
@@ -496,14 +505,15 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
         const G = GARDE_CORPS;
         const yg = gcBase;
         for (const zc of ends.map((e) => gcZ(e.z0, e.s))) {
-          for (const px of gardeCorpsPosts(B)) {
+          for (const q of gardeCorpsPosts(B)) {
+            const rx = q.w / 2 - c, rz = G.ep / 2 - c;
             for (const [dx, dz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
-              const xx = px + dx * (G.post / 2 - c), zz = zc + dz * (G.post / 2 - c);
-              bars.seg(V(xx, yg - G.ancrage, zz), V(xx, yg + G.h - c, zz));
+              const xx = q.x + dx * rx, zz = zc + dz * rz;
+              bars.seg(V(xx, yg - G.ancrage, zz), V(xx, yg + q.h - c, zz));
             }
-            for (let py = yg + 0.05; py <= yg + G.h - G.lisseH; py += 0.15) {
-              const r = G.post / 2 - c;
-              bars.poly([V(px - r, py, zc - r), V(px + r, py, zc - r), V(px + r, py, zc + r), V(px - r, py, zc + r), V(px - r, py, zc - r)], false);
+            const yc = q.main ? yg + q.h - 0.05 : yg + G.h - G.lisseH;
+            for (let py = yg + 0.05; py <= yc + 1e-9; py += 0.15) {
+              bars.poly([V(q.x - rx, py, zc - rz), V(q.x + rx, py, zc - rz), V(q.x + rx, py, zc + rz), V(q.x - rx, py, zc + rz), V(q.x - rx, py, zc - rz)], false);
             }
           }
           for (const py of [yg + G.h - G.lisseH + c, yg + G.h - c]) for (const dz of [-1, 1]) bars.seg(V(c, py, zc + dz * (G.lisseW / 2 - c)), V(B - c, py, zc + dz * (G.lisseW / 2 - c)));
