@@ -11,6 +11,13 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--fond);colo
 header.app{background:var(--bleu);color:#fff;padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
 header.app h1{font-size:17px;margin:0}
 .btn{background:var(--orange);color:#fff;border:0;border-radius:4px;padding:9px 14px;font-weight:bold;font-size:13px;cursor:pointer}
+#croquis{background:#fff;border:1px solid var(--bord);border-radius:6px;margin:0 auto 14px;max-width:281mm;padding:8px}
+#cvcrq{width:100%;height:44vh;min-height:260px;display:block;touch-action:none;border:1px dashed #C9D1DB;border-radius:4px;cursor:crosshair}
+.rcrq{font-size:12.5px;margin-top:6px;line-height:1.5}.rcrq .err{color:#C00000}
+.fcrq{display:flex;flex-wrap:wrap;gap:8px;align-items:end;margin-top:4px}.fcrq label{display:flex;flex-direction:column;font-size:11.5px}
+.fcrq input{width:110px;background:var(--jaune);border:1px solid #999;padding:3px;font-weight:bold}
+.bcrq{background:var(--orange)!important;color:#fff;border:0;border-radius:3px;padding:6px 10px;font-weight:bold;cursor:pointer}.bcrq.sec{background:#1F4E79!important}
+.bfile{background:#1F4E79;color:#fff;border-radius:3px;padding:4px 8px;cursor:pointer}
 #visu3d{background:#fff;border:1px solid var(--bord);border-radius:6px;margin:0 auto 14px;max-width:281mm;padding:8px}
 .barre3d{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;margin-bottom:6px}
 .barre3d .grp{display:inline-flex;gap:3px;flex-wrap:wrap;align-items:center;border-left:1px solid #ddd;padding-left:6px}
@@ -81,6 +88,15 @@ table.cart td{border:1px solid #000;padding:2px 4px;vertical-align:middle}
   <p class="note">Bouton « Enregistrer en PDF » : choisir l'imprimante « Enregistrer au format PDF » (ou « Microsoft Print to PDF »), format A4 paysage, marges par défaut, sans en-têtes ni pieds de page.</p>
 </aside>
 <main>
+  <section id="croquis" class="noprint">
+    <div class="barre3d"><b>CROQUIS → PROJET</b>
+      <span class="grp"><label class="bfile">Charger une photo de croquis<input id="photo_crq" type="file" accept="image/*" hidden></label>
+        <label>Opacité <input type="range" min="0.1" max="1" step="0.05" value="0.5" oninput="CRQ.opac=+this.value;renduCroquis()"></label></span>
+      <span class="grp"><button onclick="annulerTrait()">Annuler le trait</button><button onclick="effacerCroquis()">Effacer</button></span>
+      <span class="grp"><button class="bcrq" onclick="reconnaitre()">Reconnaître le croquis</button></span></div>
+    <canvas id="cvcrq"></canvas>
+    <div id="res_crq" class="rcrq"></div>
+  </section>
   <section id="visu3d" class="noprint">
     <div class="barre3d">
       <b>MAQUETTE 3D</b>
@@ -1586,9 +1602,11 @@ function faces3D(mod){
 function dessiner3D(canvas,mod,opts={}){
   const ctx=canvas.getContext("2d"), Wc=canvas.width, Hc=canvas.height, {L,W,Hf}=mod.dims;
   ctx.fillStyle=opts.fond||"#F4F7FA"; ctx.fillRect(0,0,Wc,Hc);
-  const c=[L/2,W/2,Hf/2], R=Math.hypot(L,W,Hf), dist=R*1.35/VUE3D.zoom, ca=Math.cos(VUE3D.az), sa=Math.sin(VUE3D.az), ce=Math.cos(VUE3D.el), se=Math.sin(VUE3D.el);
+  const c=[L/2,W/2,Hf/2], R=Math.hypot(L,W,Hf), dist=R*1.6, ca=Math.cos(VUE3D.az), sa=Math.sin(VUE3D.az), ce=Math.cos(VUE3D.el), se=Math.sin(VUE3D.el);
   const cam=pt=>{const x=pt[0]-c[0], y=pt[1]-c[1], z=pt[2]-c[2]; const x1=ca*x-sa*y, y1=sa*x+ca*y; return [x1, ce*z-se*y1, se*z+ce*y1];};
-  const f=Math.min(Wc,Hc)*1.15, proj=q=>{const dz=dist+q[2]; return [Wc/2+f*q[0]/dz, Hc/2-f*q[1]/dz, dz];};
+  // cadrage automatique : la boîte englobante du bâtiment occupe ~85 % du cadre (zoom = 1)
+  let mx=1e-6,my=1e-6; for(const X of [-2,L+2]) for(const Y of [-2,W+2]) for(const Z of [-1.4,Hf]){const q=cam([X,Y,Z]), dz=dist+q[2]; mx=Math.max(mx,Math.abs(q[0])/dz); my=Math.max(my,Math.abs(q[1])/dz);}
+  const f=Math.min(Wc*0.43/mx,Hc*0.40/my)*VUE3D.zoom, proj=q=>{const dz=dist+q[2]; return [Wc/2+f*q[0]/dz, Hc/2-f*q[1]/dz, dz];};
   const lum=v3.norm([0.4,-0.6,0.8]);
   // sol
   const sol=[[-2,-2,-0.02],[L+2,-2,-0.02],[L+2,W+2,-0.02],[-2,W+2,-0.02]].map(q=>proj(cam(q)));
@@ -1659,6 +1677,123 @@ function exporterIFC(){ if(typeof ifcTexte!=="function"){alert("Export IFC : en 
 function exporterDXF3D(){if(!VUE3D.modele){const g=calc(); lancerCalcul(g); VUE3D.modele=modele3D(g);}
   telecharger(new TextEncoder().encode(dxf3D(VUE3D.modele)),"Maquette_3D.dxf","application/dxf");}
 
+// ============================================================ MODE CROQUIS (esquisse à main levée → projet)
+// Reconnaissance (fonction pure) : traits [[x,y],...] en pixels écran (y vers le bas) → structure de la coupe
+function rdp(pts,eps){
+  if(pts.length<3) return pts.slice();
+  const [a,b]=[pts[0],pts[pts.length-1]], dx=b[0]-a[0], dy=b[1]-a[1], L=Math.hypot(dx,dy)||1;
+  let dmax=0,idx=0; for(let i=1;i<pts.length-1;i++){const d=Math.abs(dy*pts[i][0]-dx*pts[i][1]+b[0]*a[1]-b[1]*a[0])/L; if(d>dmax){dmax=d;idx=i;}}
+  if(dmax<=eps) return [a,b];
+  return rdp(pts.slice(0,idx+1),eps).slice(0,-1).concat(rdp(pts.slice(idx),eps));
+}
+function reconnaitreCroquis(traits){
+  const tous=traits.flat(); if(tous.length<4) return {erreur:"Tracé trop court : dessiner la coupe (poteaux puis versants)."};
+  const xs=tous.map(p=>p[0]), ys=tous.map(p=>p[1]), Wx=Math.max(...xs)-Math.min(...xs), Hy=Math.max(...ys)-Math.min(...ys);
+  if(Wx<40||Hy<20) return {erreur:"Tracé trop petit."};
+  const eps=0.025*Math.max(Wx,Hy), simples=traits.filter(t=>t.length>1).map(t=>rdp(t,eps)), segs=[];
+  simples.forEach(t=>{for(let i=0;i<t.length-1;i++) segs.push([t[i],t[i+1]]);});
+  // poteaux = segments quasi verticaux assez longs
+  const vert=segs.filter(([a,b])=>{const dx=Math.abs(b[0]-a[0]), dy=Math.abs(b[1]-a[1]); return dy>0.25*Hy&&Math.atan2(dy,dx)>70*Math.PI/180;})
+    .map(([a,b])=>({x:(a[0]+b[0])/2,top:Math.min(a[1],b[1]),bas:Math.max(a[1],b[1])})).sort((u,v)=>u.x-v.x);
+  const cols=[]; vert.forEach(v=>{const c=cols.find(c=>Math.abs(c.x-v.x)<0.04*Wx); if(c){c.x=(c.x*c.n+v.x)/(c.n+1); c.n++; c.top=Math.min(c.top,v.top); c.bas=Math.max(c.bas,v.bas);} else cols.push({...v,n:1});});
+  cols.sort((u,v)=>u.x-v.x);
+  if(cols.length<2) return {erreur:"Poteaux non reconnus : tracer au moins deux traits verticaux (poteaux de rive)."};
+  const sol=cols.map(c=>c.bas).sort((a,b)=>a-b)[Math.floor(cols.length/2)];
+  const egout=(cols[0].top+cols[cols.length-1].top)/2;
+  const pts=simples.flat();
+  // faîtage le plus haut entre deux poteaux consécutifs
+  const faitageEntre=(xa,xb)=>{let best=null; pts.forEach(p=>{if(p[0]>xa+0.08*(xb-xa)&&p[0]<xb-0.08*(xb-xa)&&(!best||p[1]<best[1])) best=p;}); return best;};
+  // séparer poteaux de noue / poteaux de faîtage
+  let lignes=[cols[0]], fint=false;
+  for(let i=1;i<cols.length-1;i++){const c=cols[i], f=faitageEntre(cols[0].x,cols[cols.length-1].x), montee=egout-(f?f[1]:egout);
+    if(montee>0&&(egout-c.top)>0.45*montee) fint=true; else lignes.push(c);}
+  lignes.push(cols[cols.length-1]);
+  const nefs=[]; for(let k=0;k<lignes.length-1;k++){const xa=lignes[k].x, xb=lignes[k+1].x, f=faitageEntre(xa,xb);
+    nefs.push({px:xb-xa, montee:f?Math.max(0,egout-f[1]):0, xf:f?f[0]:(xa+xb)/2});}
+  const Wpx=lignes[lignes.length-1].x-lignes[0].x, Hpx=sol-egout;
+  return {nefs,fint,Wpx,Hpx,egoutPx:egout,solPx:sol,lignes:lignes.map(c=>c.x),poteauxFaitage:cols.filter(c=>!lignes.includes(c)).map(c=>c.x),segments:segs.length};
+}
+// dimensions réelles à partir des cotes saisies (largeur totale, hauteurs)
+function dimensionnerCroquis(R,Wm,Hm_,HFm){
+  const k=Wm/R.Wpx, portees=R.nefs.map(n=>Math.round(n.px*k/0.05)*0.05);
+  const pentes=R.nefs.map((n,i)=>{const rise=(HFm!=null?HFm-Hm_:n.montee*k); return Math.round(Math.max(3,Math.min(60,rise/(portees[i]/2)*100))*10)/10;});
+  return {portees,pentes,H:Hm_,echelle:k};
+}
+
+// ---------------------------------------------------------- interface du mode croquis
+const CRQ={traits:[],cur:null,photo:null,opac:0.5,res:null,dim:null};
+function initCroquis(){
+  const cv=document.getElementById("cvcrq"); if(!cv||cv._init) return; cv._init=true;
+  const pos=e=>{const r=cv.getBoundingClientRect(); return [e.clientX-r.left,e.clientY-r.top];};
+  cv.addEventListener("pointerdown",e=>{cv.setPointerCapture(e.pointerId); CRQ.cur=[pos(e)]; CRQ.res=null; renduCroquis();});
+  cv.addEventListener("pointermove",e=>{if(!CRQ.cur) return; const p=pos(e), l=CRQ.cur[CRQ.cur.length-1]; if(Math.hypot(p[0]-l[0],p[1]-l[1])>2){CRQ.cur.push(p); renduCroquis();}});
+  const fin=()=>{if(CRQ.cur&&CRQ.cur.length>1) CRQ.traits.push(CRQ.cur); CRQ.cur=null; renduCroquis();};
+  cv.addEventListener("pointerup",fin); cv.addEventListener("pointercancel",fin);
+  document.getElementById("photo_crq").addEventListener("change",e=>{const f=e.target.files[0]; if(!f) return; const rd=new FileReader();
+    rd.onload=()=>{const im=new Image(); im.onload=()=>{CRQ.photo=im; renduCroquis();}; im.src=rd.result;}; rd.readAsDataURL(f);});
+  renduCroquis();
+}
+function renduCroquis(){
+  const cv=document.getElementById("cvcrq"); if(!cv) return; const r=cv.getBoundingClientRect(), dpr=window.devicePixelRatio||1;
+  cv.width=Math.round(r.width*dpr); cv.height=Math.round(r.height*dpr); const x=cv.getContext("2d"); x.setTransform(dpr,0,0,dpr,0,0);
+  x.fillStyle="#FFFEF7"; x.fillRect(0,0,r.width,r.height);
+  if(CRQ.photo){const s=Math.min(r.width/CRQ.photo.width,r.height/CRQ.photo.height); x.globalAlpha=CRQ.opac;
+    x.drawImage(CRQ.photo,(r.width-CRQ.photo.width*s)/2,(r.height-CRQ.photo.height*s)/2,CRQ.photo.width*s,CRQ.photo.height*s); x.globalAlpha=1;}
+  x.strokeStyle="#E3E8EE"; x.lineWidth=1; for(let i=0;i<r.width;i+=20){x.beginPath();x.moveTo(i,0);x.lineTo(i,r.height);x.stroke();} for(let j=0;j<r.height;j+=20){x.beginPath();x.moveTo(0,j);x.lineTo(r.width,j);x.stroke();}
+  x.strokeStyle="#1F2D3A"; x.lineWidth=2.2; x.lineCap="round"; x.lineJoin="round";
+  [...CRQ.traits,...(CRQ.cur?[CRQ.cur]:[])].forEach(t=>{x.beginPath(); t.forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1])); x.stroke();});
+  const R=CRQ.res; if(R&&!R.erreur){ x.lineWidth=3; x.strokeStyle="rgba(0,112,192,0.85)";
+    R.lignes.forEach(cx=>{x.beginPath(); x.moveTo(cx,R.solPx); x.lineTo(cx,R.egoutPx); x.stroke();});
+    x.strokeStyle="rgba(197,90,17,0.9)"; R.nefs.forEach((n,k)=>{const xa=R.lignes[k], xb=R.lignes[k+1]; x.beginPath(); x.moveTo(xa,R.egoutPx); x.lineTo((xa+xb)/2,R.egoutPx-n.montee); x.lineTo(xb,R.egoutPx); x.stroke();
+      x.fillStyle="#C55A11"; x.font="bold 13px Arial"; x.fillText(`Nef ${k+1}`+(CRQ.dim?` : ${fmt(CRQ.dim.portees[k])} m – ${fmt(CRQ.dim.pentes[k],1)} %`:""),(xa+xb)/2-45,R.egoutPx-n.montee-10);});
+    R.poteauxFaitage.forEach(cx=>{x.strokeStyle="rgba(0,112,192,0.85)"; x.setLineDash([6,4]); x.beginPath(); x.moveTo(cx,R.solPx); x.lineTo(cx,R.egoutPx-20); x.stroke(); x.setLineDash([]);});
+    x.strokeStyle="#000"; x.lineWidth=1; x.beginPath(); x.moveTo(R.lignes[0],R.solPx+18); x.lineTo(R.lignes[R.lignes.length-1],R.solPx+18); x.stroke();
+    x.fillStyle="#000"; x.font="12px Arial"; x.fillText(CRQ.dim?`Largeur ${fmt(CRQ.dim.portees.reduce((a,b)=>a+b,0))} m`:"largeur à coter",(R.lignes[0]+R.lignes[R.lignes.length-1])/2-40,R.solPx+32);}
+  if(!CRQ.traits.length&&!CRQ.cur){x.fillStyle="#8A96A3"; x.font="15px Arial"; x.fillText("Dessiner ici la coupe transversale : poteaux (traits verticaux) puis versants – ou charger la photo du croquis et la décalquer",14,26);}
+}
+function annulerTrait(){CRQ.traits.pop(); CRQ.res=null; CRQ.dim=null; renduCroquis(); document.getElementById("res_crq").innerHTML="";}
+function effacerCroquis(){CRQ.traits=[]; CRQ.res=null; CRQ.dim=null; renduCroquis(); document.getElementById("res_crq").innerHTML="";}
+function reconnaitre(){
+  const R=reconnaitreCroquis(CRQ.traits), box=document.getElementById("res_crq"); CRQ.res=R; CRQ.dim=null;
+  if(R.erreur){box.innerHTML=`<span class="err">${esc(R.erreur)}</span>`; renduCroquis(); return;}
+  const Wprop=Math.round(+P.B*(parseInt(P.nn)||1)), Hprop=(+P.H).toFixed(2);
+  box.innerHTML=`<b>Reconnu :</b> ${R.nefs.length} nef(s)${R.fint?" + poteau sous faîtage":""} – proportions des portées ${R.nefs.map(n=>Math.round(n.px/R.Wpx*100)+" %").join(" / ")}.
+   <div class="fcrq">
+    <label>Largeur totale (m) <input id="crq_W" type="number" step="any" value="${Wprop}"></label>
+    <label>H sablière (m) <input id="crq_H" type="number" step="any" value="${Hprop}"></label>
+    <label>H faîtage (m, vide = d'après le tracé) <input id="crq_HF" type="number" step="any" value=""></label>
+    <label>Longueur (m) <input id="crq_L" type="number" step="any" value="${P.L}"></label>
+    <label>Entraxe des portiques (m) <input id="crq_e" type="number" step="any" value="${P.ep}"></label>
+    <button class="bcrq" onclick="calculerCroquis()">Calculer les dimensions</button></div><div id="dim_crq"></div>`;
+  calculerCroquis();
+}
+function valCrq(id){const v=document.getElementById(id).value.trim().replace(",","."); return v===""?null:parseFloat(v);}
+function calculerCroquis(){
+  const R=CRQ.res; if(!R||R.erreur) return;
+  const D=dimensionnerCroquis(R,valCrq("crq_W")||20,valCrq("crq_H")||6,valCrq("crq_HF")); CRQ.dim=D; renduCroquis();
+  const egales=Math.max(...D.portees)-Math.min(...D.portees)<=0.03*Math.max(...D.portees);
+  document.getElementById("dim_crq").innerHTML=`<b>Résultat :</b> ${D.portees.map((b,i)=>`nef ${i+1} : ${fmt(b)} m, pente ${fmt(D.pentes[i],1)} %`).join(" ; ")} – H sablière ${fmt(D.H)} m – faîtage ${fmt(D.H+D.pentes[0]/100*D.portees[0]/2)} m.
+   ${egales?"":"<br><span class=\"err\">Nefs de portées différentes : le générateur retient des nefs identiques de la plus grande portée ; la fiche JSON garde les portées exactes pour le calcul détaillé (calculer_portique.py).</span>"}
+   <div class="fcrq"><button class="bcrq" onclick="appliquerCroquis()">Appliquer au projet → plans 2D, maquette 3D, calcul</button>
+   <button class="bcrq sec" onclick="ficheCroquis()">Télécharger la fiche projet (JSON)</button></div>`;
+}
+function appliquerCroquis(){
+  const R=CRQ.res, D=CRQ.dim; if(!D) return;
+  P.nn=String(Math.min(4,D.portees.length)); P.B=Math.max(...D.portees); P.p=Math.max(...D.pentes); P.H=D.H;
+  P.L=valCrq("crq_L")||P.L; P.ep=valCrq("crq_e")||P.ep; P.fint=R.fint?"Oui":"Non"; P.gab="PERSONNALISÉ";
+  ["nn","B","p","H","L","ep","fint","gab"].forEach(setVal); dessiner(); vue3D("iso");
+  document.getElementById("visu3d").scrollIntoView({behavior:"smooth"});
+}
+function ficheCroquis(){
+  const R=CRQ.res, D=CRQ.dim; if(!D) return;
+  const fiche={nom:P.projet,lieu:P.lieu,auteur:P.auteur,longueur:valCrq("crq_L")||+P.L,entraxe:valCrq("crq_e")||+P.ep,hauteur:D.H,
+    nefs:D.portees.map((b,i)=>({portee:+b.toFixed(2),pente:D.pentes[i],poteau_faitage:R.fint})),
+    lecture:{source:"Croquis tracé dans le générateur de plans",lu_par:"Reconnaissance automatique du tracé – cotes saisies par l'utilisateur",
+      valeurs:[{element:"Nefs",valeur:`${D.portees.length} nef(s) : ${D.portees.map(b=>fmt(b)+" m").join(" + ")}`,confiance:"cotes saisies"},
+               {element:"Pentes",valeur:D.pentes.map(x=>fmt(x,1)+" %").join(" / "),confiance:valCrq("crq_HF")?"déduite des hauteurs saisies":"déduite des proportions du tracé – à confirmer"}]}};
+  telecharger(new TextEncoder().encode(JSON.stringify(fiche,null,2)),"fiche_projet_croquis.json","application/json");
+}
+
 // ============================================================ planches + cartouches
 const LEG="Couleurs : charpente en bleu · contreventements en orange · béton en gris · aciers en rouge · maçonnerie en marron clair · cotes et baies en noir · translucides hachurés en bleu clair · remblai en latérite";
 function legende(k,g){
@@ -1701,7 +1836,7 @@ function dessiner(){
   </section>`).join("");
 }
 document.getElementById("calques3d").innerHTML=Object.entries(CALQUES3D).map(([k,t])=>`<label><input type="checkbox" ${VUE3D.calques[k]?"checked":""} onchange="basculer3D('${k}',this.checked)"> ${t}</label>`).join(" ");
-buildForm(); dessiner(); initVisu3D(); rendu3D(); window.addEventListener("resize",()=>rendu3D());
+buildForm(); dessiner(); initVisu3D(); rendu3D(); initCroquis(); window.addEventListener("resize",()=>{rendu3D(); renduCroquis();});
 </script>
 </body>
 </html>
