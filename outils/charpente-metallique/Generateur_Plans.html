@@ -11,6 +11,13 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--fond);colo
 header.app{background:var(--bleu);color:#fff;padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
 header.app h1{font-size:17px;margin:0}
 .btn{background:var(--orange);color:#fff;border:0;border-radius:4px;padding:9px 14px;font-weight:bold;font-size:13px;cursor:pointer}
+#visu3d{background:#fff;border:1px solid var(--bord);border-radius:6px;margin:0 auto 14px;max-width:281mm;padding:8px}
+.barre3d{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;margin-bottom:6px}
+.barre3d .grp{display:inline-flex;gap:3px;flex-wrap:wrap;align-items:center;border-left:1px solid #ddd;padding-left:6px}
+.barre3d button{background:#1F4E79;color:#fff;border:0;border-radius:3px;padding:4px 8px;font-size:12px;cursor:pointer}
+.barre3d select{font-size:12px}.barre3d label{font-size:12px;white-space:nowrap}
+#cv3d{width:100%;height:62vh;min-height:320px;display:block;touch-action:none;border-radius:4px;cursor:grab}
+.aide3d{font-size:11px;color:#666;margin-top:3px}
 .mini{float:right;background:#fff;color:#1F4E79;border:0;border-radius:3px;font-size:11px;font-weight:bold;padding:1px 8px;cursor:pointer}
 .btn.sec{background:#fff;color:var(--bleu);border:1px solid #fff}
 .layout{display:flex;gap:14px;padding:14px;align-items:flex-start}
@@ -73,7 +80,20 @@ table.cart td{border:1px solid #000;padding:2px 4px;vertical-align:middle}
   <div id="form"></div>
   <p class="note">Bouton « Enregistrer en PDF » : choisir l'imprimante « Enregistrer au format PDF » (ou « Microsoft Print to PDF »), format A4 paysage, marges par défaut, sans en-têtes ni pieds de page.</p>
 </aside>
-<main id="planches"></main>
+<main>
+  <section id="visu3d" class="noprint">
+    <div class="barre3d">
+      <b>MAQUETTE 3D</b>
+      <span class="grp"><button onclick="vue3D('iso')">Iso</button><button onclick="vue3D('pignon')">Pignon</button><button onclick="vue3D('longpan')">Long-pan</button><button onclick="vue3D('dessus')">Dessus</button><button onclick="vue3D('arriere')">Arrière</button></span>
+      <span class="grp" id="calques3d"></span>
+      <span class="grp"><select onchange="VUE3D.mode=this.value;rendu3D()"><option value="type">Couleurs par élément</option><option value="ratio">Couleurs par taux de travail EC3</option></select></span>
+      <span class="grp"><button onclick="exporterPNG3D()">Image</button><button onclick="exporterOBJ()">OBJ</button><button onclick="exporterDXF3D()">DXF 3D</button><button onclick="exporterIFC()">IFC</button></span>
+    </div>
+    <canvas id="cv3d"></canvas>
+    <div class="aide3d">Faire glisser pour tourner · molette ou pincement à deux doigts pour zoomer · calques à cocher</div>
+  </section>
+  <div id="planches"></div>
+</main>
 </div>
 <script>
 "use strict";
@@ -1457,6 +1477,188 @@ function assemblagesSVG(g){
   return o;
 }
 
+// ============================================================ MAQUETTE 3D (modèle commun : visualiseur, OBJ, DXF 3D, IFC)
+// Repère : x le long du bâtiment (0 → L), y en travers (0 → W), z vertical (0 = dallage)
+const CALQUES3D={ossature:"Ossature principale",secondaire:"Pannes et lisses",contrev:"Contreventements",fondations:"Fondations",couverture:"Couverture",facades:"Façades"};
+function dimProfil(nom){
+  if(SEC[nom]) return {h:SEC[nom].h/1000,b:SEC[nom].b/1000,tw:SEC[nom].tw/1000,tf:SEC[nom].tf/1000,I:true};
+  const n=String(nom), v=parseFloat((n.match(/[\d.]+/)||[100])[0]);
+  if(/^[ZC] /.test(n)) return {h:v/1000,b:0.07,tw:0.0025,tf:0.0025,I:false};
+  if(/^L /.test(n)) return {h:v/1000,b:v/1000,tw:0.007,tf:0.007,I:false};
+  if(/^Rond/.test(n)) return {h:v/1000,b:v/1000,I:false};
+  if(/^UPN/.test(n)) return {h:v/1000,b:v/2500,I:false};
+  return {h:0.2,b:0.1,I:false};
+}
+function modele3D(g){
+  const {B,W,L,H,Hm,Hf,p,er,nt,nn}=g, M=[], PAN=[], d=+P.deb;
+  const top=y=>{const yy=y-Math.floor(Math.min(y,W-1e-9)/B)*B; return Hm+p*Math.min(yy,B-yy);};
+  const barre=(a,b,prof,calque,ifc,wx,ratioGrp,nom)=>{M.push({a,b,prof,calque,ifc,w:wx||[1,0,0],grp:ratioGrp||null,nom:nom||prof,dim:dimProfil(prof)});};
+  const pPot=g.ppot, pTr=g.ptrav, pInt=CALC&&CALC.profils.poteau_interieur&&CALC.profils.poteau_interieur!=="—"?CALC.profils.poteau_interieur:pPot;
+  // fondations (semelles + fûts) : boîtes béton
+  const fond=(x,y,a)=>{const zs=-P.D+P.eprop; M.push({box:[x-a/2,y-a/2,zs,x+a/2,y+a/2,zs+(+P.hs1)],calque:"fondations",ifc:"IfcFooting",nom:"Semelle "+Math.round(a*100)+"×"+Math.round(a*100)});
+    M.push({box:[x-P.f1/2,y-P.f1/2,zs+(+P.hs1),x+P.f1/2,y+P.f1/2,0],calque:"fondations",ifc:"IfcFooting",nom:"Fût "+Math.round(P.f1*100)+"×"+Math.round(P.f1*100)});};
+  for(let i=0;i<=nt;i++){const x=er*i;
+    for(let k=0;k<=nn;k++){const rive=k===0||k===nn; barre([x,k*B,0],[x,k*B,Hm],rive?pPot:pInt,"ossature","IfcColumn",[1,0,0],rive?"poteau_rive":"poteau_interieur",rive?"Poteau de rive":"Poteau de noue"); fond(x,k*B,+P.a1);}
+    for(let k=0;k<nn;k++){const o=k*B;
+      if(g.treil){ const cs=g.pmsup, ci=g.pminf; barre([x,o,Hm],[x,o+B/2,Hf],cs,"ossature","IfcBeam",[1,0,0],"traverse","Membrure supérieure"); barre([x,o+B/2,Hf],[x,o+B,Hm],cs,"ossature","IfcBeam",[1,0,0],"traverse","Membrure supérieure");
+        barre([x,o,H],[x,o+B,H],ci,"ossature","IfcBeam",[1,0,0],"traverse","Membrure inférieure");
+        const a=B/Math.max(1,g.npan), tp=y=>Hm+p*Math.min(y,B-y);
+        for(let j=1;j<g.npan;j++) barre([x,o+j*a,H],[x,o+j*a,tp(j*a)],"L 50x5","ossature","IfcMember",[1,0,0],null,"Montant");
+        for(let j=1;j<=g.npan;j++){const y0=(j-1)*a,y1=j*a; if(j<=g.npan/2) barre([x,o+y0,tp(y0)],[x,o+y1,H],"L 60x6","ossature","IfcMember",[1,0,0],null,"Diagonale"); else barre([x,o+y0,H],[x,o+y1,tp(y1)],"L 60x6","ossature","IfcMember",[1,0,0],null,"Diagonale");}
+      } else {
+        barre([x,o,Hm],[x,o+B/2,Hf],pTr,"ossature","IfcBeam",[1,0,0],"traverse","Traverse"); barre([x,o+B/2,Hf],[x,o+B,Hm],pTr,"ossature","IfcBeam",[1,0,0],"traverse","Traverse");
+        const ht=dimProfil(pTr).h, lj=g.lj, hj=ht*(+P.jh-1);
+        barre([x,o,H-ht/2-hj/2],[x,o+lj,H+p*lj-ht],pTr,"ossature","IfcMember",[1,0,0],null,"Jarret"); barre([x,o+B,H-ht/2-hj/2],[x,o+B-lj,H+p*lj-ht],pTr,"ossature","IfcMember",[1,0,0],null,"Jarret");
+      }
+      if(g.fint){barre([x,o+B/2,0],[x,o+B/2,g.treil?H:Hf],pInt,"ossature","IfcColumn",[1,0,0],"poteau_interieur","Poteau de faîtage"); fond(x,o+B/2,+P.a1);}
+    }
+  }
+  // poteaux de pignon
+  for(const x of [0,L]) for(let k=0;k<nn;k++) for(let j=1;j<g.nip;j++){const y=k*B+j*g.eppr; barre([x,y,0],[x,y,top(y)],g.ppp,"ossature","IfcColumn",[0,1,0],null,"Poteau de pignon"); fond(x,y,+P.a2);}
+  // pannes, sablières
+  const hp=dimProfil(g.ppanne).h;
+  for(let k=0;k<nn;k++) for(let j=0;j<g.np;j++){const y=j*(B/2)/Math.max(1,g.np-1);
+    for(const yy of [k*B+y,(k+1)*B-y]) barre([-d,yy,top(yy)+hp/2+0.05],[L+d,yy,top(yy)+hp/2+0.05],g.ppanne,"secondaire","IfcBeam",[0,1,0],null,"Panne");}
+  for(let k=0;k<=nn;k++) barre([0,k*B,Hm],[L,k*B,Hm],"UPN 140","secondaire","IfcBeam",[0,1,0],null,"Sablière");
+  // lisses
+  if(g.kbard){ const hl=dimProfil(g.plisse).h;
+    for(let q=0;q<g.nrows;q++){const z=g.z0+q*P.elis+0.3; barre([0,-hl/2,z],[L,-hl/2,z],g.plisse,"secondaire","IfcMember",[0,0,1],null,"Lisse"); barre([0,W+hl/2,z],[L,W+hl/2,z],g.plisse,"secondaire","IfcMember",[0,0,1],null,"Lisse");}
+    for(const x of [0,L]) for(let k=0;k<nn;k++) for(let q=0;q<16;q++){const z=g.z0+q*P.elis+0.3; if(z>=Hf-0.3) break; const ya=z<=Hm?0:(z-Hm)/p;
+      const xx=x===0?-hl/2:L+hl/2; barre([xx,k*B+ya,z],[xx,(k+1)*B-ya,z],g.plisse,"secondaire","IfcMember",[0,0,1],null,"Lisse de pignon");} }
+  // contreventements
+  const cvv=g.B<=20?"L 60x6":"L 70x7", cvt=g.B<=20?"L 50x5":(g.B<=30?"L 60x6":"L 70x7");
+  for(let m=1;m<=g.nbcv;m++){const b=bayBraced(g,m),xa=(b-1)*er,xb=b*er;
+    for(const y of [0,W]){barre([xa,y,0.15],[xb,y,Hm-0.15],cvv,"contrev","IfcMember",[0,1,0],null,"Croix de Saint-André"); barre([xb,y,0.15],[xa,y,Hm-0.15],cvv,"contrev","IfcMember",[0,1,0],null,"Croix de Saint-André");}
+    for(let k=0;k<nn;k++) for(const v of [0,1]) for(let r=1;r<=g.npv;r++){const ya=k*B+v*B/2+(r-1)*(B/2)/g.npv, yb=ya+(B/2)/g.npv;
+      const za=top(ya+1e-6)-0.05, zb=top(yb-1e-6)-0.05; barre([xa,ya,za],[xb,yb,zb],cvt,"contrev","IfcMember",[0,0,1],null,"Poutre au vent"); barre([xa,yb,zb],[xb,ya,za],cvt,"contrev","IfcMember",[0,0,1],null,"Poutre au vent");}}
+  // panneaux : couverture (par travée et versant), façades
+  const ep=0.01;
+  for(let i=1;i<=nt;i++){const x0=(i-1)*er-(i===1?d:0), x1=i*er+(i===nt?d:0);
+    for(let k=0;k<nn;k++){const o=k*B, zt=Hf+hp+0.06, ze=Hm+hp+0.06;
+      PAN.push({pts:[[x0,o,ze],[x1,o,ze],[x1,o+B/2,zt],[x0,o+B/2,zt]],calque:"couverture",c:[176,190,204],a:0.55,nom:"Couverture"});
+      PAN.push({pts:[[x0,o+B/2,zt],[x1,o+B/2,zt],[x1,o+B,ze],[x0,o+B,ze]],calque:"couverture",c:[176,190,204],a:0.55,nom:"Couverture"});}}
+  const z0=g.z0, cb=[206,214,222], ca=[233,216,191];
+  for(let i=1;i<=nt;i++){const x0=(i-1)*er, x1=i*er;
+    for(const y of [-0.12,W+0.12]){ if(z0>0) PAN.push({pts:[[x0,y,0],[x1,y,0],[x1,y,z0],[x0,y,z0]],calque:"facades",c:ca,a:0.85,nom:"Maçonnerie agglos"});
+      if(z0<Hm) PAN.push({pts:[[x0,y,z0],[x1,y,z0],[x1,y,Hm],[x0,y,Hm]],calque:"facades",c:cb,a:0.5,nom:"Bardage"});}}
+  for(const x of [-0.12,L+0.12]) for(let k=0;k<nn;k++){const o=k*B;
+    if(z0>0){const zt=Math.min(z0,Hm); PAN.push({pts:[[x,o,0],[x,o+B,0],[x,o+B,zt],[x,o,zt]],calque:"facades",c:ca,a:0.85,nom:"Maçonnerie agglos"});
+      if(g.aggFull) PAN.push({pts:[[x,o,Hm],[x,o+B,Hm],[x,o+B/2,Hf]],calque:"facades",c:ca,a:0.85,nom:"Maçonnerie agglos"});}
+    if(z0<Hm) PAN.push({pts:[[x,o,z0],[x,o+B,z0],[x,o+B,Hm],[x,o+B/2,Hf],[x,o,Hm]],calque:"facades",c:cb,a:0.5,nom:"Bardage"});}
+  for(const dd of g.doors.LP) PAN.push({pts:[[dd.xl,-0.2,0],[dd.xr,-0.2,0],[dd.xr,-0.2,dd.h],[dd.xl,-0.2,dd.h]],calque:"facades",c:[90,100,112],a:0.95,nom:"Porte"});
+  for(const dd of g.doors.PG) PAN.push({pts:[[-0.2,dd.xl,0],[-0.2,dd.xr,0],[-0.2,dd.xr,dd.h],[-0.2,dd.xl,dd.h]],calque:"facades",c:[90,100,112],a:0.95,nom:"Porte"});
+  return {M,PAN,dims:{L,W,Hf}};
+}
+// ---------------------------------------------------------- géométrie des barres (boîte orientée)
+const v3={sub:(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],add:(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]],mul:(a,s)=>[a[0]*s,a[1]*s,a[2]*s],
+  dot:(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],cross:(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],
+  norm:a=>{const l=Math.hypot(...a)||1; return [a[0]/l,a[1]/l,a[2]/l];}};
+function reperesBarre(e){
+  const dir=v3.norm(v3.sub(e.b,e.a)); let wv=e.w; if(Math.abs(v3.dot(wv,dir))>0.95) wv=Math.abs(dir[2])<0.9?[0,0,1]:[1,0,0];
+  const hv=v3.norm(v3.cross(dir,wv)), wn=v3.norm(v3.cross(hv,dir)); return {dir,wv:wn,hv};
+}
+function boitesElement(e){   // renvoie une liste de boîtes (8 sommets) ; profils en I : 3 boîtes (semelles + âme)
+  if(e.box){const [x0,y0,z0,x1,y1,z1]=e.box; return [[[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]]];}
+  const {dir,wv,hv}=reperesBarre(e), D=e.dim, Lb=Math.hypot(...v3.sub(e.b,e.a));
+  const boite=(c,ww,hh)=>{const r=[]; for(const [s,t] of [[-1,-1],[1,-1],[1,1],[-1,1]]){const off=v3.add(v3.mul(wv,s*ww/2),v3.mul(hv,t*hh/2)); r.push(v3.add(v3.add(e.a,c),off));}
+    for(let k=0;k<4;k++) r.push(v3.add(r[k],v3.mul(dir,Lb))); return [r[0],r[1],r[2],r[3],r[4],r[5],r[6],r[7]];};
+  if(D.I&&D.h>0.15){const tf=D.tf, tw=D.tw;
+    return [boite(v3.mul(hv,(D.h-tf)/2),D.b,tf),boite([0,0,0],tw,D.h-2*tf),boite(v3.mul(hv,-(D.h-tf)/2),D.b,tf)];}
+  return [boite([0,0,0],D.b,D.h)];
+}
+const FACES_BOITE=[[0,1,2,3],[4,7,6,5],[0,4,5,1],[1,5,6,2],[2,6,7,3],[3,7,4,0]];
+function couleurRatio(r){if(r==null) return null; if(r<=0.5) return [46,160,67]; if(r<=0.8) return [150,200,60]; if(r<=0.95) return [240,190,40]; if(r<=1) return [240,120,30]; return [200,30,30];}
+function couleurElement(e,mode){
+  if(e.calque==="fondations") return [170,170,170];
+  if(mode==="ratio"&&e.grp&&CALC) return couleurRatio(CALC.ratios[e.grp]);
+  if(mode==="ratio") return [175,180,188];
+  return ({ossature:[52,73,94],secondaire:[93,122,145],contrev:[211,84,0]})[e.calque]||[120,120,120];
+}
+// ---------------------------------------------------------- visualiseur (canvas 2D, projection perspective, algorithme du peintre)
+const VUE3D={az:-0.75,el:0.45,zoom:1,cible:null,calques:{ossature:true,secondaire:true,contrev:true,fondations:true,couverture:false,facades:false},mode:"type",modele:null};
+function faces3D(mod){
+  const F=[]; const cal=VUE3D.calques;
+  mod.M.forEach(e=>{ if(!cal[e.calque]) return; const col=couleurElement(e,VUE3D.mode);
+    boitesElement(e).forEach(bx=>FACES_BOITE.forEach(fc=>F.push({p:fc.map(i=>bx[i]),c:col,a:1})));});
+  mod.PAN.forEach(pn=>{ if(cal[pn.calque]) F.push({p:pn.pts,c:pn.c,a:pn.a,panneau:true}); });
+  return F;
+}
+function dessiner3D(canvas,mod,opts={}){
+  const ctx=canvas.getContext("2d"), Wc=canvas.width, Hc=canvas.height, {L,W,Hf}=mod.dims;
+  ctx.fillStyle=opts.fond||"#F4F7FA"; ctx.fillRect(0,0,Wc,Hc);
+  const c=[L/2,W/2,Hf/2], R=Math.hypot(L,W,Hf), dist=R*1.35/VUE3D.zoom, ca=Math.cos(VUE3D.az), sa=Math.sin(VUE3D.az), ce=Math.cos(VUE3D.el), se=Math.sin(VUE3D.el);
+  const cam=pt=>{const x=pt[0]-c[0], y=pt[1]-c[1], z=pt[2]-c[2]; const x1=ca*x-sa*y, y1=sa*x+ca*y; return [x1, ce*z-se*y1, se*z+ce*y1];};
+  const f=Math.min(Wc,Hc)*1.15, proj=q=>{const dz=dist+q[2]; return [Wc/2+f*q[0]/dz, Hc/2-f*q[1]/dz, dz];};
+  const lum=v3.norm([0.4,-0.6,0.8]);
+  // sol
+  const sol=[[-2,-2,-0.02],[L+2,-2,-0.02],[L+2,W+2,-0.02],[-2,W+2,-0.02]].map(q=>proj(cam(q)));
+  ctx.fillStyle="#E4E8EC"; ctx.beginPath(); sol.forEach((q,i)=>i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1])); ctx.closePath(); ctx.fill();
+  const F=faces3D(mod).map(fc=>{const qc=fc.p.map(cam); const pr=qc.map(proj); const zm=qc.reduce((s,q)=>s+q[2],0)/qc.length;
+    let n=v3.cross(v3.sub(fc.p[1],fc.p[0]),v3.sub(fc.p[2],fc.p[0])); n=v3.norm(n);
+    const k=0.55+0.45*Math.abs(v3.dot(n,lum)); return {pr,zm,col:fc.c.map(v=>Math.round(v*k)),a:fc.a,panneau:fc.panneau};});
+  F.sort((u,v)=>v.zm-u.zm);
+  F.forEach(fc=>{ if(fc.pr.some(q=>q[2]<=0.1)) return; ctx.beginPath(); fc.pr.forEach((q,i)=>i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1])); ctx.closePath();
+    ctx.fillStyle=`rgba(${fc.col[0]},${fc.col[1]},${fc.col[2]},${fc.a})`; ctx.fill();
+    ctx.strokeStyle=fc.panneau?"rgba(80,90,100,0.35)":"rgba(20,30,40,0.35)"; ctx.lineWidth=0.5; ctx.stroke();});
+  if(!opts.sansLegende){ ctx.fillStyle="#1F2D3A"; ctx.font="bold 14px Arial"; ctx.fillText(opts.titre||"Maquette 3D",12,22);
+    if(VUE3D.mode==="ratio"){ [["≤ 0,5",[46,160,67]],["≤ 0,8",[150,200,60]],["≤ 0,95",[240,190,40]],["≤ 1",[240,120,30]],["> 1",[200,30,30]]].forEach(([t,c_],i)=>{
+      ctx.fillStyle=`rgb(${c_})`; ctx.fillRect(12,34+i*18,14,12); ctx.fillStyle="#1F2D3A"; ctx.font="12px Arial"; ctx.fillText("taux "+t,32,44+i*18);}); } }
+}
+function initVisu3D(){
+  const cv=document.getElementById("cv3d"); if(!cv||cv._init) return; cv._init=true;
+  const pts=new Map(); let d0=null;
+  cv.addEventListener("pointerdown",e=>{cv.setPointerCapture(e.pointerId); pts.set(e.pointerId,[e.clientX,e.clientY]);});
+  cv.addEventListener("pointermove",e=>{ if(!pts.has(e.pointerId)) return; const prev=pts.get(e.pointerId); pts.set(e.pointerId,[e.clientX,e.clientY]);
+    if(pts.size===1){VUE3D.az-= (e.clientX-prev[0])*0.008; VUE3D.el=Math.max(-0.1,Math.min(1.5,VUE3D.el+(e.clientY-prev[1])*0.006)); rendu3D();}
+    else if(pts.size===2){const [a,b]=[...pts.values()], dd=Math.hypot(a[0]-b[0],a[1]-b[1]); if(d0) {VUE3D.zoom=Math.max(0.3,Math.min(6,VUE3D.zoom*dd/d0)); rendu3D();} d0=dd;}});
+  const fin=e=>{pts.delete(e.pointerId); if(pts.size<2) d0=null;};
+  cv.addEventListener("pointerup",fin); cv.addEventListener("pointercancel",fin);
+  cv.addEventListener("wheel",e=>{e.preventDefault(); VUE3D.zoom=Math.max(0.3,Math.min(6,VUE3D.zoom*(e.deltaY<0?1.12:0.89))); rendu3D();},{passive:false});
+}
+function rendu3D(){
+  const cv=document.getElementById("cv3d"); if(!cv) return;
+  const r=cv.getBoundingClientRect(), dpr=window.devicePixelRatio||1;
+  cv.width=Math.max(300,Math.round(r.width*dpr)); cv.height=Math.max(200,Math.round(r.height*dpr));
+  if(!VUE3D.modele){const g=calc(); lancerCalcul(g); VUE3D.modele=modele3D(g);}
+  dessiner3D(cv,VUE3D.modele,{titre:`Maquette 3D – ${P.gab}${(parseInt(P.nn)||1)>1?" – "+P.nn+" nefs":""}`});
+}
+function vue3D(nom){const v={iso:[-0.75,0.45],pignon:[0,0.12],longpan:[-Math.PI/2,0.12],dessus:[-0.0001,1.5],arriere:[2.4,0.45]}[nom]; VUE3D.az=v[0]; VUE3D.el=v[1]; VUE3D.zoom=1; rendu3D();}
+function basculer3D(cal,on){VUE3D.calques[cal]=on; rendu3D();}
+// ---------------------------------------------------------- exports 3D
+function exporterPNG3D(){const cv=document.createElement("canvas"); cv.width=2400; cv.height=1500;
+  if(!VUE3D.modele){const g=calc(); lancerCalcul(g); VUE3D.modele=modele3D(g);}
+  dessiner3D(cv,VUE3D.modele,{titre:`Maquette 3D – ${P.projet} – ${P.gab}`,fond:"#FFFFFF"});
+  cv.toBlob(b=>telecharger(b,"Maquette_3D.png","image/png"),"image/png");}
+function objMtl(mod){
+  const V=[],Fo=[],mats={}; let nv=0, cur="";
+  const mat=(nom,c)=>{const k=nom.replace(/[^A-Za-z0-9_]/g,"_"); mats[k]=c; return k;};
+  const add=(pts,m)=>{ if(m!==cur){Fo.push("usemtl "+m); cur=m;} pts.forEach(q=>V.push(`v ${q[0].toFixed(4)} ${q[1].toFixed(4)} ${q[2].toFixed(4)}`)); Fo.push("f "+pts.map((_,i)=>nv+i+1).join(" ")); nv+=pts.length;};
+  mod.M.forEach(e=>{const m=mat(e.calque+"_"+(e.box?"beton":"acier"),couleurElement(e,"type")); Fo.push("g "+(e.nom||e.prof).replace(/\s+/g,"_"));
+    boitesElement(e).forEach(bx=>FACES_BOITE.forEach(fc=>add(fc.map(i=>bx[i]),m)));});
+  mod.PAN.forEach(pn=>{const m=mat(pn.nom,pn.c); add(pn.pts,m);});
+  const mtl=Object.entries(mats).map(([k,c])=>`newmtl ${k}\nKd ${(c[0]/255).toFixed(3)} ${(c[1]/255).toFixed(3)} ${(c[2]/255).toFixed(3)}\nd 1.0\n`).join("\n");
+  return {obj:`# Maquette 3D – ${P.projet} – générée par le générateur de plans\n# unités : mètres ; x long, y travers, z vertical\nmtllib maquette.mtl\n`+V.join("\n")+"\n"+Fo.join("\n")+"\n",mtl};
+}
+function exporterOBJ(){if(!VUE3D.modele){const g=calc(); lancerCalcul(g); VUE3D.modele=modele3D(g);}
+  const {obj,mtl}=objMtl(VUE3D.modele), E_=new TextEncoder();
+  telecharger(zipStore([{nom:"maquette.obj",data:E_.encode(obj)},{nom:"maquette.mtl",data:E_.encode(mtl)}]),"Maquette_3D_OBJ.zip","application/zip");}
+function dxf3D(mod){
+  const L_=["0","SECTION","2","HEADER","9","$ACADVER","1","AC1009","9","$INSUNITS","70","6","0","ENDSEC","0","SECTION","2","TABLES","0","TABLE","2","LAYER","70","6"];
+  const cal={ossature:5,secondaire:4,contrev:30,fondations:8,couverture:9,facades:254};
+  Object.entries(cal).forEach(([n,c])=>L_.push("0","LAYER","2",n.toUpperCase(),"70","0","62",String(c),"6","CONTINUOUS"));
+  L_.push("0","ENDTAB","0","ENDSEC","0","SECTION","2","ENTITIES");
+  const face=(pts,lay)=>{const q=pts.length===3?[pts[0],pts[1],pts[2],pts[2]]:pts; if(q.length>4){ for(let i=1;i<q.length-1;i++) face([q[0],q[i],q[i+1]],lay); return;}
+    L_.push("0","3DFACE","8",lay); q.forEach((pt,i)=>L_.push(String(10+i),pt[0].toFixed(4),String(20+i),pt[1].toFixed(4),String(30+i),pt[2].toFixed(4)));};
+  mod.M.forEach(e=>boitesElement(e).forEach(bx=>FACES_BOITE.forEach(fc=>face(fc.map(i=>bx[i]),e.calque.toUpperCase()))));
+  mod.PAN.forEach(pn=>face(pn.pts,pn.calque.toUpperCase()));
+  L_.push("0","ENDSEC","0","EOF"); return L_.join("\n");
+}
+function exporterIFC(){ if(typeof ifcTexte!=="function"){alert("Export IFC : en cours de développement.");return;}
+  if(!VUE3D.modele){const g=calc(); lancerCalcul(g); VUE3D.modele=modele3D(g);}
+  telecharger(new TextEncoder().encode(ifcTexte(VUE3D.modele)),"Maquette_BIM.ifc","application/x-step");}
+function exporterDXF3D(){if(!VUE3D.modele){const g=calc(); lancerCalcul(g); VUE3D.modele=modele3D(g);}
+  telecharger(new TextEncoder().encode(dxf3D(VUE3D.modele)),"Maquette_3D.dxf","application/dxf");}
+
 // ============================================================ planches + cartouches
 const LEG="Couleurs : charpente en bleu · contreventements en orange · béton en gris · aciers en rouge · maçonnerie en marron clair · cotes et baies en noir · translucides hachurés en bleu clair · remblai en latérite";
 function legende(k,g){
@@ -1481,6 +1683,7 @@ const TITRES=["VUE EN PLAN – IMPLANTATION","COUPE TRANSVERSALE – PORTIQUE TY
 let DATE=new Date().toLocaleDateString("fr-FR");
 function dessiner(){
   const g=calc(); lancerCalcul(g);
+  VUE3D.modele=modele3D(g); if(document.getElementById("cv3d")&&document.getElementById("cv3d")._init) rendu3D();
   const vues=[P1,P2,P3,P4,P5,P6,P7,pageEnsemble,pageEclate,pageDetails,pageCalcFigures,pageCalcTableaux,pageAssemblages].map(f=>f(g)), NP=vues.length;
   const gabTxt=`Gabarit ${P.gab}${g.nn>1?" – "+g.nn+" nefs":""} : portée ${f2(g.B)} m × longueur ${f2(g.L)} m – H sablière ${f2(g.H)} m – pente ${f1(P.p)} % – ${g.systeme} – façade : ${P.fac}`;
   document.getElementById("planches").innerHTML=vues.map((v,k)=>`
@@ -1497,7 +1700,8 @@ function dessiner(){
     </table>
   </section>`).join("");
 }
-buildForm(); dessiner();
+document.getElementById("calques3d").innerHTML=Object.entries(CALQUES3D).map(([k,t])=>`<label><input type="checkbox" ${VUE3D.calques[k]?"checked":""} onchange="basculer3D('${k}',this.checked)"> ${t}</label>`).join(" ");
+buildForm(); dessiner(); initVisu3D(); rendu3D(); window.addEventListener("resize",()=>rendu3D());
 </script>
 </body>
 </html>
