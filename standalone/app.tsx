@@ -9,9 +9,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { CheckStatus } from "@/lib/dalot/checks";
 import type { GroupId } from "@/lib/dalot/design";
-import { optimizeThicknesses, runStudy, type RunOutcome } from "@/lib/dalot/engine";
+import { optimizeThicknesses, runStudy, runStudyAsync, type RunOutcome, type RunStep } from "@/lib/dalot/engine";
+import { optimizeAll, type OptimizeResult } from "@/lib/dalot/optimize";
 import {
-  DALOT_PRESETS, normalizeSpec, sectionSpec, seriesSpec, SERIES_TYPES, specFromPreset, type DalotSpec, type FieldValue, type SectionDims,
+  DALOT_PRESETS, normalizeSpec, sectionSpec, seriesSpec, SERIES_TYPES, specFromPreset, type DalotSpec, type FieldValue, type Imposed, type SectionDims,
 } from "@/lib/dalot/fields";
 import { FieldsPanel, GeometryAside, HeadsAside, HydroAside, sectionState, type SpecApi } from "@/app/(app)/dalots/[id]/_components/data-panels";
 import { downloadText, setSaver, slug } from "@/app/(app)/dalots/[id]/_components/download";
@@ -109,7 +110,7 @@ function App() {
   return (
     <div className="min-h-full bg-slate-50 text-slate-900">
       {!store ? (
-        <div className="p-10 text-center text-slate-500">Ouverture de DalotPro…</div>
+        <div className="p-10 text-center text-slate-500">Ouverture de DalotPro Expert CI…</div>
       ) : open ? (
         <Workspace key={open.id} item={open} onBack={() => setOpenId(null)} onSave={upsert}
           onDelete={async () => { await remove([open.id]); setOpenId(null); }}
@@ -317,10 +318,14 @@ function Home({ items, store, onOpen, onCreate, onRemove }: {
         <div className="flex items-start gap-3">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-orange-500 text-lg font-bold">▣</span>
           <div className="min-w-0">
-            <h1 className="text-xl font-semibold">Dalot<span className="text-orange-400">Pro</span> — calcul des dalots cadres</h1>
+            <h1 className="text-xl font-semibold">Dalot<span className="text-orange-400">Pro</span> Expert CI <span className="ml-1 rounded bg-orange-500/90 px-1.5 py-0.5 align-middle text-[11px] font-semibold">v21</span> — calcul des dalots cadres</h1>
             <p className="text-sm text-blue-100">
               Hydrologie et hydraulique, portique par bande de 1 m sur sol élastique, convois du Fascicule 61 titre II promenés pas à pas,
-              ferraillage BAEL 91 mod. 99 avec contrôle Eurocode 2, note Word, plans DXF, nomenclature, vue 3D.
+              ferraillage BAEL 91 mod. 99 avec contrôle Eurocode 2, note Word, plans DXF au cartouche République de Côte d&apos;Ivoire, nomenclature, vue 3D.
+            </p>
+            <p className="mt-1 text-xs text-blue-100">
+              Version expert : ouvrages annexes réglés position par position (4 ailes, 2 têtes, choc sur guide-roues), coupe de sol et situations hydrauliques,
+              ferraillage modifiable « Enregistrer et vérifier », bouton Calculer avec suivi des étapes et optimisation globale.
             </p>
             <p className="mt-1 text-xs text-blue-200">
               Auteur : Moulo Jean Claude · Vos études sont enregistrées {store.kind === "compte" ? "dans votre espace privé claude.ai" : "dans ce navigateur (exportez-les en JSON pour les garder)"}.
@@ -481,6 +486,16 @@ function Workspace({ item, onBack, onSave, onDelete, onDuplicate, onNewSection }
   const [pending, setPending] = useState<DalotSpec | null>(null);
   const [importErr, setImportErr] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const [calc, setCalc] = useState<{ steps: RunStep[]; current: string | null; t0: number; done: number | null } | null>(null);
+  const [opt, setOpt] = useState<{ log: string[]; t0: number; t1: number | null; result: OptimizeResult | null; running: boolean; failed?: boolean } | null>(null);
+  const optCancel = useRef(false);
+  const [now, setNow] = useState(0);
+  const ticking = (calc !== null && calc.done === null) || (opt !== null && opt.running);
+  useEffect(() => {
+    if (!ticking) return undefined;
+    const h = setInterval(() => setNow(performance.now()), 250);
+    return () => clearInterval(h);
+  }, [ticking]);
 
   useEffect(() => {
     const h = setTimeout(() => setComputed({ spec, outcome: runStudy(spec) }), computedOnce.current ? 220 : 0);
@@ -520,7 +535,29 @@ function Workspace({ item, onBack, onSave, onDelete, onDuplicate, onNewSection }
     confirm: useCallback((keys: string[]) => setSpec((s) => ({ ...s, defaulted: s.defaulted.filter((k) => !keys.includes(k)) })), []),
   };
 
-  const onImpose = (g: GroupId, v: { phi: number; s: number } | undefined) => setSpec((s) => ({ ...s, imposed: { ...s.imposed, [g]: v } }));
+  const onImpose = (g: GroupId, v: Imposed | undefined) => setSpec((s) => ({ ...s, imposed: { ...s.imposed, [g]: v } }));
+  const onImposeMany = (patch: Record<string, Imposed | undefined>) => setSpec((s) => ({ ...s, imposed: { ...s.imposed, ...patch } }));
+  const saveNow = async () => {
+    const r = runStudy(spec);
+    await onSave({ ...item, spec, name: String(spec.values.projet || "Dalot"), status: r.ok ? r.study.status : "non_verifie", updatedAt: Date.now() }).catch(() => undefined);
+    setSaved(spec);
+  };
+  const calculate = async () => {
+    const t0 = performance.now();
+    setCalc({ steps: [], current: "Validation des données", t0, done: null });
+    const target = spec;
+    const out = await runStudyAsync(target, (steps, current) => setCalc((c) => (c ? { ...c, steps: [...steps], current } : c)));
+    setComputed({ spec: target, outcome: out });
+    setVerifiedAt(Date.now());
+    setCalc((c) => (c ? { ...c, current: null, done: performance.now() - t0 } : c));
+  };
+  const optimizeGlobal = async () => {
+    optCancel.current = false;
+    setOpt({ log: [], t0: performance.now(), t1: null, result: null, running: true });
+    const res = await optimizeAll(spec, (line) => setOpt((o) => (o ? { ...o, log: [...o.log, line] } : o)), () => optCancel.current);
+    const t1 = performance.now();
+    setOpt((o) => (o ? { ...o, running: false, t1, result: res, failed: !res } : o));
+  };
   const onOptimize = () => {
     setOptimizing(true);
     setProposal(null);
@@ -554,7 +591,7 @@ function Workspace({ item, onBack, onSave, onDelete, onDuplicate, onNewSection }
           <button onClick={onBack} className="text-xs text-slate-400 hover:text-white">← {item.seriesName ? `Série ${item.seriesName}` : "Toutes les études"}</button>
           <div className="mt-2 flex items-center gap-2">
             <span className="grid h-7 w-7 place-items-center rounded bg-orange-500 text-sm font-bold text-white">▣</span>
-            <div className="font-semibold text-white">Dalot<span className="text-orange-400">Pro</span></div>
+            <div><div className="font-semibold text-white">Dalot<span className="text-orange-400">Pro</span> Expert CI</div><div className="text-[10px] text-slate-500">Version 21</div></div>
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto px-2 py-3">
@@ -591,12 +628,19 @@ function Workspace({ item, onBack, onSave, onDelete, onDuplicate, onNewSection }
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-slate-200 bg-white py-3" style={{ paddingLeft: "max(16px, env(safe-area-inset-left, 0px))", paddingRight: "max(16px, env(safe-area-inset-right, 0px))" }}>
           <button onClick={onBack} className="text-sm text-blue-800 lg:hidden">← Études</button>
-          <div className="min-w-0"><div className="text-[11px] uppercase text-slate-400">Projet</div><div className="truncate font-semibold">{String(spec.values.projet || "—")}</div></div>
+          <div className="min-w-0">
+            <div className="text-[11px] uppercase text-slate-400">Projet</div>
+            <div className="flex items-center gap-2"><span className="truncate font-semibold">{String(spec.values.projet || "—")}</span>{saved !== spec && <span className="whitespace-nowrap text-[11px] text-amber-700">modifié, non enregistré</span>}</div>
+          </div>
           <div><div className="text-[11px] uppercase text-slate-400">Dossier</div><div className="text-sm">{String(spec.values.dossier || "—")}</div></div>
           <div><div className="text-[11px] uppercase text-slate-400">Règlement</div><div className="text-sm">BAEL 91 mod. 99 · F61 T.II · EC2</div></div>
           <div><div className="text-[11px] uppercase text-slate-400">Empreinte</div><div className="font-mono text-sm">{study?.fingerprint ?? "—"}</div></div>
           <div><div className="text-[11px] uppercase text-slate-400">Résultat</div><div>{computing ? <span className="text-xs text-slate-400">calcul…</span> : <StatusBadge status={status} />}</div></div>
-          <div className="ml-auto text-xs text-slate-400">{saved === spec ? "Enregistré" : "Enregistrement…"}</div>
+          <div className="ml-auto flex items-center gap-2">
+            <button onClick={saveNow} disabled={saved === spec} className={btn}>{saved === spec ? "Enregistré" : "Enregistrer"}</button>
+            <button onClick={optimizeGlobal} disabled={!study || !!opt?.running} className={btn} title="Cherche les épaisseurs, armatures et dispositions qui rendent l'ouvrage conforme, et vous les propose avant toute modification.">Optimiser</button>
+            <button onClick={calculate} disabled={!!calc && calc.done === null} className="rounded-md bg-blue-700 px-4 py-1.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50">Calculer</button>
+          </div>
           <select id="panneau" value={panel} onChange={(e) => setPanel(e.target.value)} className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm lg:hidden">
             {NAV.flatMap((g) => g.items).map((i) => <option key={i.id} value={i.id}>{i.label}</option>)}
           </select>
@@ -610,6 +654,76 @@ function Workspace({ item, onBack, onSave, onDelete, onDuplicate, onNewSection }
         </header>
 
         <main className="min-w-0 flex-1 py-6" style={{ paddingLeft: "max(16px, env(safe-area-inset-left, 0px))", paddingRight: "max(16px, env(safe-area-inset-right, 0px))" }}>
+          {calc && (
+            <div className="fixed inset-0 z-40 grid place-items-center bg-slate-900/30 p-4" role="dialog" aria-modal="true" aria-label="Calcul en cours">
+              <div className="w-full max-w-lg rounded-xl bg-white p-5 shadow-xl">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">{calc.done === null ? "Calcul en cours" : "Calcul terminé"}</h3>
+                  <span className="text-xs text-slate-500">{fr(Math.max(0, calc.done ?? now - calc.t0) / 1000, 1)} s</span>
+                </div>
+                <ul className="mt-3 space-y-1 text-sm">
+                  {calc.steps.map((st) => <li key={st.label} className="flex justify-between gap-3 text-slate-600"><span>✓ {st.label}</span><span className="whitespace-nowrap text-xs text-slate-400">{fr(st.ms / 1000, 2)} s</span></li>)}
+                  {calc.current && <li className="flex items-center gap-2 font-medium text-blue-800"><span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-blue-700 border-t-transparent" />{calc.current}</li>}
+                </ul>
+                {calc.done !== null && (
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    <div className="text-sm">{study ? <>Résultat : <StatusBadge status={study.status} /> <span className="text-xs text-slate-500">{study.checks.length} vérifications</span></> : outcome && !outcome.ok ? <span className="text-red-700">Calcul bloqué : {outcome.missing.length ? `${outcome.missing.length} donnée(s) obligatoire(s) manquante(s)` : outcome.error}</span> : null}</div>
+                    <div className="flex gap-2">
+                      {study && <button onClick={() => { setCalc(null); setPanel("verifications"); }} className={btn}>Voir les vérifications</button>}
+                      <button onClick={() => setCalc(null)} className="rounded-md bg-blue-700 px-3 py-1.5 text-sm font-semibold text-white">Fermer</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          {opt && (
+            <div className="fixed inset-0 z-40 grid place-items-center bg-slate-900/30 p-4" role="dialog" aria-modal="true" aria-label="Optimisation">
+              <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">{opt.running ? "Optimisation en cours" : "Optimisation terminée"}</h3>
+                  <span className="text-xs text-slate-500">{fr(Math.max(0, (opt.t1 ?? now) - opt.t0) / 1000, 0)} s</span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">Chaque étape est un calcul complet de l&apos;ouvrage modifié. Rien n&apos;est appliqué sans votre accord.</p>
+                <ol className="mt-3 max-h-56 space-y-0.5 overflow-y-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-700">
+                  {opt.log.length === 0 && <li>Analyse de l&apos;ouvrage…</li>}
+                  {opt.log.map((l, i) => <li key={i}>{l}</li>)}
+                  {opt.running && <li className="flex items-center gap-2 text-blue-800"><span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-blue-700 border-t-transparent" />calcul…</li>}
+                </ol>
+                {opt.failed && <p className="mt-3 text-sm text-red-700">L&apos;optimisation n&apos;a pas pu aboutir (données incomplètes ou erreur de calcul).</p>}
+                {opt.result && (
+                  <div className="mt-4 space-y-3">
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                      Avant : <StatusBadge status={opt.result.before.status} />{opt.result.before.nc > 0 && <span className="text-xs text-slate-500">{opt.result.before.nc} non conforme(s)</span>}
+                      <span className="text-slate-400">→</span>
+                      Après : <StatusBadge status={opt.result.after.status} />{opt.result.after.nc > 0 && <span className="text-xs text-slate-500">{opt.result.after.nc} non conforme(s)</span>}
+                    </div>
+                    {opt.result.changes.length > 0 ? (
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-50 text-left text-xs text-slate-500"><tr><th className="px-2 py-1">Donnée</th><th className="px-2 py-1 text-right">Actuel</th><th className="px-2 py-1 text-right">Proposé</th></tr></thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {opt.result.changes.map((c) => <tr key={c.key}><td className="px-2 py-1">{c.label}</td><td className="px-2 py-1 text-right text-slate-500">{c.from}</td><td className="px-2 py-1 text-right font-semibold">{c.to}</td></tr>)}
+                        </tbody>
+                      </table>
+                    ) : <p className="text-sm text-slate-600">Aucune modification à proposer.</p>}
+                  </div>
+                )}
+                <div className="mt-4 flex justify-end gap-2">
+                  {opt.running ? (
+                    <button onClick={() => { optCancel.current = true; }} className={btn}>Arrêter</button>
+                  ) : (
+                    <>
+                      <button onClick={() => setOpt(null)} className={btn}>{opt.result?.changes.length ? "Annuler" : "Fermer"}</button>
+                      {opt.result && opt.result.changes.length > 0 && (
+                        <button onClick={() => { const r = opt.result!; setProposal(null); setSpec({ ...r.spec, defaulted: spec.defaulted.filter((k) => !r.changes.some((c) => c.key === k)) }); setOpt(null); }}
+                          className="rounded-md bg-blue-700 px-3 py-1.5 text-sm font-semibold text-white">Appliquer les modifications</button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
           {newSec && (
             <div className="mb-4 rounded-xl border border-orange-300 bg-white p-4 shadow-sm">
               <NewSectionForm title="Nouvelle section de dalot — mêmes données de projet (sol, matériaux, convois, cartouche)"
@@ -653,7 +767,7 @@ function Workspace({ item, onBack, onSave, onDelete, onDuplicate, onNewSection }
               {panel === "synthese" && <SynthesePanel study={study} onNav={setPanel} />}
               {panel === "combinaisons" && <CombosPanel study={study} />}
               {panel === "efforts" && <EffortsPanel study={study} />}
-              {panel === "dimensionnement" && <DesignPanel study={study} imposed={spec.imposed} onImpose={onImpose} onOptimize={onOptimize} optimizing={optimizing} proposal={proposal} onApply={applyProposal} />}
+              {panel === "dimensionnement" && <DesignPanel study={study} imposed={spec.imposed} onImpose={onImpose} onImposeMany={onImposeMany} onOptimize={onOptimize} optimizing={optimizing} proposal={proposal} onApply={applyProposal} />}
               {panel === "verifications" && (
                 <ChecksPanel study={study} fix={{
                   spec, verifiedAt: computed?.outcome === outcome ? verifiedAt : null,

@@ -28,7 +28,8 @@ export type FieldDef = {
   group: string;
   label: string;
   unit?: string;
-  kind: "number" | "text" | "select" | "bool";
+  /** « json » : donnée structurée (tableau) éditée par un composant dédié, stockée en texte JSON. */
+  kind: "number" | "text" | "select" | "bool" | "json";
   options?: { value: string; label: string }[];
   /** Valeur proposée par défaut. `undefined` = aucune, la saisie est attendue. */
   default?: FieldValue;
@@ -91,6 +92,16 @@ export const FIELDS: FieldDef[] = [
   { key: "itineraire", section: "general", group: "Cartouche des plans", label: "Itinéraire", kind: "text", default: "", help: "Vide : la localisation est reprise." },
   { key: "departement", section: "general", group: "Cartouche des plans", label: "Département", kind: "text", default: "" },
   { key: "datePlan", section: "general", group: "Cartouche des plans", label: "Date des plans", kind: "text", default: "", help: "Ex. « Juillet 2026 ». Vide : mois en cours." },
+  { key: "etat", section: "general", group: "Cartouche République de Côte d'Ivoire", label: "État", kind: "text", default: "RÉPUBLIQUE DE CÔTE D'IVOIRE" },
+  { key: "devise", section: "general", group: "Cartouche République de Côte d'Ivoire", label: "Devise", kind: "text", default: "Union – Discipline – Travail" },
+  { key: "drapeau", section: "general", group: "Cartouche République de Côte d'Ivoire", label: "Drapeau orange – blanc – vert dans le cartouche", kind: "bool", default: true },
+  { key: "phase", section: "general", group: "Cartouche République de Côte d'Ivoire", label: "Phase du dossier", kind: "select", default: "EXÉCUTION", options: [
+    { value: "APS", label: "APS — avant-projet sommaire" }, { value: "APD", label: "APD — avant-projet détaillé" },
+    { value: "DAO", label: "DAO — dossier d'appel d'offres" }, { value: "EXÉCUTION", label: "Exécution (EXE)" }, { value: "RÉCOLEMENT", label: "Récolement (DOE)" },
+  ] },
+  { key: "editePar", section: "general", group: "Cartouche République de Côte d'Ivoire", label: "Édité par", kind: "text", default: "" },
+  { key: "verifiePar", section: "general", group: "Cartouche République de Côte d'Ivoire", label: "Vérifié par", kind: "text", default: "" },
+  { key: "approuvePar", section: "general", group: "Cartouche République de Côte d'Ivoire", label: "Approuvé par (mission de contrôle)", kind: "text", default: "" },
 
   // ── Hydrologie et hydraulique ─────────────────────────────
   { key: "hyActif", section: "hydro", group: "Étude hydraulique", label: "Justifier la capacité hydraulique de l'ouvrage", kind: "bool", default: true },
@@ -188,8 +199,10 @@ export const FIELDS: FieldDef[] = [
   { key: "oedCc", section: "sol", group: "Tassement", label: "Indice de compression Cc", kind: "number", default: 0.25, min: 0.01, max: 2, step: 0.01, visibleIf: (v) => v.tassMethode === "oedometrique" },
   { key: "oedE0", section: "sol", group: "Tassement", label: "Indice des vides initial e0", kind: "number", default: 0.8, min: 0.2, max: 4, step: 0.05, visibleIf: (v) => v.tassMethode === "oedometrique" },
   { key: "oedH", section: "sol", group: "Tassement", label: "Épaisseur de la couche compressible", unit: "m", kind: "number", default: 3, min: 0.5, max: 30, step: 0.5, visibleIf: (v) => v.tassMethode === "oedometrique" },
+  { key: "couchesSol", section: "sol", group: "Coupe de sol sous le radier (tassement)", label: "Couches de sol", kind: "json", default: "", help: "Une ligne par couche, du haut vers le bas, depuis la sous-face du radier. Renseignée, la coupe remplace la méthode ci-dessus." },
   { key: "nappe", section: "sol", group: "Eau", label: "Nappe phréatique ou crue au-dessus du radier", kind: "bool", default: false },
   { key: "hw", section: "sol", group: "Eau", label: "Hauteur d'eau au-dessus de la sous-face du radier", unit: "m", kind: "number", default: 1, min: 0, max: 20, step: 0.05, visibleIf: yes("nappe") },
+  { key: "situationsHydro", section: "sol", group: "Situations hydrauliques", label: "Situations hydrauliques", kind: "json", default: "", help: "Chaque ligne est une situation étudiée (étiage, crue, vidange, nappe haute…). Niveaux repérés depuis la sous-face du radier." },
 
   // ── Convois ───────────────────────────────────────────────
   { key: "cv_A", section: "convois", group: "Fascicule 61 titre II — charges civiles", label: "Système A(l)", kind: "bool", default: true },
@@ -231,6 +244,9 @@ export const FIELDS: FieldDef[] = [
   { key: "guideRoueL", section: "tetes", group: "Équipements", label: "Largeur du guide-roue", unit: "m", kind: "number", default: 0.25, min: 0.15, max: 0.6, step: 0.01 },
   { key: "guideRoues", section: "tetes", group: "Équipements", label: "Guide-roues sur murs de tête", kind: "bool", default: true, help: "Toujours présent quand il y a des murs en aile : il assure le raccord entre les voiles et les ailes." },
   { key: "gardeCorps", section: "tetes", group: "Équipements", label: "Garde-corps en béton armé (poteaux et lisse)", kind: "bool", default: true, help: "Prévu sur tous les dalots (sécurité des usagers, pratique des marchés AGEROUTE / BNETD) : garde-corps de 1,00 m sur les deux rives, posé sur le guide-roue ; poteaux 20 × 20 tous les 1,00 m environ, lisse 20 × 15. Le décocher fait apparaître une réserve dans la note." },
+  { key: "chocGR", section: "tetes", group: "Contrôles des équipements", label: "Effort de choc sur un guide-roue", unit: "kN", kind: "number", default: 60, min: 0, max: 300, help: "Force horizontale appliquée en tête du guide-roue (ou du mur de tête). 60 kN par défaut ; à fixer selon le CCTP et le Fascicule 61 titre II. 0 = non vérifié." },
+  { key: "chocL", section: "tetes", group: "Contrôles des équipements", label: "Longueur d'application du choc", unit: "m", kind: "number", default: 0.5, min: 0.1, max: 3, step: 0.05, help: "Diffusion à 45° jusqu'à l'encastrement : largeur résistante = longueur + 2 × hauteur." },
+  { key: "annexes", section: "tetes", group: "Ouvrages annexes par position", label: "Ouvrages annexes par position", kind: "json", default: "", help: "Vide : les quatre murs en aile et les deux têtes reprennent les valeurs ci-dessus." },
   { key: "gcCover", section: "tetes", group: "Équipements", label: "Enrobage des armatures du garde-corps", unit: "m", kind: "number", default: 0.025, min: 0.015, max: 0.05, step: 0.005, visibleIf: (v) => v.gardeCorps !== false, help: "2,5 cm comme le plan type (cadres 15 × 15 dans les poteaux 20 × 20) ; l'enrobage du projet reste appliqué au corps et aux têtes." },
 
   // ── Talus du remblai ──────────────────────────────────────
@@ -242,14 +258,17 @@ export const FIELDS: FieldDef[] = [
 
 export const FIELD_BY_KEY: Record<string, FieldDef> = Object.fromEntries(FIELDS.map((f) => [f.key, f]));
 
+/** Ferraillage imposé d'une nappe (barres principales, répartition facultative). */
+export type Imposed = { phi: number; s: number; phiR?: number; sR?: number };
+
 /** État persisté d'une étude. */
 export type DalotSpec = {
   version: 1;
   values: Record<string, FieldValue>;
   /** Clés dont la valeur provient du défaut et n'a pas encore été confirmée. */
   defaulted: string[];
-  /** Ferraillage imposé : groupe → { Ø (mm), espacement (m) }. */
-  imposed: Record<string, { phi: number; s: number } | undefined>;
+  /** Ferraillage imposé : nappe → { Ø (mm), espacement (m) } et, au besoin, la répartition (Ø, espacement). */
+  imposed: Record<string, Imposed | undefined>;
 };
 
 export function defaultSpec(name?: string): DalotSpec {
@@ -257,7 +276,7 @@ export function defaultSpec(name?: string): DalotSpec {
   const defaulted: string[] = [];
   for (const f of FIELDS) {
     values[f.key] = f.default ?? null;
-    if (f.default !== undefined && f.kind !== "bool" && f.section !== "general") defaulted.push(f.key);
+    if (f.default !== undefined && f.kind !== "bool" && f.kind !== "json" && f.section !== "general") defaulted.push(f.key);
   }
   if (name) values.projet = name;
   return { version: 1, values, defaulted, imposed: {} };
@@ -301,6 +320,81 @@ export function parseList(text: string): number[] {
 
 // ── Entrée typée du moteur de calcul ───────────────────────────
 
+// ── Données structurées (tableaux) ─────────────────────────────
+
+export type HeadId = "amont" | "aval";
+export type Side = "g" | "d";
+export type WingPos = `${HeadId}_${Side}`;
+export const HEAD_IDS: HeadId[] = ["amont", "aval"];
+export const WING_POS: WingPos[] = ["amont_g", "amont_d", "aval_g", "aval_d"];
+export const WING_LABELS: Record<WingPos, string> = {
+  amont_g: "Amont, rive gauche", amont_d: "Amont, rive droite", aval_g: "Aval, rive gauche", aval_d: "Aval, rive droite",
+};
+/** Réglages propres à une tête (vide = valeur générale de la rubrique). */
+export type HeadOverride = { murTeteEp?: number; grH?: number; grL?: number; radierLong?: number; becheProf?: number; becheEp?: number };
+/** Réglages propres à un mur en aile (vide = valeur générale). */
+export type WingOverride = { actif?: boolean; angle?: number; long?: number; ep?: number; hEnd?: number | null };
+export type Annexes = { heads: Partial<Record<HeadId, HeadOverride>>; wings: Partial<Record<WingPos, WingOverride>> };
+
+/** Couche de la coupe de sol sous le radier (tassement). */
+export type SoilLayer = {
+  nom: string; ep: number; gamma: number; methode: "elastique" | "oedometrique";
+  /** Module œdométrique (MPa), méthode élastique. */
+  E: number; Cc: number; Cr: number; e0: number;
+  /** Pression de préconsolidation σ'p (kPa) ; vide = sol normalement consolidé. */
+  sigP: number | null;
+};
+/** Situation hydraulique : niveaux depuis la sous-face du radier. */
+export type HydroSituation = {
+  nom: string; nappe: number | null; eauInt: number; type: "durable" | "transitoire" | "accidentelle"; actif: boolean;
+};
+
+const finite = (x: unknown) => typeof x === "number" && Number.isFinite(x);
+function parseJson(v: FieldValue): unknown {
+  if (typeof v !== "string" || !v.trim()) return null;
+  try { return JSON.parse(v); } catch { return null; }
+}
+export function parseAnnexes(v: FieldValue): Annexes {
+  const raw = parseJson(v) as Partial<Annexes> | null;
+  const out: Annexes = { heads: {}, wings: {} };
+  if (!raw || typeof raw !== "object") return out;
+  for (const h of HEAD_IDS) {
+    const o = raw.heads?.[h];
+    if (!o) continue;
+    const c: HeadOverride = {};
+    for (const k of ["murTeteEp", "grH", "grL", "radierLong", "becheProf", "becheEp"] as const) if (finite(o[k])) c[k] = o[k];
+    if (Object.keys(c).length) out.heads[h] = c;
+  }
+  for (const w of WING_POS) {
+    const o = raw.wings?.[w];
+    if (!o) continue;
+    const c: WingOverride = {};
+    if (typeof o.actif === "boolean") c.actif = o.actif;
+    for (const k of ["angle", "long", "ep"] as const) if (finite(o[k])) c[k] = o[k];
+    if (finite(o.hEnd)) c.hEnd = o.hEnd;
+    if (Object.keys(c).length) out.wings[w] = c;
+  }
+  return out;
+}
+export function parseLayers(v: FieldValue): SoilLayer[] {
+  const raw = parseJson(v);
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((r) => r && finite(r.ep) && r.ep > 0).map((r) => ({
+    nom: String(r.nom ?? ""), ep: r.ep, gamma: finite(r.gamma) ? r.gamma : 19,
+    methode: r.methode === "oedometrique" ? "oedometrique" : "elastique",
+    E: finite(r.E) && r.E > 0 ? r.E : 10, Cc: finite(r.Cc) ? r.Cc : 0.25, Cr: finite(r.Cr) ? r.Cr : 0.03,
+    e0: finite(r.e0) && r.e0 > 0 ? r.e0 : 0.8, sigP: finite(r.sigP) && r.sigP > 0 ? r.sigP : null,
+  }));
+}
+export function parseSituations(v: FieldValue): HydroSituation[] {
+  const raw = parseJson(v);
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((r) => r && typeof r === "object").map((r) => ({
+    nom: String(r.nom ?? "Situation"), nappe: finite(r.nappe) ? r.nappe : null, eauInt: finite(r.eauInt) ? Math.max(0, r.eauInt) : 0,
+    type: r.type === "transitoire" || r.type === "accidentelle" ? r.type : "durable", actif: r.actif !== false,
+  }));
+}
+
 export type ConvoyId = "A" | "Bc" | "Bt" | "Br" | "Mc80" | "Mc120" | "Me80" | "Me120" | "D240" | "LM1" | "LM2" | "custom";
 
 export type DalotInput = {
@@ -310,6 +404,8 @@ export type DalotInput = {
     entreprise: string; pk: string; numPlan: string;
     modelePlans: "cafe" | "paia" | "engc"; ministere: string; marche: string; itineraire: string; departement: string; datePlan: string;
   };
+  /** Cartouche République de Côte d'Ivoire. */
+  cartouche: { etat: string; devise: string; drapeau: boolean; phase: string; editePar: string; verifiePar: string; approuvePar: string };
   openings: number[];
   hInt: number;
   es: number; er: number; eExt: number; eInt: number; gousset: number;
@@ -323,14 +419,22 @@ export type DalotInput = {
   gammaSol: number; phiSol: number; cSol: number; EsSol: number; nuSol: number;
   qadm: number | null; Df: number; tassementMax: number;
   oedo: { actif: boolean; Cc: number; e0: number; H: number };
+  couches: SoilLayer[];
   nappe: boolean; hw: number;
+  situations: HydroSituation[];
   convoys: ConvoyId[];
   custom: { name: string; axles: { P: number; d: number }[]; voie: number; roue: number; gU: number; gS: number };
   tanDiff: number; pas: number;
   tetes: {
     murs: boolean; angle: number; long: number; ep: number; semelle: number; semEp: number; patin: number; beche: number;
     murTeteEp: number; revanche: number; radierLong: number; debord: number; becheProf: number; becheEp: number; guideRoues: boolean; gardeCorps: boolean; gcCover: number; grH: number; grL: number;
+    /** Hauteur imposée en bout d'aile (null = déduite du talus). */
+    hEnd: number | null;
   };
+  /** Ouvrages annexes réglés position par position (vide = têtes identiques et symétriques). */
+  annexes: Annexes;
+  /** Choc sur les guide-roues : force (kN) et longueur d'application (m). */
+  choc: { F: number; l: number };
   talus: { actif: boolean; pente: number; phi: number; c: number };
   hydro: {
     actif: boolean; methode: "rationnelle" | "orstom" | "impose"; Qimpose: number; T: number;
@@ -387,6 +491,11 @@ export function toInput(spec: DalotSpec): DalotInput {
       modelePlans: v.modelePlans === "paia" || v.modelePlans === "engc" ? v.modelePlans : "cafe",
       ministere: str(v.ministere), marche: str(v.marche), itineraire: str(v.itineraire), departement: str(v.departement), datePlan: str(v.datePlan),
     },
+    cartouche: {
+      etat: v.etat === undefined ? "RÉPUBLIQUE DE CÔTE D'IVOIRE" : str(v.etat), devise: v.devise === undefined ? "Union – Discipline – Travail" : str(v.devise),
+      drapeau: v.drapeau !== false, phase: str(v.phase) || "EXÉCUTION",
+      editePar: str(v.editePar), verifiePar: str(v.verifiePar), approuvePar: str(v.approuvePar),
+    },
     openings,
     hInt: num(v.hInt, 1.5),
     es: num(v.es, 0.3), er: v.radierEgalDalle === false ? num(v.er, 0.25) : num(v.es, 0.3), eExt: num(v.eExt, 0.25), eInt: num(v.eInt, 0.25),
@@ -405,7 +514,9 @@ export function toInput(spec: DalotSpec): DalotInput {
     qadm: qadmRaw === null || qadmRaw === "" || num(qadmRaw, 0) <= 0 ? null : num(qadmRaw),
     Df: num(v.Df, 0), tassementMax: num(v.tassementMax, 2.5),
     oedo: { actif: v.tassMethode === "oedometrique", Cc: num(v.oedCc, 0.25), e0: num(v.oedE0, 0.8), H: num(v.oedH, 3) },
+    couches: parseLayers(v.couchesSol),
     nappe: v.nappe === true, hw: num(v.hw, 0),
+    situations: parseSituations(v.situationsHydro),
     convoys,
     custom: {
       name: str(v.customName) || "Convoi personnalisé", axles,
@@ -420,8 +531,10 @@ export function toInput(spec: DalotSpec): DalotInput {
       radierLong: num(v.radierTeteLong, 2.2), debord: Math.max(0, num(v.radierDebord, 0)), becheProf: num(v.becheProf, 0.8), becheEp: num(v.becheEp, 0.25),
       // Avec des murs en aile, un guide-roue (ou le mur de tête) est toujours présent : il fait le raccord voile / aile.
       guideRoues: v.guideRoues === true || v.teteMurs === true, gardeCorps: v.gardeCorps !== false, gcCover: num(v.gcCover, 0.025),
-      grH: num(v.guideRoueH, 0.2), grL: num(v.guideRoueL, 0.25),
+      grH: num(v.guideRoueH, 0.2), grL: num(v.guideRoueL, 0.25), hEnd: null,
     },
+    annexes: parseAnnexes(v.annexes),
+    choc: { F: Math.max(0, num(v.chocGR, 0)), l: Math.max(0.1, num(v.chocL, 0.5)) },
     talus: { actif: v.talusActif === true, pente: num(v.talusPente, 1.5), phi: num(v.talusPhi, 30), c: num(v.talusC, 0) },
     hydro: {
       actif: v.hyActif === true, methode: v.hyMethode === "impose" ? "impose" : v.hyMethode === "orstom" ? "orstom" : "rationnelle", Qimpose: num(v.hyQ, 10), T: num(v.hyT, 10),

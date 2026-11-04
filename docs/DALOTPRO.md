@@ -138,3 +138,28 @@ et ces cotes.
   depuis l'accueil ou depuis une étude (mêmes données de projet), têtes calculées automatiquement.
 - **Export Excel** (`excel.ts`, `xlsx.ts`) : 7 feuilles avec formules (données, charges, flexion BAEL,
   nomenclature, métré, hydraulique, vérifications) et écart avec le logiciel.
+
+## Version 21 — DalotPro Expert CI (apports de la vidéo DalotExpert, contexte ivoirien)
+
+- **Barre du haut** : Projet (avec « modifié, non enregistré »), Dossier, Règlement, Empreinte, Résultat, boutons
+  **Enregistrer**, **Optimiser** et **Calculer**. « Calculer » (`runStudyAsync`) affiche « Calcul en cours » étape par
+  étape avec la durée de chaque étape, puis le résultat.
+- **Optimiser** (`optimize.ts`) : nappes imposées en défaut rendues au choix automatique, épaisseurs du corps portées de
+  5 cm en 5 cm, autres non-conformités levées par la plus petite correction de « Corriger », puis réduction des épaisseurs
+  tant que tout reste conforme et revérification au pas réel. Journal des itérations, tableau avant / après ; rien n'est
+  appliqué sans validation.
+- **Ouvrages annexes par position** (champ `annexes`, `head-dims.ts › headLayout`) : 4 murs en aile (amont / aval, rive
+  gauche / droite vues de l'amont vers l'aval : activation, angle, longueur, épaisseur, hauteur d'extrémité imposée) et
+  2 têtes (guide-roue / mur de tête, radier de tête, bêche). Chaque tête est vérifiée avec ses ailes (identifiants
+  `-AM` / `-AV`, voiles `-AMG`…) ; ailes dissymétriques : résultante transversale Fy ajoutée au glissement. Métré, 3D et
+  note tête par tête ; les plans représentent la tête amont et le signalent. Têtes identiques : calcul inchangé.
+- **Choc sur guide-roue** (`chocGR`, `chocL`, 60 kN sur 0,50 m par défaut, à confirmer) : Mu = 1,5·F·h/(l + 2h), cadres
+  du guide-roue dimensionnés (ANX-CHOC-F / ANX-CHOC-V).
+- **Ferraillage modifiable** (`rebar-editor.tsx`) : corps et ouvrages annexes (voiles des ailes, radier de tête, mur de tête,
+  guide-roues), Automatique / Imposé, diamètre, espacement et répartition imposables, section fournie / requise, statut par
+  ligne ; brouillon puis « Enregistrer et vérifier ».
+- **Coupe de sol** (`couchesSol`) : tassement couche par couche, élastique ou œdométrique (Cc, Cr, e0, σ'p), diffusion 2/1.
+- **Situations hydrauliques** (`situationsHydro`) : flottaison (eau des cellules stabilisante) et portance en contrainte
+  effective pour chaque situation (G-SIT-FLOT-n, G-SIT-PORT-n).
+- **Cartouche République de Côte d'Ivoire** : État, devise, drapeau orange – blanc – vert (calques DRAPEAU_ORANGE /
+  DRAPEAU_VERT, surfaces SOLID dans le DXF), phase (APS, APD, DAO, EXE, DOE), édité / vérifié / approuvé par.

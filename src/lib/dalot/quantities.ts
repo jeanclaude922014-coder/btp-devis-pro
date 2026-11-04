@@ -5,7 +5,8 @@
 import { barMass, type Materials } from "./ba";
 import type { GroupDesign, GroupId } from "./design";
 import type { DalotInput } from "./fields";
-import type { HeadsResult } from "./heads";
+import type { HeadResult, HeadsResult, WingResult } from "./heads";
+import type { Tetes } from "./head-dims";
 
 export type BarShape = "droite" | "crochets" | "U" | "L" | "equerre" | "chaise" | "epingle" | "gousset" | "cadre";
 
@@ -147,13 +148,34 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
   const tWall = Math.min(inp.eExt, n > 1 ? inp.eInt : inp.eExt) - 2 * c;
   add(CORPS, "PIÉDROITS", "Épingles", { phi: 8, s: 0 }, "epingle", [0.05, tWall, 0.05], perM2((n + 1) * inp.hInt * L, 3), { spacingLabel: "3/m²" });
 
-  // ── GUIDE-ROUES ── (deux, sur les bords libres de la dalle)
+  // ── Têtes : identiques (un seul jeu compté deux fois, ailes comptées quatre fois) ou tête par tête.
   const t = inp.tetes;
-  // Avec un mur de tête (remblai sur la dalle), le guide-roue est son couronnement : pas d'élément distinct.
-  if (t.guideRoues && !(heads.headWall.H > 0.3)) {
-    const gw = t.grL, gh = t.grH;
-    add(CORPS, "GUIDE-ROUES", "Cadres ouverts ancrés dans la dalle", { phi: 8, s: 0.2 }, "U", [gh - c + 0.19, gw - 2 * c, gh - c + 0.19], 2 * nAcross(B - 2 * c, 0.2), { nElem: 2 });
-    add(CORPS, "GUIDE-ROUES", "Filants", { phi: 10, s: 0.2 }, "droite", [B - 2 * c], 2 * 4, { nElem: 2 });
+  type HeadPart = {
+    k: number; tv: Tetes; hr: HeadResult; tag: string;
+    wings: { res: WingResult; tv: Tetes; k: number; tag: string }[];
+  };
+  const parts: HeadPart[] = heads.uniform
+    ? [{ k: 2, tv: t, hr: heads.perHead[0], tag: "", wings: heads.perHead[0].wings.slice(0, 1).map((w) => ({ res: w.res, tv: w.tv, k: 4, tag: "" })) }]
+    : heads.perHead.map((h) => {
+      const sym = h.wings.length === 2 && h.wings[0].tv.angle === h.wings[1].tv.angle && h.wings[0].tv.long === h.wings[1].tv.long
+        && h.wings[0].tv.ep === h.wings[1].tv.ep && h.wings[0].tv.hEnd === h.wings[1].tv.hEnd;
+      return {
+        k: 1, tv: h.tv, hr: h, tag: ` — ${h.id}`,
+        wings: sym ? [{ res: h.wings[0].res, tv: h.wings[0].tv, k: 2, tag: ` — ${h.id}` }] : h.wings.map((w) => ({ res: w.res, tv: w.tv, k: 1, tag: ` — ${w.label}` })),
+      };
+    });
+  const tanOf = (tv: Tetes) => (tv.murs ? Math.tan((tv.angle * Math.PI) / 180) : 0);
+  /** Somme des tan α des deux ailes d'une tête (évasement du radier de tête). */
+  const tanSum = (hp: HeadPart) => heads.uniform ? 2 * tanOf(t) : hp.hr.wings.reduce((acc, w) => acc + tanOf(w.tv), 0);
+
+  // ── GUIDE-ROUES ── (deux, sur les bords libres de la dalle)
+  for (const hp of parts) {
+    // Avec un mur de tête (remblai sur la dalle), le guide-roue est son couronnement : pas d'élément distinct.
+    if (hp.tv.guideRoues && !(hp.hr.headWall.H > 0.3)) {
+      const gw = hp.tv.grL, gh = hp.tv.grH;
+      add(CORPS, "GUIDE-ROUES", `Cadres ouverts ancrés dans la dalle${hp.tag}`, hp.hr.grBars, "U", [gh - c + 0.19, gw - 2 * c, gh - c + 0.19], hp.k * nAcross(B - 2 * c, hp.hr.grBars.s), { nElem: hp.k });
+      add(CORPS, "GUIDE-ROUES", `Filants${hp.tag}`, { phi: 10, s: 0.2 }, "droite", [B - 2 * c], hp.k * 4, { nElem: hp.k });
+    }
   }
 
   // ── GARDE-CORPS ── (deux rives)
@@ -182,47 +204,61 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
   }
 
   // ── OUVRAGE DE TÊTE (deux extrémités) ──
-  const hw = heads.headWall;
-  // Mur de tête sur la largeur de l'ouvrage (plus le débord du radier) : les ailes prolongent les voiles.
-  const Bmt = B + 2 * t.debord;
-  const tanA = Math.tan((t.angle * Math.PI) / 180);
-  // Radier de tête trapézoïdal : petite base B + 2·débord, grande base + 2·L·tan(angle) ; Wrt = largeur moyenne.
-  const Wrt = B + 2 * t.debord + (t.murs ? t.radierLong * tanA : 0);
-  // Bêche sous l'about du radier de tête, alignée sur ses bords évasés : largeur moyenne sur son épaisseur.
-  const Wbe = B + 2 * t.debord + (t.murs ? 2 * Math.max(0, t.radierLong - t.becheEp / 2) * tanA : 0);
   const cm = (x: number) => Math.round(x * 100);
-  if (hw.H > 0.3) {
-    add(TETE, "MUR DE TÊTE", "Face côté remblai — barres en attente dans la dalle", hw.bars, "L", [hw.H - c, anchor(hw.bars.phi)], 2 * nAcross(Bmt - 2 * c, hw.bars.s), { nElem: 2 });
-    add(TETE, "MUR DE TÊTE", "Face vue — barres verticales", { phi: 10, s: 0.2 }, "L", [hw.H - c, anchor(10)], 2 * nAcross(Bmt - 2 * c, 0.2), { nElem: 2 });
-    add(TETE, "MUR DE TÊTE", "Répartition horizontale deux faces", hw.rep, "droite", [Bmt - 2 * c], 2 * 2 * nAcross(hw.H - c, hw.rep.s), { nElem: 2 });
-  }
-  if (t.radierLong > 0) {
-    const wMin = B + 2 * t.debord - 2 * c, wMax = B + 2 * t.debord + 2 * t.radierLong * tanA * (t.murs ? 1 : 0) - 2 * c;
-    const vl = `var (${cm(wMin)}/${cm(wMax)})`;
-    const rows = nAcross(t.radierLong - 2 * c, 0.2);
-    add(TETE, "RADIER DE TÊTE", "Nappe inférieure — barres transversales", heads.wing?.footBars ?? { phi: 10, s: 0.2 }, "crochets", [hook, (wMin + wMax) / 2, hook], 2 * nAcross(t.radierLong - 2 * c, heads.wing?.footBars.s ?? 0.2), { nElem: 2, varLabel: vl });
-    add(TETE, "RADIER DE TÊTE", "Nappe supérieure — barres transversales", { phi: 10, s: 0.2 }, "crochets", [hook, (wMin + wMax) / 2, hook], 2 * rows, { nElem: 2, varLabel: vl });
-    add(TETE, "RADIER DE TÊTE", "Barres longitudinales deux nappes", { phi: 10, s: 0.2 }, "droite", [t.radierLong - 2 * c], 2 * 2 * nAcross(Wrt - 2 * c, 0.2), { nElem: 2 });
-    add(TETE, "RADIER DE TÊTE", "Chaises", chaise, "chaise", [0.24, 0.25, 0.2], perM2(2 * Wrt * t.radierLong, 3), { spacingLabel: "3/m²" });
-  }
-  if (heads.wing) {
-    const w = heads.wing;
-    const Havg = (w.Htot + w.Hend) / 2;
-    const vl = `var (${cm(w.Hend - c)}/${cm(w.Htot - c)})`;
-    const nv = nAcross(t.long - 2 * c, w.bars.s);
-    add(TETE, "MUR EN L", "Voile — barres verticales côté remblai, ancrées dans la semelle", w.bars, "L", [Havg - c, anchor(w.bars.phi)], 4 * nv, { nElem: 4, varLabel: vl });
-    add(TETE, "MUR EN L", "Voile — barres verticales face vue", { phi: 10, s: 0.2 }, "L", [Havg - c, anchor(10)], 4 * nAcross(t.long - 2 * c, 0.2), { nElem: 4, varLabel: vl });
-    add(TETE, "MUR EN L", "Voile — barres horizontales deux faces", w.rep, "droite", [t.long - 2 * c], 4 * 2 * nAcross(Havg, w.rep.s), { nElem: 4 });
-    add(TETE, "MUR EN L", "Barres en ciseau au raccord avec le piédroit", { phi: 12, s: 0.2 }, "crochets", [0.05, 0.5 + 1.0, 0.05], 4 * nAcross(w.Htot, 0.25), { nElem: 4, varLabel: "50 / 100" });
-    add(TETE, "MUR EN L", "Couronnement", { phi: 10, s: 0.2 }, "droite", [Math.hypot(t.long, w.Htot - w.Hend)], 4 * 2, { nElem: 4 });
-    add(TETE, "MUR EN L", "Semelle — cadres transversaux (deux nappes liées)", w.footBars, "U", [t.semEp - 2 * c, t.semelle - 2 * c, t.semEp - 2 * c], 4 * nAcross(t.long - 2 * c, w.footBars.s), { nElem: 4 });
-    add(TETE, "MUR EN L", "Semelle — filants deux nappes", { phi: 10, s: 0.2 }, "droite", [t.long - 2 * c], 4 * 2 * nAcross(t.semelle - 2 * c, 0.2), { nElem: 4 });
-  }
-  if (t.becheProf > 0) {
-    const nb = nAcross(Wbe - 2 * c, 0.2);
-    add(TETE, "BÊCHE", "Cadres verticaux", { phi: 8, s: 0.2 }, "U", [t.becheEp - 2 * c, t.becheProf + inp.er - 2 * c, t.becheEp - 2 * c], 2 * nb, { nElem: 2 });
-    add(TETE, "BÊCHE", "Filants horizontaux", { phi: 10, s: 0.2 }, "droite", [Wbe - 2 * c], 2 * 2 * nAcross(t.becheProf, 0.25), { nElem: 2 });
-    add(TETE, "BÊCHE", "Épingles", { phi: 8, s: 0.2 }, "epingle", [0.05, t.becheEp - 2 * c, 0.05], 2 * nb, { nElem: 2 });
+  let vHead = 0, vWing = 0, vRad = 0, vBeche = 0, propHeads = 0, coffHeads = 0, radLong = 0;
+  for (const hp of parts) {
+    const tv = hp.tv, hw = hp.hr.headWall, k = hp.k, tag = hp.tag;
+    // Mur de tête sur la largeur de l'ouvrage (plus le débord du radier) : les ailes prolongent les voiles.
+    const Bmt = B + 2 * tv.debord;
+    const ts = tanSum(hp);
+    // Radier de tête trapézoïdal : petite base B + 2·débord, grande base + L·Σ tan(angle) ; Wrt = largeur moyenne.
+    const Wrt = B + 2 * tv.debord + tv.radierLong * ts / 2;
+    // Bêche sous l'about du radier de tête, alignée sur ses bords évasés : largeur moyenne sur son épaisseur.
+    const Wbe = B + 2 * tv.debord + Math.max(0, tv.radierLong - tv.becheEp / 2) * ts;
+    if (hw.H > 0.3) {
+      add(TETE, "MUR DE TÊTE", `Face côté remblai — barres en attente dans la dalle${tag}`, hw.bars, "L", [hw.H - c, anchor(hw.bars.phi)], k * nAcross(Bmt - 2 * c, hw.bars.s), { nElem: k });
+      add(TETE, "MUR DE TÊTE", `Face vue — barres verticales${tag}`, { phi: 10, s: 0.2 }, "L", [hw.H - c, anchor(10)], k * nAcross(Bmt - 2 * c, 0.2), { nElem: k });
+      add(TETE, "MUR DE TÊTE", `Répartition horizontale deux faces${tag}`, hw.rep, "droite", [Bmt - 2 * c], k * 2 * nAcross(hw.H - c, hw.rep.s), { nElem: k });
+    }
+    const foot = hp.hr.wings[0]?.res.footBars;
+    if (tv.radierLong > 0) {
+      const wMin = B + 2 * tv.debord - 2 * c, wMax = B + 2 * tv.debord + tv.radierLong * ts - 2 * c;
+      const vl = `var (${cm(wMin)}/${cm(wMax)})`;
+      const rows = nAcross(tv.radierLong - 2 * c, 0.2);
+      add(TETE, "RADIER DE TÊTE", `Nappe inférieure — barres transversales${tag}`, foot ?? { phi: 10, s: 0.2 }, "crochets", [hook, (wMin + wMax) / 2, hook], k * nAcross(tv.radierLong - 2 * c, foot?.s ?? 0.2), { nElem: k, varLabel: vl });
+      add(TETE, "RADIER DE TÊTE", `Nappe supérieure — barres transversales${tag}`, { phi: 10, s: 0.2 }, "crochets", [hook, (wMin + wMax) / 2, hook], k * rows, { nElem: k, varLabel: vl });
+      add(TETE, "RADIER DE TÊTE", `Barres longitudinales deux nappes${tag}`, { phi: 10, s: 0.2 }, "droite", [tv.radierLong - 2 * c], k * 2 * nAcross(Wrt - 2 * c, 0.2), { nElem: k });
+      add(TETE, "RADIER DE TÊTE", `Chaises${tag}`, chaise, "chaise", [0.24, 0.25, 0.2], perM2(k * Wrt * tv.radierLong, 3), { spacingLabel: "3/m²" });
+    }
+    for (const wg of hp.wings) {
+      const w = wg.res, wt = wg.tv, kw = wg.k, wtag = wg.tag;
+      const Havg = (w.Htot + w.Hend) / 2;
+      const vl = `var (${cm(w.Hend - c)}/${cm(w.Htot - c)})`;
+      const nv = nAcross(wt.long - 2 * c, w.bars.s);
+      add(TETE, "MUR EN L", `Voile — barres verticales côté remblai, ancrées dans la semelle${wtag}`, w.bars, "L", [Havg - c, anchor(w.bars.phi)], kw * nv, { nElem: kw, varLabel: vl });
+      add(TETE, "MUR EN L", `Voile — barres verticales face vue${wtag}`, { phi: 10, s: 0.2 }, "L", [Havg - c, anchor(10)], kw * nAcross(wt.long - 2 * c, 0.2), { nElem: kw, varLabel: vl });
+      add(TETE, "MUR EN L", `Voile — barres horizontales deux faces${wtag}`, w.rep, "droite", [wt.long - 2 * c], kw * 2 * nAcross(Havg, w.rep.s), { nElem: kw });
+      add(TETE, "MUR EN L", `Barres en ciseau au raccord avec le piédroit${wtag}`, { phi: 12, s: 0.2 }, "crochets", [0.05, 0.5 + 1.0, 0.05], kw * nAcross(w.Htot, 0.25), { nElem: kw, varLabel: "50 / 100" });
+      add(TETE, "MUR EN L", `Couronnement${wtag}`, { phi: 10, s: 0.2 }, "droite", [Math.hypot(wt.long, w.Htot - w.Hend)], kw * 2, { nElem: kw });
+      add(TETE, "MUR EN L", `Semelle — cadres transversaux (deux nappes liées)${wtag}`, w.footBars, "U", [wt.semEp - 2 * c, wt.semelle - 2 * c, wt.semEp - 2 * c], kw * nAcross(wt.long - 2 * c, w.footBars.s), { nElem: kw });
+      add(TETE, "MUR EN L", `Semelle — filants deux nappes${wtag}`, { phi: 10, s: 0.2 }, "droite", [wt.long - 2 * c], kw * 2 * nAcross(wt.semelle - 2 * c, 0.2), { nElem: kw });
+      // Voile au-dessus du radier ; semelle comptée sur le talon et l'épaisseur du voile (le reste est le radier de tête).
+      vWing += kw * wt.long * (Math.max(0, Havg - wt.semEp) * wt.ep + Math.min(wt.semelle, wt.patin + wt.ep) * wt.semEp);
+      propHeads += 0.05 * kw * wt.long * (wt.semelle + 0.2);
+      coffHeads += kw * (2 * wt.long * Havg + 2 * (wt.long + wt.semelle) * wt.semEp);
+    }
+    if (tv.becheProf > 0) {
+      const nb = nAcross(Wbe - 2 * c, 0.2);
+      add(TETE, "BÊCHE", `Cadres verticaux${tag}`, { phi: 8, s: 0.2 }, "U", [tv.becheEp - 2 * c, tv.becheProf + inp.er - 2 * c, tv.becheEp - 2 * c], k * nb, { nElem: k });
+      add(TETE, "BÊCHE", `Filants horizontaux${tag}`, { phi: 10, s: 0.2 }, "droite", [Wbe - 2 * c], k * 2 * nAcross(tv.becheProf, 0.25), { nElem: k });
+      add(TETE, "BÊCHE", `Épingles${tag}`, { phi: 8, s: 0.2 }, "epingle", [0.05, tv.becheEp - 2 * c, 0.05], k * nb, { nElem: k });
+    }
+    vHead += k * Bmt * hw.H * tv.murTeteEp + (tv.guideRoues && !(hw.H > 0.3) ? k * Bmt * tv.grL * tv.grH : 0);
+    vRad += k * Wrt * tv.radierLong * inp.er;
+    vBeche += k * Wbe * tv.becheProf * tv.becheEp;
+    propHeads += 0.05 * k * Wrt * tv.radierLong;
+    coffHeads += k * 2 * B * hw.H + k * 2 * Wbe * tv.becheProf;
+    radLong += k * tv.radierLong;
   }
 
   const steelMass = bars.reduce((s, b) => s + b.mass, 0);
@@ -230,21 +266,13 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
   // ── Volumes, surfaces ──
   const cells = inp.openings.reduce((s, o) => s + o * inp.hInt, 0);
   const vBody = (B * Hout - cells + 4 * n * (inp.gousset ** 2 / 2)) * L;
-  const vHead = 2 * Bmt * hw.H * t.murTeteEp + (t.guideRoues && !(hw.H > 0.3) ? 2 * Bmt * t.grL * t.grH : 0);
-  const Havg = heads.wing ? (heads.wing.Htot + heads.wing.Hend) / 2 : 0;
-  // Voile au-dessus du radier ; semelle comptée sur le talon et l'épaisseur du voile (le reste est le radier de tête).
-  const vWing = heads.wing ? 4 * t.long * (Math.max(0, Havg - t.semEp) * t.ep + Math.min(t.semelle, t.patin + t.ep) * t.semEp) : 0;
-  const vRad = 2 * Wrt * t.radierLong * inp.er;
-  const vBeche = 2 * Wbe * t.becheProf * t.becheEp;
   const concrete = vBody + vHead + vWing + vRad + vBeche + vGc;
-  const proprete = 0.05 * ((B + 0.2) * (L + 0.2) + 2 * Wrt * t.radierLong + (heads.wing ? 4 * t.long * (t.semelle + 0.2) : 0));
+  const proprete = 0.05 * ((B + 0.2) * (L + 0.2)) + propHeads;
   const coffrage =
     inp.openings.reduce((s, o) => s + 2 * (o + inp.hInt), 0) * L + 2 * Hout * L + 2 * (B * Hout - cells)
-    + 2 * 2 * B * hw.H
-    + (heads.wing ? 4 * (2 * t.long * Havg + 2 * (t.long + t.semelle) * t.semEp) : 0)
-    + 2 * 2 * Wbe * t.becheProf
+    + coffHeads
     + (vGc > 0 ? 2 * (gardeCorpsPosts(B).reduce((s, q) => s + 2 * (q.w + GARDE_CORPS.ep) * q.h, 0) + 2 * B * GARDE_CORPS.lisseH + B * GARDE_CORPS.lisseW) : 0);
-  const deblai = (B + 2) * (L + 2 * t.radierLong + 2) * (inp.Df + 0.05 + 0.3);
+  const deblai = (B + 2) * (L + radLong + 2) * (inp.Df + 0.05 + 0.3);
   const remblai = Math.max(0, (B + 4) * (Hout + inp.hr) * L - B * Hout * L);
   const etanch = (B + 2 * Hout) * L;
 
@@ -254,7 +282,7 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
     { lot: "Béton", designation: "Béton de propreté dosé à 150 kg/m³ (ép. 5 cm)", unit: "m³", quantity: proprete },
     { lot: "Béton", designation: `Béton armé B${inp.fc28} pour corps du dalot (radier, piédroits, dalle)`, unit: "m³", quantity: vBody },
     { lot: "Béton", designation: `Béton armé B${inp.fc28} pour murs de tête et guide-roues`, unit: "m³", quantity: vHead },
-    ...(heads.wing ? [{ lot: "Béton", designation: `Béton armé B${inp.fc28} pour murs en aile et semelles`, unit: "m³", quantity: vWing }] : []),
+    ...(vWing > 0 ? [{ lot: "Béton", designation: `Béton armé B${inp.fc28} pour murs en aile et semelles`, unit: "m³", quantity: vWing }] : []),
     { lot: "Béton", designation: `Béton armé B${inp.fc28} pour radiers de tête et bêches parafouilles`, unit: "m³", quantity: vRad + vBeche },
     ...(vGc > 0 ? [{ lot: "Béton", designation: `Béton armé B${inp.fc28} pour garde-corps (poteaux et lisses)`, unit: "m³", quantity: vGc }] : []),
     { lot: "Aciers", designation: `Aciers HA FeE${inp.fe} façonnés et posés (nomenclature)`, unit: "kg", quantity: steelMass },

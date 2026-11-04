@@ -141,8 +141,10 @@ export function designSections(inp: DalotInput, an: Analysis): Design {
         }
         d = h - mat.cover - bars.phi / 2000;
       }
-      // Répartition : A/4 (BAEL A.8.2,41) avec un minimum constructif HA8 e = 25 cm.
-      const rep = chooseBars(Math.max(bars.As / 4, barArea(8) / 0.25), h, mat, 8);
+      // Répartition : A/4 (BAEL A.8.2,41) avec un minimum constructif HA8 e = 25 cm, ou imposée.
+      const rep = imposed?.phiR && imposed.sR
+        ? { phi: imposed.phiR, s: imposed.sR, As: barArea(imposed.phiR) / imposed.sR }
+        : chooseBars(Math.max(bars.As / 4, barArea(8) / 0.25), h, mat, 8);
       const st = stressesELS(Ms / 1000, bars.As, d);
       const g: GroupDesign = {
         id, label: GROUP_LABELS[id], h, d, faces, Mu, Ms, MEd,

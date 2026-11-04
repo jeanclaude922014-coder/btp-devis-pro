@@ -49,6 +49,10 @@ export type GeoResult = {
   pMaxELU: number;
   settlement: number; // cm
   flotation: number | null;
+  /** Tassement couche par couche (coupe de sol renseignée). */
+  layers: { nom: string; z: number; ep: number; s0: number; ds: number; s: number; methode: string }[];
+  /** Situations hydrauliques vérifiées. */
+  situations: { nom: string; type: string; U: number; W: number; FS: number | null; q: number; qAllow: number }[];
   slope: { FS: number; xc: number; yc: number; R: number; H: number; n: number } | null;
   factors: ReturnType<typeof qLimit>;
 };
@@ -138,6 +142,34 @@ export function geotechChecks(inp: DalotInput, an: Analysis): { checks: Check[];
     tassLabel = `Tassement œdométrique s = H·Cc/(1+e0)·log((σ'0+Δσ)/σ'0), σ'0 = ${s0.toFixed(0)} kPa, Δσ = ${ds.toFixed(0)} kPa`;
     tassRef = "Méthode œdométrique (couche compressible normalement consolidée)";
   }
+  // Coupe de sol : tassement couche par couche (diffusion 2/1 depuis la sous-face du radier).
+  const layers: GeoResult["layers"] = [];
+  if (inp.couches.length > 0) {
+    let z = 0, sv = inp.gammaSol * inp.Df, total = 0;
+    for (const L0 of inp.couches) {
+      const gEff = inp.nappe ? L0.gamma - GAMMA_W : L0.gamma;
+      const zm = z + L0.ep / 2;
+      const s0 = Math.max(1, sv + gEff * L0.ep / 2);
+      const ds = (qNet * B * inp.L) / ((B + zm) * (inp.L + zm));
+      let sl: number;
+      if (L0.methode === "oedometrique") {
+        const sp = L0.sigP ?? s0; // vide : normalement consolidé
+        const s1 = s0 + ds;
+        sl = s1 <= sp
+          ? (L0.ep * L0.Cr) / (1 + L0.e0) * Math.log10(s1 / s0)
+          : (L0.ep / (1 + L0.e0)) * (L0.Cr * Math.log10(Math.max(sp, s0) / s0) + L0.Cc * Math.log10(s1 / Math.max(sp, s0)));
+      } else {
+        sl = (ds * L0.ep) / (L0.E * 1000);
+      }
+      layers.push({ nom: L0.nom, z: zm, ep: L0.ep, s0, ds, s: sl * 100, methode: L0.methode });
+      total += sl * 100;
+      sv += gEff * L0.ep;
+      z += L0.ep;
+    }
+    settlement = total;
+    tassLabel = `Tassement par couches (${inp.couches.length} couche${inp.couches.length > 1 ? "s" : ""} sur ${z.toFixed(2)} m, diffusion 2/1) : s = Σ sᵢ`;
+    tassRef = "Coupe de sol — élastique Δσ·h/E ou œdométrique h/(1+e0)·[Cr·log(σ'p/σ'0) + Cc·log(σ'f/σ'p)]";
+  }
   checks.push({
     id: "G-TASS", domain: dom, element: "Sol sous radier",
     label: tassLabel, value: settlement, limit: inp.tassementMax, unit: "cm",
@@ -164,6 +196,38 @@ export function geotechChecks(inp: DalotInput, an: Analysis): { checks: Check[];
       status: "non_applicable", ref: "EC7 §2.4.7.4", detail: "Pas de nappe déclarée au-dessus du radier.",
     });
   }
+  // Situations hydrauliques déclarées : flottaison et portance pour chacune.
+  const situations: GeoResult["situations"] = [];
+  inp.situations.filter((x) => x.actif).forEach((sit, i) => {
+    const k = i + 1;
+    const hwExt = sit.nappe ?? 0;
+    const cellsWater = inp.openings.reduce((acc, o) => acc + o * Math.min(sit.eauInt, inp.hInt), 0) * GAMMA_W; // kN/m
+    const U = GAMMA_W * Math.min(hwExt, Hext) * B;
+    const concrete = (B * Hext - inp.openings.reduce((acc, o) => acc + o * inp.hInt, 0)) * inp.gammaBA;
+    const submergedCover = Math.min(Math.max(0, hwExt - Hext), inp.hr + inp.ech);
+    const W = concrete + an.caseLoads.gTop * B - GAMMA_W * submergedCover * B + cellsWater;
+    const FS = U > 0 ? W / U : null;
+    if (FS !== null) {
+      checks.push({
+        id: `G-SIT-FLOT-${k}`, domain: dom, element: `Situation « ${sit.nom} »`,
+        label: `Flottaison (${sit.type}) : FS = poids stabilisant / sous-pression ≥ 1,10`, value: FS, limit: 1.1,
+        status: FS >= 1.1 ? "conforme" : "non_conforme", ref: "EC7 §2.4.7.4 (UPL)",
+        detail: `Nappe à ${hwExt.toFixed(2).replace(".", ",")} m, eau dans les cellules ${sit.eauInt.toFixed(2).replace(".", ",")} m (poids de l'eau compté stabilisant).`,
+      });
+    }
+    // Portance : contrainte effective = qref ELS + eau dans les cellules − sous-pression ; sol déjaugé si nappe.
+    const q = qrefELS + cellsWater / B - GAMMA_W * Math.min(hwExt, Hext);
+    const f = qLimit(B, Math.max(B, inp.L), inp.phiSol, inp.cSol, inp.gammaSol, inp.Df, hwExt > 0 || inp.nappe);
+    const qAllow = sit.type === "accidentelle" ? f.q0 + (f.qu - f.q0) / 2 : f.q0 + (f.qu - f.q0) / 3;
+    checks.push({
+      id: `G-SIT-PORT-${k}`, domain: dom, element: `Situation « ${sit.nom} »`,
+      label: `Portance (${sit.type}) : q'ref = qref ELS + eau intérieure − sous-pression ≤ q0 + (qu − q0)/${sit.type === "accidentelle" ? 2 : 3}`,
+      value: q, limit: qAllow, unit: "kPa", status: q <= qAllow ? "conforme" : "non_conforme",
+      ref: "Fascicule 62 titre V / EC7 annexe D (sol déjaugé sous la nappe)",
+    });
+    situations.push({ nom: sit.nom, type: sit.type, U, W, FS, q, qAllow });
+  });
+
   checks.push({
     id: "G-GLISS", domain: dom, element: "Corps du dalot", label: "Glissement et renversement d'ensemble du corps",
     status: "non_applicable", ref: "—", detail: "Ouvrage fermé soumis à des poussées symétriques : les efforts horizontaux s'équilibrent dans le cadre.",
@@ -195,7 +259,7 @@ export function geotechChecks(inp: DalotInput, an: Analysis): { checks: Check[];
 
   return {
     checks,
-    result: { B, qu, qrefELS, qrefELU, pMaxELS, pMinELS, pMaxELU, settlement, flotation, slope, factors },
+    result: { B, qu, qrefELS, qrefELU, pMaxELS, pMinELS, pMaxELU, settlement, flotation, layers, situations, slope, factors },
   };
 }
 

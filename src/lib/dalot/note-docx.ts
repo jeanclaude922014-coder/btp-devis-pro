@@ -431,6 +431,15 @@ export async function buildNoteDocx(study: Study, images: NoteImages, kind: Note
   body.push(H1("22. Vérifications géotechniques"),
     FORMULA(`Portance : qu = c·Nc·sc + q0·Nq·sq + 0,5·γ'·B·Nγ·sγ, avec Nq = ${f(gf.Nq)}, Nc = ${f(gf.Nc)}, Nγ = ${f(gf.Ng)}, sq = ${f(gf.sq)}, sγ = ${f(gf.sg)}, sc = ${f(gf.sc)}, q0 = ${f(gf.q0, 1)} kPa → qu = ${f(geo.qu, 0)} kPa`, "EC7 annexe D"),
     FORMULA(`${study.checks.find((c) => c.id === "G-TASS")?.label ?? "Tassement"} = ${f(geo.settlement)} cm`),
+    ...(geo.layers.length ? [table(["Couche", "Méthode", "Épaisseur", "Profondeur du milieu", "σ'0", "Δσ", "Tassement"],
+      geo.layers.map((l) => [l.nom || "—", l.methode === "oedometrique" ? "œdométrique" : "élastique", `${f(l.ep)} m`, `${f(l.z)} m`, `${f(l.s0, 0)} kPa`, `${f(l.ds, 1)} kPa`, `${f(l.s)} cm`]),
+      [0.24, 0.14, 0.11, 0.14, 0.12, 0.12, 0.13])] : []),
+    ...(geo.situations.length ? [
+      P("Situations hydrauliques déclarées : la flottaison est vérifiée avec le remblai immergé déjaugé, l'eau contenue dans les cellules étant comptée stabilisante ; la portance est vérifiée en contrainte effective (sous-pression déduite, sol déjaugé)."),
+      table(["Situation", "Statut", "Sous-pression", "Poids stabilisant", "FS flottaison", "q'ref / admissible"],
+        geo.situations.map((x) => [x.nom, x.type, `${f(x.U, 1)} kN/m`, `${f(x.W, 1)} kN/m`, x.FS === null ? "sans nappe" : f(x.FS), `${f(x.q, 0)} / ${f(x.qAllow, 0)} kPa`]),
+        [0.28, 0.12, 0.14, 0.16, 0.13, 0.17]),
+    ] : []),
     ...(geo.slope ? [FORMULA(`Talus : cercle critique centre (${f(geo.slope.xc)} ; ${f(geo.slope.yc)}) m, R = ${f(geo.slope.R)} m → FS = ${f(geo.slope.FS)}`, "Fellenius")] : []),
     checksTable(by("Géotechnique et stabilité")));
 
@@ -457,6 +466,26 @@ export async function buildNoteDocx(study: Study, images: NoteImages, kind: Note
         ["Renversement FS", f(w.FSr), "≥ 1,50"], ["Glissement FS", f(w.FSg), "≥ 1,50"],
         ["Excentricité |e|", `${f(Math.abs(w.e0))} m`, `≤ L/6 = ${f(w.B / 6)} m`], ["Contrainte maximale", `${f(w.sigmaMax, 0)} kPa`, `≤ ${f(w.qAllow, 0)} kPa`],
       ], [0.5, 0.25, 0.25]),
+    ] : []),
+    ...(!heads.uniform ? [
+      H2("Ouvrages annexes position par position"),
+      P("Les têtes amont et aval et les quatre murs en aile ont été réglés un à un (rive gauche et rive droite vues de l'amont vers l'aval). Chaque tête est vérifiée avec ses propres ailes ; quand elles diffèrent, la résultante transversale non équilibrée Fy s'ajoute au glissement."),
+      table(["Mur en aile", "Angle", "Longueur", "Épaisseur", "Racine / extrémité", "Voile"],
+        heads.perHead.flatMap((h) => (["g", "d"] as const).map((side) => {
+          const wg = h.wings.find((x) => x.side === side);
+          const lbl = `${h.id === "amont" ? "Amont" : "Aval"}, rive ${side === "g" ? "gauche" : "droite"}`;
+          if (!wg) return [lbl, "—", "—", "—", "—", "sans aile"];
+          return [lbl, `${f(wg.tv.angle, 1)}°`, `${f(wg.tv.long)} m`, `${f(wg.tv.ep)} m`, `${f(wg.res.Htot)} / ${f(wg.res.Hend)} m`, `HA${wg.res.bars.phi} e = ${f(wg.res.bars.s * 100, 1)} cm`];
+        })), [0.22, 0.11, 0.14, 0.14, 0.2, 0.19]),
+      table(["Tête", "Radier de tête", "Bêche", "Guide-roue / mur de tête", "Glissement FS", "Renversement FS"],
+        heads.perHead.map((h) => {
+          const w0 = h.wings[0]?.res;
+          return [h.label, `${f(h.tv.radierLong)} m`, h.tv.becheProf > 0 ? `${f(h.tv.becheEp)} × ${f(h.tv.becheProf)} m` : "sans",
+            `${f(h.tv.grL)} × ${f(h.tv.grH)} m`, w0 ? f(w0.FSg) : "—", w0 ? f(w0.FSr) : "—"];
+        }), [0.16, 0.16, 0.16, 0.2, 0.16, 0.16]),
+    ] : []),
+    ...(heads.perHead[0].choc ? [
+      FORMULA(`Choc sur le guide-roue : F = ${f(heads.perHead[0].choc.F, 0)} kN sur ${f(heads.perHead[0].choc.l)} m, diffusion à 45° → b = l + 2h = ${f(heads.perHead[0].choc.b)} m ; Mu = 1,5·F·h/b = ${f(heads.perHead[0].choc.Mu, 1)} kN·m/m → As requise ${f(heads.perHead[0].choc.AsReq)} cm²/m, cadres HA${heads.perHead[0].grBars.phi} e = ${f(heads.perHead[0].grBars.s * 100, 1)} cm`),
     ] : []),
     checksTable(by("Ouvrages de tête")));
 

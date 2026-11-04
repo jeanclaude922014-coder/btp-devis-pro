@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { DIAMETERS, SPACINGS } from "@/lib/dalot/ba";
 import { checksToCsv, countByStatus, DOMAINS, ratio, STATUS_LABELS, type CheckStatus } from "@/lib/dalot/checks";
 import type { GroupId } from "@/lib/dalot/design";
+import type { Imposed } from "@/lib/dalot/fields";
+import { RebarEditor } from "./rebar-editor";
 import { convoyFigure, envelopeSvg, passageSvg, type Quantity } from "@/lib/dalot/diagrams";
 import { buildSheets } from "@/lib/dalot/drawings";
 import { renderSceneImage } from "@/lib/dalot/scene3d";
@@ -241,11 +242,13 @@ export function EffortsPanel({ study }: { study: Study }) {
 // ── Dimensionnement ────────────────────────────────────────
 
 export function DesignPanel({
-  study, imposed, onImpose, onOptimize, optimizing, proposal, onApply,
+  study, imposed, onImpose, onImposeMany, onOptimize, optimizing, proposal, onApply,
 }: {
   study: Study;
-  imposed: Record<string, { phi: number; s: number } | undefined>;
-  onImpose: (g: GroupId, v: { phi: number; s: number } | undefined) => void;
+  imposed: Record<string, Imposed | undefined>;
+  onImpose: (g: GroupId, v: Imposed | undefined) => void;
+  /** Enregistre plusieurs nappes d'un coup (tableau « Modifier les diamètres et les espacements »). */
+  onImposeMany?: (patch: Record<string, Imposed | undefined>) => void;
   onOptimize: () => void;
   optimizing: boolean;
   proposal: { proposal: { key: string; label: string; from: number; to: number }[]; status: CheckStatus } | null;
@@ -274,12 +277,9 @@ export function DesignPanel({
           </div>
         )}
       </Card>
-      <Card title="Ferraillage face par face (BAEL 91 mod. 99)" actions={
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => study.design.groups.forEach((g) => onImpose(g.id, { phi: g.bars.phi, s: g.bars.s }))} className={btn}>Imposer partout la disposition calculée</button>
-          <button onClick={() => study.design.groups.forEach((g) => onImpose(g.id, undefined))} disabled={!study.design.groups.some((g) => imposed[g.id])} className={btn}>Tout remettre au choix automatique</button>
-        </div>
-      }>
+      <RebarEditor study={study} imposed={imposed}
+        onImposeMany={onImposeMany ?? ((patch) => { for (const [k, v] of Object.entries(patch)) onImpose(k as GroupId, v); })} />
+      <Card title="Détail du calcul des nappes du corps (BAEL 91 mod. 99)">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs text-slate-500">
@@ -304,22 +304,9 @@ export function DesignPanel({
                     <td className="px-2 py-1.5 text-right">{fr(g.AsELS)}</td>
                     <td className="px-2 py-1.5 text-right">{fr(g.AsMin)}</td>
                     <td className="px-2 py-1.5 text-right font-medium">{fr(g.AsReq)}</td>
+                    <td className="px-2 py-1.5">{imp ? <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">Imposé</span> : <span className="text-xs text-slate-500">Automatique</span>}</td>
                     <td className="px-2 py-1.5">
-                      <select value={imp ? "impose" : "auto"} onChange={(e) => onImpose(g.id, e.target.value === "impose" ? { phi: g.bars.phi, s: g.bars.s } : undefined)}
-                        className={`rounded border px-1 py-0.5 text-xs ${imp ? "border-amber-400 bg-amber-50" : "border-slate-300"}`}>
-                        <option value="auto">Automatique</option><option value="impose">Imposé</option>
-                      </select>
-                    </td>
-                    <td className="px-2 py-1.5">
-                      <div className="flex items-center gap-1">
-                        <select value={imp?.phi ?? g.bars.phi} onChange={(e) => onImpose(g.id, { phi: Number(e.target.value), s: imp?.s ?? g.bars.s })} className="rounded border border-slate-300 px-1 py-0.5 text-xs">
-                          {DIAMETERS.map((d) => <option key={d} value={d}>HA{d}</option>)}
-                        </select>
-                        <select value={imp?.s ?? g.bars.s} onChange={(e) => onImpose(g.id, { phi: imp?.phi ?? g.bars.phi, s: Number(e.target.value) })} className="rounded border border-slate-300 px-1 py-0.5 text-xs">
-                          {SPACINGS.map((s) => <option key={s} value={s}>e = {fr(s * 100, 1)}</option>)}
-                        </select>
-                        {imp ? <button onClick={() => onImpose(g.id, undefined)} className="text-[11px] text-blue-700 hover:underline">auto</button> : <span className="text-[11px] text-slate-400">auto</span>}
-                      </div>
+                      <div className="font-medium">HA{g.bars.phi} e = {fr(g.bars.s * 100, 1)} cm</div>
                       <div className="text-[11px] text-slate-500">{fr(g.bars.As * 1e4)} cm²/m · rép. HA{g.rep.phi} e = {fr(g.rep.s * 100, 1)}</div>
                     </td>
                     <td className="px-2 py-1.5 text-right">{fr(g.sigmaS, 0)}</td>
@@ -483,6 +470,45 @@ export function HeadsPanel({ study }: { study: Study }) {
           <p className="mt-2 text-xs text-slate-500">Les ailes sont encastrées dans le radier de tête (tête en U) : les poussées transversales s&apos;équilibrent ; la stabilité porte sur la résultante le long de l&apos;axe. En cas de glissement insuffisant : approfondir la bêche d&apos;extrémité ou allonger le radier de tête.</p>
         </Card>
       ) : <Card title="Murs en aile"><p className="text-sm text-slate-500">Pas de murs en aile.</p></Card>}
+      <div className="lg:col-span-2">
+        <Card title={study.heads.uniform ? "Ouvrages annexes par position (têtes identiques)" : "Ouvrages annexes par position"}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-left text-xs text-slate-500">
+                <tr><th className="px-2 py-1.5">Position</th><th className="px-2 py-1.5 text-right">Angle</th><th className="px-2 py-1.5 text-right">Longueur</th><th className="px-2 py-1.5 text-right">Épaisseur</th>
+                  <th className="px-2 py-1.5 text-right">Racine / extrémité</th><th className="px-2 py-1.5">Voile</th><th className="px-2 py-1.5 text-right">Glissement</th><th className="px-2 py-1.5 text-right">Renversement</th></tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {study.heads.perHead.flatMap((h) => (["g", "d"] as const).map((side) => {
+                  const wg = h.wings.find((x) => x.side === side);
+                  const lbl = `${h.id === "amont" ? "Amont" : "Aval"}, rive ${side === "g" ? "gauche" : "droite"}`;
+                  return (
+                    <tr key={`${h.id}${side}`}>
+                      <td className="px-2 py-1.5">{lbl}</td>
+                      {wg ? (
+                        <>
+                          <td className="px-2 py-1.5 text-right">{fr(wg.tv.angle, 1)}°</td><td className="px-2 py-1.5 text-right">{fr(wg.tv.long)} m</td><td className="px-2 py-1.5 text-right">{fr(wg.tv.ep)} m</td>
+                          <td className="px-2 py-1.5 text-right">{fr(wg.res.Htot)} / {fr(wg.res.Hend)} m</td><td className="px-2 py-1.5">HA{wg.res.bars.phi} e = {fr(wg.res.bars.s * 100, 1)}</td>
+                          <td className={`px-2 py-1.5 text-right ${wg.res.FSg < 1.5 ? "text-red-600" : ""}`}>{fr(wg.res.FSg)}</td><td className={`px-2 py-1.5 text-right ${wg.res.FSr < 1.5 ? "text-red-600" : ""}`}>{fr(wg.res.FSr)}</td>
+                        </>
+                      ) : <td colSpan={7} className="px-2 py-1.5 text-slate-400">sans mur en aile</td>}
+                    </tr>
+                  );
+                }))}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+            {study.heads.perHead.map((h) => (
+              <div key={h.id} className="rounded-lg border border-slate-200 p-2">
+                <div className="font-medium">{h.label}</div>
+                <div className="text-xs text-slate-600">Radier de tête {fr(h.tv.radierLong)} m · bêche {h.tv.becheProf > 0 ? `${fr(h.tv.becheEp)} × ${fr(h.tv.becheProf)} m` : "sans"} · guide-roue {fr(h.tv.grL)} × {fr(h.tv.grH)} m</div>
+                {h.choc && <div className="text-xs text-slate-600">Choc {fr(h.choc.F, 0)} kN : Mu = {fr(h.choc.Mu, 1)} kN·m/m → cadres HA{h.grBars.phi} e = {fr(h.grBars.s * 100, 1)} cm</div>}
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
       <div className="lg:col-span-2"><ChecksPanelMini study={study} domain="Ouvrages de tête" /></div>
     </div>
   );

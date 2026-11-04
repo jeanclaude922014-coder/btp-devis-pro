@@ -4,6 +4,7 @@ import { useState } from "react";
 import { sectionSvg } from "@/lib/dalot/diagrams";
 import { H_END_MIN, headDimensions } from "@/lib/dalot/head-dims";
 import type { RunOutcome } from "@/lib/dalot/engine";
+import { JsonField } from "./table-editors";
 import {
   FIELDS, isVisible, parseList, SOIL_PRESETS, toInput, type DalotSpec, type FieldDef, type FieldValue, type SectionId,
 } from "@/lib/dalot/fields";
@@ -84,7 +85,7 @@ export function FieldsPanel({ section, title, intro, api, aside }: { section: Se
   const { fields, missing, defaulted } = sectionState(api.spec, section);
   const groups = Array.from(new Set(fields.map((f) => f.group)));
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+    <div className={`grid grid-cols-1 gap-4 ${aside ? "xl:grid-cols-[minmax(0,1fr)_420px]" : ""}`}>
       <div className="space-y-4">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
@@ -109,9 +110,11 @@ export function FieldsPanel({ section, title, intro, api, aside }: { section: Se
             <h3 className="mb-1 text-sm font-semibold text-slate-700">{g}</h3>
             <div className="divide-y divide-slate-100">
               {fields.filter((f) => f.group === g).map((f) => (
-                section === "sol" && f.key === "soilPreset"
-                  ? <SoilPresetRow key={f.key} f={f} api={api} />
-                  : <FieldRow key={f.key} f={f} api={api} />
+                f.kind === "json"
+                  ? <JsonField key={f.key} f={f} api={api} />
+                  : section === "sol" && f.key === "soilPreset"
+                    ? <SoilPresetRow key={f.key} f={f} api={api} />
+                    : <FieldRow key={f.key} f={f} api={api} />
               ))}
             </div>
           </section>

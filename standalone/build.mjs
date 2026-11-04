@@ -20,9 +20,9 @@ const js = await build({
 const cssSrc = readFileSync(path.join(here, "styles.css"), "utf8");
 const css = await postcss([tailwind({ base: root, optimize: { minify: true } })]).process(cssSrc, { from: path.join(here, "styles.css") });
 
-const html = `<title>DalotPro</title>
+const html = `<title>DalotPro Expert CI</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="description" content="Calcul des dalots cadres — BAEL 91 mod. 99, Fascicule 61 titre II, contrôle Eurocode 2. Auteur : Moulo Jean Claude.">
+<meta name="description" content="Calcul des dalots cadres, version expert Côte d'Ivoire — BAEL 91 mod. 99, Fascicule 61 titre II, contrôle Eurocode 2. Auteur : Moulo Jean Claude.">
 <style>
 /* Thème clair assumé (plans et notes sur fond blanc) : fond et couleurs posés explicitement. */
 :root { --fond: #f8fafc; --texte: #0f172a; color-scheme: light; }
