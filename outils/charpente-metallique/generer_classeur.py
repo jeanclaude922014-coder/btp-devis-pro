@@ -394,6 +394,8 @@ def build_parametres(wb):
     P.p("deb_pign", "Débord des pannes aux pignons", 0.30, "m", "")
     P.p("sys_2030", "Système pour portée de 20 à 30 m", "IPE renforcé", "", "IPE renforcé ou Ferme treillis",
         items=["IPE renforcé", "Ferme treillis"])
+    P.p("nn", "Nombre de nefs identiques (portée du gabarit = portée d'une nef)", 1, "u", "1 à 4 nefs accolées",
+        items=["1", "2", "3", "4"])
     P.p("file_int", "File de poteaux intermédiaires (file centrale)", "Non", "", "Conseillé au-delà de 30 m",
         items=["Oui", "Non"])
     P.p("ratio_treil", "Hauteur de ferme aux appuis = portée / …", 30, "", "25 à 35")
@@ -713,8 +715,11 @@ def build_predim(wb):
     g("n_ip", "Intervalles entre poteaux de pignon (par pignon)", "MAX(1,ROUNDUP({portee}/{e_pp},0))", "u",
       "ARRONDI.SUP(portée / espacement)", "0")
     g("e_ppr", "Espacement réel des poteaux de pignon", "{portee}/{n_ip}", "m", "")
-    g("n_pp", "Poteaux de pignon (2 pignons)", "2*({n_ip}-1)", "u", "2 × (intervalles − 1)", "0")
-    g("n_int", "Poteaux intermédiaires (file centrale)", 'IF({file_int}="Oui",{N},0)', "u", "1 par portique si file centrale", "0")
+    g("nef", "Nombre de nefs", "MAX(1,MIN(4,VALUE({nn}&\"\")))", "u", "paramètre", "0")
+    g("Wt", "Largeur totale du bâtiment", "{nef}*{portee}", "m", "nombre de nefs × portée")
+    g("n_pp", "Poteaux de pignon (2 pignons)", "2*{nef}*({n_ip}-1)", "u", "2 × nefs × (intervalles − 1)", "0")
+    g("n_int", "Poteaux intermédiaires (file centrale)", 'IF({file_int}="Oui",{N}*{nef},0)', "u", "1 par portique et par nef si file centrale", "0")
+    g("n_val", "Poteaux de noue (files entre nefs)", "{N}*({nef}-1)", "u", "N × (nefs − 1)", "0")
     g("n_pan", "Panneaux du treillis", "{treil}*2*ROUNDUP({portee}/2/{pas_treil},0)", "u", "nombre pair ≈ portée / pas", "0")
     g("np", "Pannes par versant", "ROUNDUP({R1}/{e_pan},0)+1", "u", "ARRONDI.SUP(rampant / entraxe) + 1", "0")
     g("e_panr", "Entraxe réel des pannes", "{R1}/({np}-1)", "m", "")
@@ -723,8 +728,8 @@ def build_predim(wb):
     g("nb_cv", "Travées contreventées", "IF({nt}<=2,{nt},2+INT(({nt}-1)/5))", "u",
       "2 travées d'extrémité + 1 travée sur 5", "0")
     g("n_pv", "Panneaux de poutre au vent par versant", "MAX(1,ROUND({R1}/{er},0))", "u", "panneaux ≈ carrés", "0")
-    g("S_bat", "Surface couverte (emprise)", "{portee}*{longueur}", "m²", "portée × longueur")
-    g("P", "Périmètre", "2*({portee}+{longueur})", "m", "2 × (portée + longueur)")
+    g("S_bat", "Surface couverte (emprise)", "{Wt}*{longueur}", "m²", "largeur totale × longueur")
+    g("P", "Périmètre", "2*({Wt}+{longueur})", "m", "2 × (largeur totale + longueur)")
     g("fac", "Type de façade (scénario)", "{facade}", "", "PARAMÈTRES (comparatif : bardage puis agglos)", "@",
       eng=lambda gi, s: ["{facade}", f'"{FACADES[0]}"', f'"{FACADES[1]}"'][s])
     g("z0", "Hauteur de maçonnerie d'élévation (base du bardage)",
@@ -748,8 +753,8 @@ def build_predim(wb):
     g("rc_pt", "Rangées de lisses coupées par un portillon",
       "MIN({n_rows},MAX(0,ROUNDUP(({h_pt}-{z0})/{e_lis},0)))", "u", "", "0")
     g("S_pig_b", "Surface brute des 2 pignons dans la zone bardée",
-      "{kbard}*2*({portee}*({Hm}-{z0})+{pente}*{portee}^2/4)", "m²", "trapèze : B × h + pente × B² / 4")
-    g("S_couv", "Surface de couverture (rampants)", "2*{R1}*{Lp}", "m²", "2 × rampant × longueur couverte")
+      "{kbard}*2*({Wt}*({Hm}-{z0})+{nef}*{pente}*{portee}^2/4)", "m²", "trapèze : W × h + nefs × pente × B² / 4")
+    g("S_couv", "Surface de couverture (rampants)", "2*{R1}*{Lp}*{nef}", "m²", "2 × rampant × longueur × nefs")
     g("nb_desc", "Descentes EP", "MAX(2,2*ROUNDUP({S_bat}/(2*{S_desc}),0))", "u",
       "1 pour 150 à 200 m², réparties sur les 2 long-pans", "0")
     g("pu_prot_kg", "Coût de protection ramené au kg",
@@ -912,63 +917,65 @@ def build_qc(wb):
     L("pot", "Poteaux de portiques (2 par portique)", "ml", "{prof_pot}", "2*{N}", "{Hm}", kgml="{kg_pot}",
       rule="2 × N poteaux × hauteur à l'égout (H + hauteur de ferme)", tag="acier")
     L("pp", "Poteaux de pignon (hauteur variable avec la pente)", "ml", "{prof_pp}", "{n_pp}", None,
-      "2*(({n_ip}-1)*{Hm}+{pente}*{e_ppr}*INT({n_ip}^2/4))", "{kg_pp}",
+      "2*{nef}*(({n_ip}-1)*{Hm}+{pente}*{e_ppr}*INT({n_ip}^2/4))", "{kg_pp}",
       rule="2 pignons × Σ (Hm + pente × min(x ; B − x)) ; Σ min = (B / n) × ENT(n² / 4)", tag="acier")
     L("pint", "Poteaux intermédiaires (file centrale)", "ml", "{prof_pint}", "{n_int}",
       "IF({treil}=1,{hauteur},{Hf})", kgml="{kg_pint}", rule="1 par portique si file centrale = Oui", tag="acier")
-    L("trav", "Traverses de portique (2 versants)", "ml", "{prof_trav}", "{N}*(1-{treil})", "2*{R1}",
+    L("pval", "Poteaux de noue (files entre nefs)", "ml", "{prof_pot}", "{n_val}", "{Hm}", kgml="{kg_pot}",
+      rule="1 par portique et par file intermédiaire (nefs − 1)", tag="acier")
+    L("trav", "Traverses de portique (2 versants)", "ml", "{prof_trav}", "{N}*{nef}*(1-{treil})", "2*{R1}",
       kgml="{kg_trav}", rule="Longueur rampante = (portée / 2) / cos(arctan(pente)) × 2", tag="acier")
-    L("jar", "Jarrets (renforts poteau-traverse)", "ml", "{prof_trav}", "2*{N}*(1-{treil})",
+    L("jar", "Jarrets (renforts poteau-traverse)", "ml", "{prof_trav}", "2*{N}*{nef}*(1-{treil})",
       "{ratio_jarret}*{portee}", kgml="{kg_trav}", rule="2 par portique, longueur = % × portée, découpés dans le profil de traverse", tag="acier")
-    L("msup", "Ferme treillis – membrures supérieures", "ml", "{prof_msup}", "{N}*{treil}", "2*{R1}",
+    L("msup", "Ferme treillis – membrures supérieures", "ml", "{prof_msup}", "{N}*{nef}*{treil}", "2*{R1}",
       kgml="{kg_msup}", rule="1 par ferme, longueur = 2 × rampant ; poids × cornières accolées", tag="acier")
-    L("minf", "Ferme treillis – membrures inférieures", "ml", "{prof_minf}", "{N}*{treil}", "{portee}",
+    L("minf", "Ferme treillis – membrures inférieures", "ml", "{prof_minf}", "{N}*{nef}*{treil}", "{portee}",
       kgml="{kg_minf}", rule="1 par ferme, longueur = portée", tag="acier")
-    L("mont", "Ferme treillis – montants", "ml", "{prof_mont}", "{N}*{treil}*({n_pan}+1)", None,
-      "{N}*{treil}*(({n_pan}+1)*{h0}+{pente}*({portee}/{ktreil_pv})*INT({n_pan}^2/4))", "{kg_mont}",
+    L("mont", "Ferme treillis – montants", "ml", "{prof_mont}", "{N}*{nef}*{treil}*({n_pan}+1)", None,
+      "{N}*{nef}*{treil}*(({n_pan}+1)*{h0}+{pente}*({portee}/{ktreil_pv})*INT({n_pan}^2/4))", "{kg_mont}",
       rule="(n + 1) montants par ferme, hauteur h0 + pente × min(x ; B − x)", tag="acier")
     L("diag", "Ferme treillis – diagonales courantes (cornières accolées)", "ml", "{prof_diag}",
-      "{N}*{treil}*MAX(0,{n_pan}-4)",
+      "{N}*{nef}*{treil}*MAX(0,{n_pan}-4)",
       "{treil}*SQRT(({portee}/{ktreil_pv})^2+({h0}+{pente}*{portee}/4)^2)", kgml="{kg_diag}",
       rule="(n − 4) diagonales par ferme, longueur √(pas² + h moyenne²) ; poids × cornières accolées", tag="acier")
     L("diab", "Ferme treillis – diagonales d'about (cornières accolées)", "ml", "{prof_diab}",
-      "{N}*{treil}*MIN(4,{n_pan})", "{treil}*SQRT(({portee}/{ktreil_pv})^2+({h0}+{pente}*{portee}/{ktreil_pv})^2)",
+      "{N}*{nef}*{treil}*MIN(4,{n_pan})", "{treil}*SQRT(({portee}/{ktreil_pv})^2+({h0}+{pente}*{portee}/{ktreil_pv})^2)",
       kgml="{kg_diab}", rule="4 diagonales les plus sollicitées près des appuis", tag="acier")
-    L("pl_pp", "Platines de pied – poteaux de portique", "u", '"PL"', "2*{N}+{n_int}", kgml="{kg_pl_pied_port}",
+    L("pl_pp", "Platines de pied – poteaux de portique", "u", '"PL"', "2*{N}+{n_int}+{n_val}", kgml="{kg_pl_pied_port}",
       rule="1 par poteau de portique ou intermédiaire", tag="acier")
     L("pl_pg", "Platines de pied – poteaux de pignon", "u", '"PL"', "{n_pp}", kgml="{kg_pl_pied_pig}",
       rule="1 par poteau de pignon", tag="acier")
-    L("pl_tt", "Platines de tête de poteau et d'about de jarret", "u", '"PL"', "IF({treil}=1,2,4)*{N}",
+    L("pl_tt", "Platines de tête de poteau et d'about de jarret", "u", '"PL"', "IF({treil}=1,{nef}+1,4*{nef})*{N}",
       kgml="{kg_pl_tete}", rule="Portique : 2 platines par nœud × 2 nœuds ; treillis : 1 platine de tête par poteau", tag="acier")
     L("pl_tg", "Platines de tête – poteaux de pignon", "u", '"PL"', "{n_pp}", kgml="{kg_pl_tete_pig}",
       rule="1 par poteau de pignon", tag="acier")
-    L("gous", "Goussets de nœuds de treillis", "u", '"PL"', "{N}*{treil}*(2*{n_pan}+2)", kgml="{kg_pl_gousset}",
+    L("gous", "Goussets de nœuds de treillis", "u", '"PL"', "{N}*{nef}*{treil}*(2*{n_pan}+2)", kgml="{kg_pl_gousset}",
       rule="2 (n + 1) nœuds par ferme", tag="acier")
-    L("ecf", "Éclisses de faîtage (paires de plaques)", "u", '"PL"', "{N}", kgml="2*{kg_pl_ecl_fait}",
+    L("ecf", "Éclisses de faîtage (paires de plaques)", "u", '"PL"', "{N}*{nef}", kgml="2*{kg_pl_ecl_fait}",
       rule="1 paire par portique", tag="acier")
-    L("ecp", "Éclisses de pannes (à chaque raboutage)", "u", '"PL"', "2*{np}*MAX(0,ROUNDUP({Lp}/{L_barre},0)-1)",
+    L("ecp", "Éclisses de pannes (à chaque raboutage)", "u", '"PL"', "2*{np}*{nef}*MAX(0,ROUNDUP({Lp}/{L_barre},0)-1)",
       kgml="{kg_ecl_pan}", rule="Pannes × (ARRONDI.SUP(longueur / 12 m) − 1)", tag="acier")
     Lq.sec("A2. STABILITÉ")
     L("cvv", "Contreventements verticaux – croix de Saint-André (long-pans)", "ml", "{prof_cvv}",
       "{nb_cv}*2*2", "SQRT({er}^2+{Hm}^2)", kgml="{kg_cvv}",
       rule="Travées d'extrémité + 1 sur 5 ; 2 long-pans × 2 diagonales", tag="acier")
     L("cvt", "Contreventements de couverture – poutre au vent", "ml", "{prof_cvt}",
-      "{nb_cv}*2*{n_pv}*2", "SQRT({er}^2+({R1}/{n_pv})^2)", kgml="{kg_cvt}",
+      "{nb_cv}*2*{n_pv}*2*{nef}", "SQRT({er}^2+({R1}/{n_pv})^2)", kgml="{kg_cvt}",
       rule="Mêmes travées ; 2 versants × panneaux × 2 diagonales", tag="acier")
-    L("lier", "Liernes de pannes", "ml", "{prof_lierne}", "{nt}*{n_l}*2*({np}-1)", "{e_panr}",
+    L("lier", "Liernes de pannes", "ml", "{prof_lierne}", "{nt}*{n_l}*2*({np}-1)*{nef}", "{e_panr}",
       kgml="{kg_lierne}", rule="À mi-portée (au tiers si entraxe > 6 m), entre pannes successives", tag="acier")
-    L("bret", "Bretelles de faîtage", "ml", "{prof_lierne}", "{nt}*{n_l}*2",
+    L("bret", "Bretelles de faîtage", "ml", "{prof_lierne}", "{nt}*{n_l}*2*{nef}",
       "SQRT(({er}/({n_l}+1))^2+{e_panr}^2)", kgml="{kg_lierne}", rule="2 par ligne de liernes au faîtage", tag="acier")
     L("lll", "Liernes de lisses – long-pans", "ml", "{prof_lierne}", "{nt}*{n_l}*2*{n_rows}",
       "IF({n_rows}>0,({Hm}-{z0})/{n_rows},0)", kgml="{kg_lierne}",
       rule="Par ligne de liernes : hauteur bardée ; 0 en façade agglos", tag="acier")
-    L("llp", "Liernes de lisses – pignons", "ml", "{prof_lierne}", "{kbard}*2*{n_ip}", None,
-      "{kbard}*2*{n_ip}*(({Hm}-{z0})+{pente}*{portee}/4)", "{kg_lierne}",
+    L("llp", "Liernes de lisses – pignons", "ml", "{prof_lierne}", "{kbard}*2*{n_ip}*{nef}", None,
+      "{kbard}*2*{n_ip}*{nef}*(({Hm}-{z0})+{pente}*{portee}/4)", "{kg_lierne}",
       rule="1 par intervalle de pignon, hauteur moyenne", tag="acier")
     Lq.sec("A3. COUVERTURE")
-    L("pan", "Pannes", "ml", "{prof_panne}", "2*{np}", "{Lp}", kgml="{kg_panne}",
+    L("pan", "Pannes", "ml", "{prof_panne}", "2*{np}*{nef}", "{Lp}", kgml="{kg_panne}",
       rule="Par versant : ARRONDI.SUP(rampant / entraxe) + 1 ; longueur = L + débords", tag="acier")
-    L("ech", "Échantignoles (taquets de pannes)", "u", '"Taquet"', "2*{np}*{N}", kgml="{kg_echant}",
+    L("ech", "Échantignoles (taquets de pannes)", "u", '"Taquet"', "2*{np}*{N}*{nef}", kgml="{kg_echant}",
       rule="1 par panne et par portique", tag="acier")
     L("chev", "Chevêtres de skydomes", "ml", "{prof_chev}", "{nb_sky}", "2*({a_sky}+{b_sky})",
       kgml="{kg_chev}", rule="1 cadre par skydome", tag="acier")
@@ -980,10 +987,11 @@ def build_qc(wb):
       rule="rampant × longueur × 2 × (1 + recouvrement) − translucides − skydomes")
     L("transl", "Panneaux sandwich translucides", "m²", '"Translucide"', "{pct_transl}*{S_couv}",
       rule="% × surface de couverture")
-    L("fait", "Faîtières", "ml", '"Faîtière"', "{Lp}", rule="Longueur couverte")
-    L("rive", "Rives", "ml", '"Rive"', "4*{R1}", rule="2 pignons × 2 versants × rampant")
+    L("fait", "Faîtières", "ml", '"Faîtière"', "{Lp}*{nef}", rule="Longueur couverte × nefs")
+    L("rive", "Rives", "ml", '"Rive"', "4*{R1}*{nef}", rule="2 pignons × 2 versants × rampant × nefs")
     L("larm", "Larmiers / bavettes de couverture", "ml", '"Bavette"', "2*{Lp}", rule="2 égouts")
-    L("chen", "Chéneaux d'eau (2 côtés)", "ml", '"Chéneau"', "2*{longueur}", rule="2 × longueur")
+    L("chen", "Chéneaux d'eau (rives + noues)", "ml", '"Chéneau"', "({nef}+1)*{longueur}",
+      rule="2 chéneaux de rive + 1 chéneau central par noue")
     L("naiss", "Naissances EP", "u", '"Naissance"', "{nb_desc}", rule="1 descente pour 150 à 200 m² de toiture")
     L("desc", "Descentes EP", "ml", '"PVC Ø110"', "{nb_desc}*{Hm}", rule="Nombre × hauteur")
     L("sky", "Skydomes", "u", '"Skydome"', "{nb_sky}", rule="Paramètre")
@@ -1009,9 +1017,9 @@ def build_qc(wb):
     L("larb", "Larmiers de bardage (pied + angles)", "ml", '"Larmier"',
       "{kbard}*(MAX(0,{P}-{L_ouv})+4*({Hm}-{z0}))", rule="Périmètre − portes + 4 angles ; 0 si agglos")
     Lq.sec("A5. ASSEMBLAGES ET ANCRAGES")
-    L("b_nd", "Boulons HR M20 – assemblages poteau-traverse / jarrets", "u", '"HR M20"', "2*{N}*{nb_b_noeud}",
+    L("b_nd", "Boulons HR M20 – assemblages poteau-traverse / jarrets", "u", '"HR M20"', "2*{N}*{nef}*{nb_b_noeud}",
       kgml="{kg_HR20}", rule="2 nœuds par portique × boulons par nœud", tag="boul")
-    L("b_ft", "Boulons HR M20 – faîtage", "u", '"HR M20"', "{N}*{nb_b_fait}", kgml="{kg_HR20}",
+    L("b_ft", "Boulons HR M20 – faîtage", "u", '"HR M20"', "{N}*{nef}*{nb_b_fait}", kgml="{kg_HR20}",
       rule="1 faîtage par portique", tag="boul")
     L("b_pn", "Boulons M12 – pannes sur échantignoles", "u", '"M12"', "{ech_q}*{nb_b_ech}", kgml="{kg_M12}",
       rule="Échantignoles × boulons", tag="boul")
@@ -1021,13 +1029,13 @@ def build_qc(wb):
       kgml="{kg_HR16}", rule="Diagonales × 2 extrémités × boulons", tag="boul")
     L("b_ls", "Boulons M12 – lisses", "u", '"M12"', "({lis_lp_q}+{lis_pg_q})*2*{nb_b_lis}", kgml="{kg_M12}",
       rule="Tronçons de lisses × 2 attaches × boulons", tag="boul")
-    L("tg_po", "Tiges d'ancrage – poteaux de portique", "ml", "{d_tige_port}", "(2*{N}+{n_int})*{nb_tige_port}",
+    L("tg_po", "Tiges d'ancrage – poteaux de portique", "ml", "{d_tige_port}", "(2*{N}+{n_int}+{n_val})*{nb_tige_port}",
       "{l_tige_port}", kgml=XL("{d_tige_port}", "D"), rule="4 par poteau de portique", tag="boul")
     L("tg_pg", "Tiges d'ancrage – poteaux de pignon", "ml", "{d_tige_pig}", "{n_pp}*{nb_tige_pig}",
       "{l_tige_pig}", kgml=XL("{d_tige_pig}", "D"), rule="2 par poteau de pignon", tag="boul")
     L("ecr", "Écrous de tiges d'ancrage", "u", '"Écrou"', "2*({tg_po_q}+{tg_pg_q})", rule="2 par tige")
     L("rond", "Rondelles de tiges d'ancrage", "u", '"Rondelle"', "2*({tg_po_q}+{tg_pg_q})", rule="2 par tige")
-    L("gab", "Gabarits de pose des tiges", "u", '"Gabarit"', "2*{N}+{n_int}+{n_pp}", rule="1 par poteau")
+    L("gab", "Gabarits de pose des tiges", "u", '"Gabarit"', "2*{N}+{n_int}+{n_val}+{n_pp}", rule="1 par poteau")
     L("vis", "Vis autoforeuses", "u", '"Vis"', "ROUNDUP({vis_m2}*({tole_q}+{transl_q}+{bard_q}),0)",
       rule="≈ 6 par m² de tôle, translucide et bardage")
     Lq.sec("A6. TOTAUX CHARPENTE")
@@ -1059,17 +1067,17 @@ def build_go(wb):
         ("e_rem", "Épaisseur du remblai compacté", "VALUE(LEFT({e_rem_c},2))/100", "m", "Liste 20 / 40 cm"),
         ("maille", "Maille du dallage", "VALUE(LEFT({maille_c},2))/100", "m", "Liste 15 / 20 / 25 cm"),
         ("kdbl", "Nappe double (1 = oui)", 'IF({ferr}="Nappe double",1,0)', "", ""),
-        ("n_s1", "Semelles isolées 1 (poteaux de portique et file centrale)", "2*{N}+{n_int}", "u", ""),
+        ("n_s1", "Semelles isolées 1 (poteaux de portique, noues, file centrale)", "2*{N}+{n_int}+{n_val}", "u", ""),
         ("n_s2", "Semelles isolées 2 (poteaux de pignon)", "{n_pp}", "u", ""),
         ("L_fil", "Longueur de semelle filante", "MAX(0,{P}-2*{N}*{a1}-{n_pp}*{a2})", "m",
          "Périmètre − largeur des semelles isolées traversées"),
         ("Bx", "Dallage : longueur intérieure (sens X)", "{longueur}-{e_mur}", "m", "L − épaisseur de mur"),
-        ("By", "Dallage : largeur intérieure (sens Y)", "{portee}-{e_mur}", "m", "B − épaisseur de mur"),
+        ("By", "Dallage : largeur intérieure (sens Y)", "{Wt}-{e_mur}", "m", "largeur totale − épaisseur de mur"),
         ("S_int", "Surface intérieure", "{Bx}*{By}", "m²", ""),
         ("h_ag", "Hauteur de maçonnerie d'élévation", "{z0}", "m", "selon type de façade"),
         ("nb_ch", "Nombre de chaînages horizontaux", f'IF({{fac}}="{FACADES[1]}",3,IF({{fac}}="Mixte",2,0))', "u",
          "Agglos : bas, intermédiaire, haut · Mixte : bas et haut"),
-        ("n_panx", "Panneaux de maçonnerie (travées du périmètre)", "{kag}*(2*{nt}+2*{n_ip})", "u", ""),
+        ("n_panx", "Panneaux de maçonnerie (travées du périmètre)", "{kag}*(2*{nt}+2*{nef}*{n_ip})", "u", ""),
         ("c_beton", "Coût matériaux d'1 m³ de béton armé",
          "{dos_ba}/{sac}*{pu_ciment}+{sab_b}*{pu_sable}+{g1_b}*{pu_g1}+{g2_b}*{pu_g2}", "FCFA/m³", ""),
         ("c_mort", "Coût matériaux d'1 m³ de mortier", "{dos_mort}/{sac}*{pu_ciment}+{sab_m}*{pu_sable}", "FCFA/m³", ""),
@@ -1092,7 +1100,7 @@ def build_go(wb):
         Lg.tags.setdefault("ha", []).append(key)
 
     Lg.sec("B1. TERRASSEMENTS")
-    L("dec", "Décapage de l'emprise", "m²", None, "({portee}+2*{deb_dec})*({longueur}+2*{deb_dec})",
+    L("dec", "Décapage de l'emprise", "m²", None, "({Wt}+2*{deb_dec})*({longueur}+2*{deb_dec})",
       rule="(B + 2 débords) × (L + 2 débords)")
     L("fp1", "Fouilles en puits – semelles isolées 1", "m³", None, "{n_s1}*({a1}+2*{surl})^2*{D}",
       rule="n × (a + 2 surlargeurs)² × profondeur 1,20 m", tag="fouil")
@@ -1159,12 +1167,12 @@ def build_go(wb):
 
     Lg.sec("B7. VARIANTE ÉLÉVATION EN AGGLOS 15 CREUX (selon type de façade)")
     L("ag_s", "Surface des murs (− ouvertures, pignons en trapèze)", "m²", None,
-      f'MAX(0,{{kag}}*({{P}}*{{h_ag}}+IF({{fac}}="{FACADES[1]}",2*{{pente}}*{{portee}}^2/4,0))-{{S_ouv_ag}})',
+      f'MAX(0,{{kag}}*({{P}}*{{h_ag}}+IF({{fac}}="{FACADES[1]}",2*{{nef}}*{{pente}}*{{portee}}^2/4,0))-{{S_ouv_ag}})',
       rule="Périmètre × hauteur + pignons (agglos) − ouvertures")
     L("ag_u", "Agglos 15 creux", "u", None, "ROUNDUP({ag_s_q}*{agg_m2}*(1+{casse}),0)", rule="12,5 /m² + 5 % de casse")
     L("ag_m", "Mortier de pose", "m³", None, "{ag_s_q}*{mort_m2}", rule="m² × mortier / m²", tag="mort")
     L("ch_l", "Chaînages 15 × 20 (bas, intermédiaire, haut + rampants)", "ml", None,
-      f'{{nb_ch}}*{{P}}+IF({{fac}}="{FACADES[1]}",4*{{R1}},0)', rule="Nombre de chaînages × périmètre (+ rampants des pignons)")
+      f'{{nb_ch}}*{{P}}+IF({{fac}}="{FACADES[1]}",4*{{R1}}*{{nef}},0)', rule="Nombre de chaînages × périmètre (+ rampants des pignons)")
     L("ch_b", "Béton des chaînages", "m³", None, "{ch_l_q}*{b_ch}*{h_ch}", rule="ml × 0,15 × 0,20", tag="ba")
     L("ch_c", "Coffrage des chaînages", "m²", None, "{ch_l_q}*2*{h_ch}", rule="2 faces", tag="coff")
     steel("ch_a", "Chaînages – aciers longitudinaux (4 HA10)", "{ha_chl}", "{nb_chl}",
@@ -1308,7 +1316,7 @@ def build_verif(wb):
     d("qs", "Portique : charge ELS", "{v_qG}+{v_qQ}", "kN/m", "G + Q")
     d("lam1", "Élancement de référence λ1", lam1, "", "93,9 √(235 / fy)")
     d("a", "Treillis : pas des panneaux", "{portee}/{ktreil_pv}", "m", "portée / nombre de panneaux")
-    d("Spig", "Surface d'un pignon", "{portee}*{Hm}+{pente}*{portee}^2/4", "m²", "B × Hm + pente × B² / 4")
+    d("Spig", "Surface d'un pignon", "{Wt}*{Hm}+{nef}*{pente}*{portee}^2/4", "m²", "W × Hm + nefs × pente × B² / 4")
     d("RG", "Semelle portique : réaction permanente", "{v_qG}*{portee}/2+{kg_pot}*{Hm}*9.81/1000", "kN", "qG × B / 2 + poteau")
     d("RQ", "Semelle portique : réaction d'exploitation", "{v_qQ}*{portee}/2", "kN", "qQ × B / 2")
     d("RW", "Semelle portique : soulèvement au vent", "{v_qW}*{portee}/2", "kN", "qW × B / 2")
@@ -1791,7 +1799,8 @@ def build_accueil(ws, G_RANGE, alerts):
        border=False)
     st(ws.cell(7, 2, "Légende : cellule jaune = saisie ; cellule bleu clair = résultat ; rouge = contrôle en alerte"),
        size=8, italic=True, border=False)
-    rows = [("Portée", "{portee}", "m", NF_2), ("Longueur", "{longueur}", "m", NF_2),
+    rows = [("Portée d'une nef", "{portee}", "m", NF_2), ("Nombre de nefs / largeur totale", '{nef}&" nef(s) – "&FIXED({Wt},2,TRUE)&" m"', "", "@"),
+            ("Longueur", "{longueur}", "m", NF_2),
             ("Hauteur sous sablière", "{hauteur}", "m", NF_2), ("Hauteur au faîtage", "{Hf}", "m", NF_2),
             ("Pente", "{pente}", "%", NF_PCT), ("Système structurel", "{systeme}", "", "@"),
             ("Nombre de portiques", "{N}", "u", NF_INT), ("Type de façade", "{facade}", "", "@"),
@@ -1846,7 +1855,7 @@ def build_accueil(ws, G_RANGE, alerts):
 
 
 CODE_KEYS = [  # clé du générateur HTML, expression, n = numérique / t = texte
-    ("gab", "{gab}", "t"), ("B", "{portee}", "n"), ("L", "{longueur}", "n"), ("H", "{hauteur}", "n"),
+    ("gab", "{gab}", "t"), ("B", "{portee}", "n"), ("nn", "{nef}", "n"), ("L", "{longueur}", "n"), ("H", "{hauteur}", "n"),
     ("p", "{pente}*100", "n"), ("ep", "{e_port}", "n"), ("epan", "{e_pan}", "n"), ("elis", "{e_lis}", "n"),
     ("epp", "{e_pp}", "n"), ("deb", "{deb_pign}", "n"), ("sys", "{sys_2030}", "t"), ("fint", "{file_int}", "t"),
     ("rtr", "{ratio_treil}", "n"), ("pas", "{pas_treil}", "n"), ("rj", "{ratio_jarret}*100", "n"), ("nacc", "{nb_acc}", "n"),

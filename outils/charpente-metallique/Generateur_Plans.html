@@ -72,7 +72,7 @@ const FORM = [
   ["projet","Projet / ouvrage","Bâtiment industriel","t"],
   ["lieu","Lieu","Abidjan","t"],
   ["gab","Gabarit",Object.keys(GABARITS),"s"],
-  ["B","Portée (m)",20],["L","Longueur (m)",40],["H","Hauteur sous sablière (m)",6],["p","Pente (%)",16]]],
+  ["B","Portée d'une nef (m)",20],["nn","Nombre de nefs",["1","2","3","4"],"s"],["L","Longueur (m)",40],["H","Hauteur sous sablière (m)",6],["p","Pente (%)",16]]],
  ["Charpente",[
   ["ep","Entraxe des portiques (m)",6],["epan","Entraxe des pannes (m)",1.35],["elis","Entraxe des lisses (m)",1.8],
   ["epp","Espacement poteaux de pignon (m)",6],["deb","Débord des pannes (m)",0.3],
@@ -144,6 +144,7 @@ function importer(){
     const k=part.slice(0,i).trim(), raw=part.slice(i+1).trim(); if(!(k in P))continue;
     const el=document.getElementById("i_"+k);
     if(el&&el.type==="number"){P[k]=parseFloat(raw.replace(/\s/g,"").replace(",","."))||0;} else P[k]=raw;
+    if(el&&el.tagName==="SELECT"&&/^[0-9]+([.,]0+)?$/.test(raw)) P[k]=String(parseInt(raw));
     if(el&&el.tagName==="SELECT"&&![...el.options].some(o=>o.value===P[k])){const o=document.createElement("option");o.text=P[k];el.add(o);}
     setVal(k); n++; }
   document.getElementById("code").value=n+" paramètres importés.";
@@ -160,6 +161,7 @@ function calc(){
   g.R1=(B/2)/Math.cos(Math.atan(p));
   g.h0=g.treil?B/P.rtr:0; g.Hm=H+g.h0; g.Hf=g.Hm+p*B/2;
   g.nip=Math.max(1,Math.ceil(B/P.epp-1e-9)); g.eppr=B/g.nip;
+  g.nn=Math.max(1,Math.min(4,parseInt(P.nn)||1)); g.W=g.nn*B;
   g.npan=g.treil?2*Math.ceil(B/2/P.pas-1e-9):0;
   g.np=Math.ceil(g.R1/P.epan-1e-9)+1; g.epanr=g.R1/(g.np-1);
   g.nl=g.er>6?2:1;
@@ -169,7 +171,7 @@ function calc(){
   g.z0=P.fac==="Agglos 15 creux"?g.Hm:(P.fac==="Mixte"?Math.min(P.hs,g.Hm):0);
   g.kbard=P.fac!=="Agglos 15 creux"; g.kag=P.fac!=="Bardage bac acier"; g.aggFull=P.fac==="Agglos 15 creux";
   g.nrows=g.kbard?Math.ceil((g.Hm-g.z0)/P.elis-1e-9):0;
-  g.ndesc=Math.max(2,2*Math.ceil(B*L/(2*P.sdesc)-1e-9));
+  g.ndesc=Math.max(2,2*Math.ceil(g.nn*B*L/(2*P.sdesc)-1e-9));
   g.hacr=P.acr==="Oui"?+P.hacr:0;
   g.edal=parseInt(P.edal)/100; g.erem=parseInt(P.erem)/100; g.maille=parseInt(P.maille)/100; g.kdbl=P.ferr==="Nappe double";
   const idx=RULES.findIndex(r=>B<=r[0]);
@@ -242,44 +244,52 @@ function bayBraced(g,m){return m===1?1:(m===g.nbcv?g.nt:5*(m-1));}
 
 // ---------------------------------------------------------- P1 implantation
 function P1(g){
-  const v=new Vue(0,g.L,0,g.B,[24,16,18,18]), u=v.u, {B,L,er,nt}=g;
-  for(let i=0;i<=nt;i++) v.seg(er*i,-4*u,er*i,B+4*u,C.noir,0.15,"4 1 1 1");
-  v.seg(-4*u,0,L+4*u,0,C.noir,0.15,"4 1 1 1"); v.seg(-4*u,B,L+4*u,B,C.noir,0.15,"4 1 1 1");
-  const bf=P.bf; v.rect(-bf/2,-bf/2,L+bf/2,B+bf/2,C.gris,0.25,"none","1.5 1"); v.rect(bf/2,bf/2,L-bf/2,B-bf/2,C.gris,0.25,"none","1.5 1");
+  const {B,W,L,er,nt,nn}=g, v=new Vue(0,L,0,W,[30,16,18,18]), u=v.u;
+  for(let i=0;i<=nt;i++) v.seg(er*i,-4*u,er*i,W+4*u,C.noir,0.15,"4 1 1 1");
+  for(let k=0;k<=nn;k++) v.seg(-4*u,k*B,L+4*u,k*B,C.noir,0.15,"4 1 1 1");
+  const bf=P.bf; v.rect(-bf/2,-bf/2,L+bf/2,W+bf/2,C.gris,0.25,"none","1.5 1"); v.rect(bf/2,bf/2,L-bf/2,W-bf/2,C.gris,0.25,"none","1.5 1");
   const a1=P.a1,a2=P.a2;
-  for(let i=0;i<=nt;i++){const x=er*i; for(const y of [0,B]) v.rect(x-a1/2,y-a1/2,x+a1/2,y+a1/2,C.gris,0.3,C.beton);
-    if(g.fint) v.rect(x-a1/2,B/2-a1/2,x+a1/2,B/2+a1/2,C.gris,0.3,C.beton);}
-  for(let k=1;k<g.nip;k++) for(const x of [0,L]) v.rect(x-a2/2,k*g.eppr-a2/2,x+a2/2,k*g.eppr+a2/2,C.gris,0.3,C.beton);
-  for(let i=0;i<=nt;i++){v.dot(er*i,0,C.bleu,0.9,true);v.dot(er*i,B,C.bleu,0.9,true); if(g.fint) v.dot(er*i,B/2,C.bleu,0.9,true);
-    v.txt(er*i,B+11*u,String(i+1),{bold:true,size:3});}
-  for(let k=1;k<g.nip;k++){v.dot(0,k*g.eppr,C.bleu,0.9);v.dot(L,k*g.eppr,C.bleu,0.9);}
+  for(let i=0;i<=nt;i++){const x=er*i;
+    for(let k=0;k<=nn;k++){v.rect(x-a1/2,k*B-a1/2,x+a1/2,k*B+a1/2,C.gris,0.3,C.beton);}
+    if(g.fint) for(let k=0;k<nn;k++) v.rect(x-a1/2,(k+0.5)*B-a1/2,x+a1/2,(k+0.5)*B+a1/2,C.gris,0.3,C.beton);}
+  for(let k=0;k<nn;k++) for(let j=1;j<g.nip;j++) for(const x of [0,L]) v.rect(x-a2/2,k*B+j*g.eppr-a2/2,x+a2/2,k*B+j*g.eppr+a2/2,C.gris,0.3,C.beton);
+  for(let i=0;i<=nt;i++){ for(let k=0;k<=nn;k++) v.dot(er*i,k*B,C.bleu,0.9,true);
+    if(g.fint) for(let k=0;k<nn;k++) v.dot(er*i,(k+0.5)*B,C.bleu,0.9,true);
+    v.txt(er*i,W+11*u,String(i+1),{bold:true,size:3});}
+  for(let k=0;k<nn;k++) for(let j=1;j<g.nip;j++){v.dot(0,k*B+j*g.eppr,C.bleu,0.9);v.dot(L,k*B+j*g.eppr,C.bleu,0.9);}
   for(const d of g.doors.LP){v.seg(d.xl,-2.5*u,d.xr,-2.5*u,C.noir,0.9); v.txt(d.xc,-2.5*u,d.t,{size:2.2,dy:3});}
   for(const d of g.doors.PG){v.seg(-2.5*u,d.xl,-2.5*u,d.xr,C.noir,0.9); v.txt(-5*u,d.xc,d.t,{size:2.2,rot:-90,dy:0.8});}
-  v.coteH(0,L,-11*u,"Longueur "+f2(L)+" m",true); v.coteV(-16*u,0,B,"Portée "+f2(B)+" m");
-  v.coteH(0,er,B+6*u,"Entraxe "+f2(er)+" m ("+nt+" travées)");
-  v.txt(L+6*u,0,"A",{bold:true,size:3.2,anchor:"start",dy:1}); v.txt(L+6*u,B,"B",{bold:true,size:3.2,anchor:"start",dy:1});
+  v.coteH(0,L,-11*u,"Longueur "+f2(L)+" m",true); v.coteV(-16*u,0,B,(nn>1?"Nef ":"Portée ")+f2(B)+" m");
+  if(nn>1) v.coteV(-22*u,0,W,"Largeur totale "+f2(W)+" m ("+nn+" nefs)");
+  v.coteH(0,er,W+6*u,"Entraxe "+f2(er)+" m ("+nt+" travées)");
+  for(let k=0;k<=nn;k++) v.txt(L+6*u,k*B,"ABCDE"[k],{bold:true,size:3.2,anchor:"start",dy:1});
   return v;
 }
 // ---------------------------------------------------------- P2 coupe transversale
 function P2(g){
-  const {B,H,Hm,Hf,p}=g, v=new Vue(0,B,-P.D-0.1,Hf,[22,22,14,10]), u=v.u;
-  v.seg(-6*u,0,B+6*u,0,C.noir,0.35);
-  v.pl([[0,0],[0,Hm]],C.bleu,0.8); v.pl([[B,0],[B,Hm]],C.bleu,0.8); v.pl([[0,Hm],[B/2,Hf],[B,Hm]],C.bleu,0.8);
-  if(g.fint) v.seg(B/2,0,B/2,g.treil?H:Hf,C.bleu,0.8);
-  if(g.treil){ v.seg(0,H,B,H,C.bleu,0.8); const a=B/Math.max(1,g.npan), top=x=>Hm+p*Math.min(x,B-x);
-    for(let j=1;j<g.npan;j++) v.seg(j*a,H,j*a,top(j*a),C.bleu,0.35);
-    for(let j=1;j<=g.npan;j++){const x0=(j-1)*a,x1=j*a; if(j<=g.npan/2) v.seg(x0,top(x0),x1,H,C.bleu,0.35); else v.seg(x0,H,x1,top(x1),C.bleu,0.35);} }
-  else { const lj=g.lj, hj=g.htrav; v.seg(0,H-hj,lj,H+p*lj,C.bleu,0.5); v.seg(B,H-hj,B-lj,H+p*lj,C.bleu,0.5);
-    v.pl([[B/2-lj/2,Hf-p*lj/2],[B/2,Hf-hj],[B/2+lj/2,Hf-p*lj/2]],C.bleu,0.5); }
-  for(let j=0;j<g.np;j++){const x=j*(B/2)/Math.max(1,g.np-1); v.dot(x,Hm+p*x+1.2*u,C.bleu,0.55,true); v.dot(B-x,Hm+p*x+1.2*u,C.bleu,0.55,true);}
+  const {B,W,H,Hm,Hf,p,nn}=g, v=new Vue(0,W,-P.D-0.1,Hf,[22,22,16,10]), u=v.u;
+  v.seg(-6*u,0,W+6*u,0,C.noir,0.35);
+  for(let k=0;k<=nn;k++) v.pl([[k*B,0],[k*B,Hm]],C.bleu,0.8);
+  for(let k=0;k<nn;k++){ const o=k*B;
+    v.pl([[o,Hm],[o+B/2,Hf],[o+B,Hm]],C.bleu,0.8);
+    if(g.fint) v.seg(o+B/2,0,o+B/2,g.treil?H:Hf,C.bleu,0.8);
+    if(g.treil){ v.seg(o,H,o+B,H,C.bleu,0.8); const a=B/Math.max(1,g.npan), top=x=>Hm+p*Math.min(x,B-x);
+      for(let j=1;j<g.npan;j++) v.seg(o+j*a,H,o+j*a,top(j*a),C.bleu,0.35);
+      for(let j=1;j<=g.npan;j++){const x0=(j-1)*a,x1=j*a; if(j<=g.npan/2) v.seg(o+x0,top(x0),o+x1,H,C.bleu,0.35); else v.seg(o+x0,H,o+x1,top(x1),C.bleu,0.35);} }
+    else { const lj=g.lj, hj=g.htrav; v.seg(o,H-hj,o+lj,H+p*lj,C.bleu,0.5); v.seg(o+B,H-hj,o+B-lj,H+p*lj,C.bleu,0.5);
+      v.pl([[o+B/2-lj/2,Hf-p*lj/2],[o+B/2,Hf-hj],[o+B/2+lj/2,Hf-p*lj/2]],C.bleu,0.5); }
+    for(let j=0;j<g.np;j++){const x=j*(B/2)/Math.max(1,g.np-1); v.dot(o+x,Hm+p*x+1.2*u,C.bleu,0.55,true); v.dot(o+B-x,Hm+p*x+1.2*u,C.bleu,0.55,true);}
+  }
   v.pl([[-3.5*u,Hm+1.5*u],[-3.5*u,Hm-0.8*u],[-0.3*u,Hm-0.8*u],[-0.3*u,Hm+1.5*u]],C.bleu,0.4);
-  v.pl([[B+3.5*u,Hm+1.5*u],[B+3.5*u,Hm-0.8*u],[B+0.3*u,Hm-0.8*u],[B+0.3*u,Hm+1.5*u]],C.bleu,0.4);
-  const zs=-P.D+P.eprop;
-  for(const x0 of [0,B].concat(g.fint?[B/2]:[])){ v.rect(x0-P.a1/2,zs,x0+P.a1/2,zs+P.hs1,C.gris,0.3,C.beton); v.rect(x0-P.f1/2,zs+P.hs1,x0+P.f1/2,0,C.gris,0.3,C.beton); }
-  v.coteV(-10*u,0,H,"H sablière "+f2(H)+" m"); v.coteV(B+10*u,0,Hf,"H faîtage "+f2(Hf)+" m",true);
-  v.coteH(0,B,-P.D-4*u,"Portée "+f2(B)+" m",true);
+  v.pl([[W+3.5*u,Hm+1.5*u],[W+3.5*u,Hm-0.8*u],[W+0.3*u,Hm-0.8*u],[W+0.3*u,Hm+1.5*u]],C.bleu,0.4);
+  for(let k=1;k<nn;k++) v.pl([[k*B-1.6*u,Hm+1*u],[k*B-1.6*u,Hm-1.2*u],[k*B+1.6*u,Hm-1.2*u],[k*B+1.6*u,Hm+1*u]],C.bleu,0.4);
+  const zs=-P.D+P.eprop, cols=[]; for(let k=0;k<=nn;k++) cols.push(k*B); if(g.fint) for(let k=0;k<nn;k++) cols.push((k+0.5)*B);
+  for(const x0 of cols){ v.rect(x0-P.a1/2,zs,x0+P.a1/2,zs+P.hs1,C.gris,0.3,C.beton); v.rect(x0-P.f1/2,zs+P.hs1,x0+P.f1/2,0,C.gris,0.3,C.beton); }
+  v.coteV(-10*u,0,H,"H sablière "+f2(H)+" m"); v.coteV(W+10*u,0,Hf,"H faîtage "+f2(Hf)+" m",true);
+  v.coteH(0,B,-P.D-4*u,(nn>1?"Nef ":"Portée ")+f2(B)+" m",true);
+  if(nn>1) v.coteH(0,W,-P.D-10*u,"Largeur totale "+f2(W)+" m ("+nn+" nefs)",true);
   v.txt(B/4,Hm+p*B/4+5*u,"Pente "+f1(P.p)+" %",{size:2.8});
-  v.txt(B/2,H/2,g.systeme+" – poteaux "+g.ppot+(g.treil?" – membrures "+P.nacc+" "+g.pmsup+" / "+P.nacc+" "+g.pminf:" – traverses "+g.ptrav),{size:2.8});
+  v.txt(W/2,H/2,g.systeme+" – poteaux "+g.ppot+(g.treil?" – membrures "+P.nacc+" "+g.pmsup+" / "+P.nacc+" "+g.pminf:" – traverses "+g.ptrav),{size:2.8});
   v.txt(B/2,Hf+7*u,"Pannes "+g.ppanne+" : "+g.np+" par versant, e = "+f2(g.epanr)+" m",{size:2.4});
   return v;
 }
@@ -304,42 +314,52 @@ function P3(g){
 }
 // ---------------------------------------------------------- P4 pignon
 function P4(g){
-  const {B,Hm,Hf,p,z0}=g, v=new Vue(0,B,0,Hf,[22,22,14,8]), u=v.u, D=g.doors.PG;
-  const xa=z=>z<=Hm?0:(z-Hm)/p, xb=z=>B-xa(z);
-  v.seg(-5*u,0,B+5*u,0,C.noir,0.35);
-  if(g.kag){ const ztop=g.aggFull?Hf-0.2:g.z0; for(let z=0.4;z<ztop-1e-6;z+=0.4) rowCut(v,z,xa(z),xb(z),D,C.marron,0.18);
-    v.seg(0,P.hch/2,B,P.hch/2,C.gris,0.7); v.seg(0,g.z0-P.hch/2,B,g.z0-P.hch/2,C.gris,0.7);
-    if(g.aggFull){v.seg(0,g.z0/2,B,g.z0/2,C.gris,0.7); v.pl([[0,Hm-P.hch/2],[B/2,Hf-P.hch/2],[B,Hm-P.hch/2]],C.gris,0.7);} }
-  if(g.kbard) for(let k=0;k<16;k++){const z=z0+k*P.elis; if(z>=Hf-0.3)break; rowCut(v,z,xa(z),xb(z),D,C.bleu,0.22);}
-  v.pl([[0,0],[0,Hm],[B/2,Hf],[B,Hm],[B,0]],C.bleu,0.7);
-  for(let k=1;k<g.nip;k++){const y=k*g.eppr; v.seg(y,0,y,Hm+p*Math.min(y,B-y),C.bleu,0.6);}
+  const {B,W,Hm,Hf,p,z0,nn}=g, v=new Vue(0,W,0,Hf,[22,22,16,8]), u=v.u, D=g.doors.PG;
+  const xa=(z,k)=>k*B+(z<=Hm?0:(z-Hm)/p), xb=(z,k)=>(k+1)*B-(z<=Hm?0:(z-Hm)/p);
+  v.seg(-5*u,0,W+5*u,0,C.noir,0.35);
+  if(g.kag){ const ztop=g.aggFull?Hf-0.2:g.z0;
+    for(let k=0;k<nn;k++) for(let z=0.4;z<ztop-1e-6;z+=0.4) rowCut(v,z,xa(z,k),xb(z,k),k===0?D:[],C.marron,0.18);
+    v.seg(0,P.hch/2,W,P.hch/2,C.gris,0.7); v.seg(0,g.z0-P.hch/2,W,g.z0-P.hch/2,C.gris,0.7);
+    if(g.aggFull){v.seg(0,g.z0/2,W,g.z0/2,C.gris,0.7); for(let k=0;k<nn;k++) v.pl([[k*B,Hm-P.hch/2],[(k+0.5)*B,Hf-P.hch/2],[(k+1)*B,Hm-P.hch/2]],C.gris,0.7);} }
+  if(g.kbard) for(let k=0;k<nn;k++) for(let q=0;q<16;q++){const z=z0+q*P.elis; if(z>=Hf-0.3)break; rowCut(v,z,xa(z,k),xb(z,k),k===0?D:[],C.bleu,0.22);}
+  const cont=[[0,0],[0,Hm]]; for(let k=0;k<nn;k++){cont.push([(k+0.5)*B,Hf]); cont.push([(k+1)*B,Hm]);} cont.push([W,0]);
+  v.pl(cont,C.bleu,0.7);
+  for(let k=1;k<nn;k++) v.seg(k*B,0,k*B,Hm,C.bleu,0.7);
+  for(let k=0;k<nn;k++) for(let j=1;j<g.nip;j++){const y=j*g.eppr; v.seg(k*B+y,0,k*B+y,Hm+p*Math.min(y,B-y),C.bleu,0.6);}
   for(const d of D){ const ht=Math.min(Hm,d.h+P.elis); v.seg(d.xl,0,d.xl,ht,C.bleu,0.45); v.seg(d.xr,0,d.xr,ht,C.bleu,0.45); v.seg(d.xl,d.h,d.xr,d.h,C.bleu,0.45);
     v.seg(d.xl,0,d.xr,d.h,C.noir,0.25,"1 0.6"); v.seg(d.xr,0,d.xl,d.h,C.noir,0.25,"1 0.6");
     if(d.coul) v.seg(d.xl-0.1,d.h+0.15,d.xr+0.1,d.h+0.15,C.noir,0.45);
     v.txt(d.xc,d.h+0.15,d.t,{size:2.2,dy:-1}); }
-  v.coteH(0,B,-6*u,"Portée "+f2(B)+" m",true); v.coteV(-10*u,0,Hm,"H égout "+f2(Hm)+" m"); v.coteV(B+10*u,0,Hf,"H faîtage "+f2(Hf)+" m",true);
-  v.txt(B/2,Hf+3*u,"Poteaux de pignon "+g.ppp+" e = "+f2(g.eppr)+" m",{size:2.4});
+  v.coteH(0,B,-6*u,(nn>1?"Nef ":"Portée ")+f2(B)+" m",true);
+  if(nn>1) v.coteH(0,W,-12*u,"Largeur totale "+f2(W)+" m ("+nn+" nefs)",true);
+  v.coteV(-10*u,0,Hm,"H égout "+f2(Hm)+" m"); v.coteV(W+10*u,0,Hf,"H faîtage "+f2(Hf)+" m",true);
+  v.txt(W/2,Hf+3*u,"Poteaux de pignon "+g.ppp+" e = "+f2(g.eppr)+" m",{size:2.4});
   return v;
 }
 // ---------------------------------------------------------- P5 toiture
 function P5(g){
-  const {B,L,er,nt}=g, d=+P.deb, v=new Vue(-d,L+d,0,B,[22,20,16,10]), u=v.u;
+  const {B,W,L,er,nt,nn}=g, d=+P.deb, v=new Vue(-d,L+d,0,W,[28,20,16,10]), u=v.u;
   v.defs=`<defs><pattern id="hach" width="1.2" height="1.2" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="1.2" stroke="${C.transl}" stroke-width="0.35"/></pattern></defs>`;
   const pct=P.pct/100, w=pct*er;
-  if(pct>0) for(let i=1;i<=nt;i++){const xc=(i-0.5)*er; for(const vv of [0,1]) v.rect(xc-w/2,vv*B/2+0.6*u,xc+w/2,vv*B/2+B/2-0.6*u,C.transl,0.25,"url(#hach)");}
-  for(let j=0;j<g.np;j++){const y=j*(B/2)/Math.max(1,g.np-1); v.seg(-d,y,L+d,y,C.bleu,0.18); v.seg(-d,B-y,L+d,B-y,C.bleu,0.18);}
-  for(let i=1;i<=nt;i++) for(let l=1;l<=g.nl;l++){const x=(i-1)*er+l*er/(g.nl+1); v.seg(x,0,x,B,C.bleu,0.18,"0.6 0.6");}
-  for(let m=1;m<=g.nbcv;m++){const b=bayBraced(g,m),xa=(b-1)*er,xb=b*er;
-    for(const vv of [0,1]) for(let r=1;r<=g.npv;r++){const ya=vv*B/2+(r-1)*(B/2)/g.npv, yb=ya+(B/2)/g.npv; v.seg(xa,ya,xb,yb,C.orange,0.4); v.seg(xa,yb,xb,ya,C.orange,0.4);}}
-  for(let i=0;i<=nt;i++) v.seg(er*i,0,er*i,B,C.bleu,0.6);
-  for(let k=1;k<=P.nsky;k++){const b=Math.max(1,Math.min(nt,Math.round(k*nt/(+P.nsky+1)))), xc=(b-1)*er+0.25*er, yc=k%2===1?B/4:3*B/4;
+  for(let k=0;k<nn;k++){ const o=k*B;
+    if(pct>0) for(let i=1;i<=nt;i++){const xc=(i-0.5)*er; for(const vv of [0,1]) v.rect(xc-w/2,o+vv*B/2+0.6*u,xc+w/2,o+vv*B/2+B/2-0.6*u,C.transl,0.25,"url(#hach)");}
+    for(let j=0;j<g.np;j++){const y=j*(B/2)/Math.max(1,g.np-1); v.seg(-d,o+y,L+d,o+y,C.bleu,0.18); v.seg(-d,o+B-y,L+d,o+B-y,C.bleu,0.18);}
+    for(let m=1;m<=g.nbcv;m++){const b=bayBraced(g,m),xa=(b-1)*er,xb=b*er;
+      for(const vv of [0,1]) for(let r=1;r<=g.npv;r++){const ya=o+vv*B/2+(r-1)*(B/2)/g.npv, yb=ya+(B/2)/g.npv; v.seg(xa,ya,xb,yb,C.orange,0.4); v.seg(xa,yb,xb,ya,C.orange,0.4);}}
+    v.seg(-d,o+B/2,L+d,o+B/2,C.noir,0.7,"2.5 1.2");
+    if(k>0) v.seg(-d,o,L+d,o,"#002060",0.8);
+  }
+  for(let i=1;i<=nt;i++) for(let l=1;l<=g.nl;l++){const x=(i-1)*er+l*er/(g.nl+1); v.seg(x,0,x,W,C.bleu,0.18,"0.6 0.6");}
+  for(let i=0;i<=nt;i++) v.seg(er*i,0,er*i,W,C.bleu,0.6);
+  for(let k=1;k<=P.nsky;k++){const b=Math.max(1,Math.min(nt,Math.round(k*nt/(+P.nsky+1)))), xc=(b-1)*er+0.25*er, yc=((k-1)%nn)*B+(k%2===1?B/4:3*B/4);
     v.rect(xc-P.asky/2-0.2,yc-P.bsky/2-0.2,xc+P.asky/2+0.2,yc+P.bsky/2+0.2,C.bleu,0.4);
     v.rect(xc-P.asky/2,yc-P.bsky/2,xc+P.asky/2,yc+P.bsky/2,C.bleu,0.3,"#DDEBF7");}
-  v.seg(-d,B/2,L+d,B/2,C.noir,0.7,"2.5 1.2");
-  v.rect(-d,0,L+d,B,C.noir,0.45);
-  const ns=g.ndesc/2; for(let k=1;k<=ns;k++){const x=(k-0.5)*L/ns; v.dot(x,0,"#002060",0.9); v.dot(x,B,"#002060",0.9);}
-  v.coteH(0,L,-7*u,"Longueur "+f2(L)+" m",true); v.coteV(-d-10*u,0,B,"Portée "+f2(B)+" m");
+  v.rect(-d,0,L+d,W,C.noir,0.45);
+  const ns=g.ndesc/2; for(let k=1;k<=ns;k++){const x=(k-0.5)*L/ns; for(let q=0;q<=nn;q++) v.dot(x,q*B,"#002060",0.9);}
+  v.coteH(0,L,-7*u,"Longueur "+f2(L)+" m",true); v.coteV(-d-10*u,0,B,(nn>1?"Nef ":"Portée ")+f2(B)+" m");
+  if(nn>1) v.coteV(-d-17*u,0,W,"Largeur totale "+f2(W)+" m ("+nn+" nefs)");
   v.txt(L+d+2*u,B/2,"Faîtage",{anchor:"start",size:2.4,dy:0.8});
+  if(nn>1) v.txt(L+d+2*u,B,"Chéneau central",{anchor:"start",size:2.4,dy:0.8});
   v.txt(L+d+2*u,B/4,"Pente "+f1(P.p)+" %",{anchor:"start",size:2.4,dy:0.8});
   v.txt(L/2,-2.5*u,"● descentes EP ("+g.ndesc+")  ▨ translucides "+f1(P.pct)+" %  ✕ poutre au vent",{size:2.3,dy:3});
   return v;
@@ -488,136 +508,135 @@ class Scene3D{
 }
 // ---------------------------------------------------------- ossature 3D (option éclatée)
 function ossature(g,ex=0,f){
-  const {B,L,H,Hm,Hf,p,er,nt}=g, sc=new Scene3D(), d=+P.deb;
-  const wP=Math.max(0.55,Math.min(1.3,0.025*Math.max(B,L)))*1.0;
-  const top=(y)=>Hm+p*Math.min(y,B-y);
-  const dzP=ex*0.14*B, dxF=ex*0.16*B, dyG=ex*0.12*B;
+  const {B,W,L,H,Hm,Hf,p,er,nt,nn}=g, sc=new Scene3D(), d=+P.deb;
+  const wP=Math.max(0.55,Math.min(1.3,0.025*Math.max(W,L)))*1.0;
+  const top=(y)=>{const yy=((y%B)+B)%B; return Hm+p*Math.min(yy,B-yy);};
+  const dzP=ex*0.14*B, dxF=ex*0.16*Math.max(B,W/2), dyG=ex*0.12*B;
   const callPts={};
   for(let i=0;i<=nt;i++){
     const x=er*i-(i===0?dxF:0), cP=i===0&&ex?"#2C3E50":ST.acier;
-    sc.seg([x,0,0],[x,0,Hm],cP,wP,1); sc.seg([x,B,0],[x,B,Hm],cP,wP,1);
-    if(g.treil){ sc.seg([x,0,Hm],[x,B/2,Hf],cP,wP*0.8,1); sc.seg([x,B/2,Hf],[x,B,Hm],cP,wP*0.8,1); sc.seg([x,0,H],[x,B,H],cP,wP*0.7,1);
-      const a=B/Math.max(1,g.npan);
-      for(let j=1;j<g.npan;j++) sc.seg([x,j*a,H],[x,j*a,top(j*a)],cP,wP*0.3);
-      for(let j=1;j<=g.npan;j++){const y0=(j-1)*a,y1=j*a; if(j<=g.npan/2) sc.seg([x,y0,top(y0)],[x,y1,H],cP,wP*0.3); else sc.seg([x,y0,H],[x,y1,top(y1)],cP,wP*0.3);} }
-    else { sc.seg([x,0,Hm],[x,B/2,Hf],cP,wP,1); sc.seg([x,B/2,Hf],[x,B,Hm],cP,wP,1);
-      const lj=g.lj, hj=g.htrav*1.6;
-      sc.seg([x,0,H-hj],[x,lj,H+p*lj],ST.cv,wP*0.55); sc.seg([x,B,H-hj],[x,B-lj,H+p*lj],ST.cv,wP*0.55); }
-    if(g.fint) sc.seg([x,B/2,0],[x,B/2,g.treil?H:Hf],cP,wP,1);
+    for(let k=0;k<=nn;k++) sc.seg([x,k*B,0],[x,k*B,Hm],cP,wP,1);
+    for(let k=0;k<nn;k++){ const o=k*B;
+      if(g.treil){ sc.seg([x,o,Hm],[x,o+B/2,Hf],cP,wP*0.8,1); sc.seg([x,o+B/2,Hf],[x,o+B,Hm],cP,wP*0.8,1); sc.seg([x,o,H],[x,o+B,H],cP,wP*0.7,1);
+        const a=B/Math.max(1,g.npan), tp=y=>Hm+p*Math.min(y,B-y);
+        for(let j=1;j<g.npan;j++) sc.seg([x,o+j*a,H],[x,o+j*a,tp(j*a)],cP,wP*0.3);
+        for(let j=1;j<=g.npan;j++){const y0=(j-1)*a,y1=j*a; if(j<=g.npan/2) sc.seg([x,o+y0,tp(y0)],[x,o+y1,H],cP,wP*0.3); else sc.seg([x,o+y0,H],[x,o+y1,tp(y1)],cP,wP*0.3);} }
+      else { sc.seg([x,o,Hm],[x,o+B/2,Hf],cP,wP,1); sc.seg([x,o+B/2,Hf],[x,o+B,Hm],cP,wP,1);
+        const lj=g.lj, hj=g.htrav*1.6;
+        sc.seg([x,o,H-hj],[x,o+lj,H+p*lj],ST.cv,wP*0.55); sc.seg([x,o+B,H-hj],[x,o+B-lj,H+p*lj],ST.cv,wP*0.55); }
+      if(g.fint) sc.seg([x,o+B/2,0],[x,o+B/2,g.treil?H:Hf],cP,wP,1);
+    }
   }
-  callPts.poteau=[-dxF,B,Hm*0.45]; callPts.trav=[-dxF,B*0.72,top(B*0.72)]; callPts.jarret=[-dxF,B-g.lj*0.6,H+p*g.lj*0.4-g.htrav*0.6];
-  // poteaux de pignon
-  for(const x of [-dxF,L]) for(let k=1;k<g.nip;k++){const y=k*g.eppr; sc.seg([x,y,0],[x,y,top(y)],ST.acier,wP*0.8,1);}
-  callPts.pignon=[-dxF,g.eppr*Math.max(1,Math.floor(g.nip/2)),top(g.eppr*Math.max(1,Math.floor(g.nip/2)))*0.5];
-  // sablières
-  sc.seg([0,0,Hm],[L,0,Hm],ST.panne,wP*0.5); sc.seg([0,B,Hm],[L,B,Hm],ST.panne,wP*0.5);
-  // pannes
-  for(let j=0;j<g.np;j++){const y=j*(B/2)/Math.max(1,g.np-1);
-    for(const yy of [y,B-y]){const z=top(yy)+0.12+dzP; sc.seg([-d,yy,z],[L+d,yy,z],ST.panne,wP*0.38);} }
-  callPts.panne=[L*0.55,B*0.25,top(B*0.25)+0.12+dzP];
-  // lisses
-  if(g.kbard){ for(let k=0;k<g.nrows;k++){const z=g.z0+k*P.elis+0.3;
-      sc.seg([0,-0.15,z],[L,-0.15,z],ST.panne,wP*0.32); sc.seg([0,B+0.15+dyG,z],[L,B+0.15+dyG,z],ST.panne,wP*0.32);}
-    for(let k=0;k<16;k++){const z=g.z0+k*P.elis+0.3; if(z>=Hf-0.3)break; const ya=z<=Hm?0:(z-Hm)/p;
-      sc.seg([L+0.15,ya,z],[L+0.15,B-ya,z],ST.panne,wP*0.32); sc.seg([-dxF-0.15,ya,z],[-dxF-0.15,B-ya,z],ST.panne,wP*0.32);}
-    callPts.lisse=[L*0.62,B+0.15+dyG,g.z0+P.elis+0.3]; }
-  // contreventements
+  const yN=(nn-1)*B;   // nef la plus proche de l'observateur
+  callPts.poteau=[-dxF,W,Hm*0.45]; callPts.trav=[-dxF,yN+B*0.72,top(yN+B*0.72)]; callPts.jarret=[-dxF,W-g.lj*0.6,H+p*g.lj*0.4-g.htrav*0.6];
+  for(const x of [-dxF,L]) for(let k=0;k<nn;k++) for(let j=1;j<g.nip;j++){const y=k*B+j*g.eppr; sc.seg([x,y,0],[x,y,top(y)],ST.acier,wP*0.8,1);}
+  const jm=Math.max(1,Math.floor(g.nip/2)); callPts.pignon=[-dxF,yN+g.eppr*jm,top(g.eppr*jm)*0.5];
+  for(let k=0;k<=nn;k++) sc.seg([0,k*B,Hm],[L,k*B,Hm],ST.panne,wP*0.5);
+  for(let k=0;k<nn;k++) for(let j=0;j<g.np;j++){const y=j*(B/2)/Math.max(1,g.np-1);
+    for(const yy of [k*B+y,(k+1)*B-y]){const z=top(yy)+0.12+dzP; sc.seg([-d,yy,z],[L+d,yy,z],ST.panne,wP*0.38);} }
+  callPts.panne=[L*0.55,yN+B*0.25,top(B*0.25)+0.12+dzP];
+  if(g.kbard){ for(let q=0;q<g.nrows;q++){const z=g.z0+q*P.elis+0.3;
+      sc.seg([0,-0.15,z],[L,-0.15,z],ST.panne,wP*0.32); sc.seg([0,W+0.15+dyG,z],[L,W+0.15+dyG,z],ST.panne,wP*0.32);}
+    for(let k=0;k<nn;k++) for(let q=0;q<16;q++){const z=g.z0+q*P.elis+0.3; if(z>=Hf-0.3)break; const ya=z<=Hm?0:(z-Hm)/p;
+      sc.seg([L+0.15,k*B+ya,z],[L+0.15,(k+1)*B-ya,z],ST.panne,wP*0.32); sc.seg([-dxF-0.15,k*B+ya,z],[-dxF-0.15,(k+1)*B-ya,z],ST.panne,wP*0.32);}
+    callPts.lisse=[L*0.62,W+0.15+dyG,g.z0+P.elis+0.3]; }
   for(let m=1;m<=g.nbcv;m++){const b=bayBraced(g,m),xa=(b-1)*er,xb=b*er;
-    for(const y of [0,B]){const yy=y===B?B+dyG*0.0:y; sc.seg([xa,yy,0.1],[xb,yy,Hm-0.1],ST.cv,wP*0.4); sc.seg([xb,yy,0.1],[xa,yy,Hm-0.1],ST.cv,wP*0.4);}
-    for(const v of [0,1]) for(let r=1;r<=g.npv;r++){const ya=v*B/2+(r-1)*(B/2)/g.npv, yb=ya+(B/2)/g.npv, za=top(ya)+0.05+dzP, zb=top(yb)+0.05+dzP;
+    for(const y of [0,W]){ sc.seg([xa,y,0.1],[xb,y,Hm-0.1],ST.cv,wP*0.4); sc.seg([xb,y,0.1],[xa,y,Hm-0.1],ST.cv,wP*0.4);}
+    for(let k=0;k<nn;k++) for(const v of [0,1]) for(let r=1;r<=g.npv;r++){const ya=k*B+v*B/2+(r-1)*(B/2)/g.npv, yb=ya+(B/2)/g.npv, za=top(ya)+0.05+dzP, zb=top(yb-1e-9)+0.05+dzP;
       sc.seg([xa,ya,za],[xb,yb,zb],ST.cv,wP*0.35); sc.seg([xa,yb,zb],[xb,ya,za],ST.cv,wP*0.35);} }
-  const bb=bayBraced(g,Math.min(2,g.nbcv)); callPts.croix=[(bb-0.5)*er,B,Hm*0.5]; callPts.pav=[(bb-0.5)*er,B*0.75,top(B*0.75)+dzP];
-  // massifs
-  for(let i=0;i<=nt;i++){const x=er*i-(i===0?dxF:0); for(const y of [0,B]) boite(f,x-P.a1/2*0.8,x+P.a1/2*0.8,y-P.a1/2*0.8,y+P.a1/2*0.8,-0.45,0);}
-  callPts.platine=[-dxF,B,0];
+  const bb=bayBraced(g,Math.min(2,g.nbcv)); callPts.croix=[(bb-0.5)*er,W,Hm*0.5]; callPts.pav=[(bb-0.5)*er,yN+B*0.75,top(B*0.75)+dzP];
+  for(let i=0;i<=nt;i++){const x=er*i-(i===0?dxF:0); for(let k=0;k<=nn;k++){const y=k*B; boite(f,x-P.a1/2*0.8,x+P.a1/2*0.8,y-P.a1/2*0.8,y+P.a1/2*0.8,-0.45,0);}}
+  callPts.platine=[-dxF,W,0];
   sc.draw(f);
   return callPts;
 }
 // ---------------------------------------------------------- bâtiment terminé
 function batiment(g,f){
-  const {B,L,Hm,Hf,p,er,nt}=g, d=+P.deb, I=iso, top=y=>Hm+p*Math.min(y,B-y);
-  f.poly([I(-1.5,-1.5,0),I(L+1.5,-1.5,0),I(L+1.5,B+1.5,0),I(-1.5,B+1.5,0)],"#EFEFEF","#BBB",0.15);
-  f.poly([I(L,B,0),I(L+0.25*Hm,B+0.6*Hm,0),I(0.25*Hm,B+0.6*Hm,0),I(0,B,0)],"#DADADA","none",0);   // ombre portée
-  // toiture
-  const s1=[I(-d,0,Hm),I(L+d,0,Hm),I(L+d,B/2,Hf),I(-d,B/2,Hf)], s2=[I(-d,B/2,Hf),I(L+d,B/2,Hf),I(L+d,B,Hm),I(-d,B,Hm)];
-  f.poly(s1,ST.toitD,"#556",0.25); f.poly(s2,ST.toit,"#556",0.25);
-  const pct=P.pct/100, w=pct*er;
-  if(pct>0) for(let i=1;i<=nt;i++){const xc=(i-0.5)*er; for(const [y0,y1] of [[0.4,B/2-0.3],[B/2+0.3,B-0.4]])
-    f.poly([I(xc-w/2,y0,top(y0)),I(xc+w/2,y0,top(y0)),I(xc+w/2,y1,top(y1)),I(xc-w/2,y1,top(y1))],ST.transl,"#7FA7C9",0.15);}
-  const step=Math.max(0.5,(L+2*d)/70);
-  for(let x=-d+step;x<L+d;x+=step){ f.line(I(x,0,Hm),I(x,B/2,Hf),"#8796A5",0.08); f.line(I(x,B/2,Hf),I(x,B,Hm),"#8796A5",0.1); }
-  f.line(I(-d,B/2,Hf),I(L+d,B/2,Hf),"#445",0.5);
-  // long-pan (y = B)
+  const {B,W,L,Hm,Hf,p,er,nt,nn}=g, d=+P.deb, I=iso, top=y=>{const yy=y-Math.floor(Math.min(y,W-1e-9)/B)*B; return Hm+p*Math.min(yy,B-yy);};
+  f.poly([I(-1.5,-1.5,0),I(L+1.5,-1.5,0),I(L+1.5,W+1.5,0),I(-1.5,W+1.5,0)],"#EFEFEF","#BBB",0.15);
+  f.poly([I(L,W,0),I(L+0.25*Hm,W+0.6*Hm,0),I(0.25*Hm,W+0.6*Hm,0),I(0,W,0)],"#DADADA","none",0);
+  const pct=P.pct/100, w=pct*er, step=Math.max(0.5,(L+2*d)/70);
+  for(let k=0;k<nn;k++){ const o=k*B;
+    const s1=[I(-d,o,Hm),I(L+d,o,Hm),I(L+d,o+B/2,Hf),I(-d,o+B/2,Hf)], s2=[I(-d,o+B/2,Hf),I(L+d,o+B/2,Hf),I(L+d,o+B,Hm),I(-d,o+B,Hm)];
+    f.poly(s1,ST.toitD,"#556",0.25); f.poly(s2,ST.toit,"#556",0.25);
+    if(pct>0) for(let i=1;i<=nt;i++){const xc=(i-0.5)*er; for(const [y0,y1] of [[o+0.4,o+B/2-0.3],[o+B/2+0.3,o+B-0.4]])
+      f.poly([I(xc-w/2,y0,top(y0)),I(xc+w/2,y0,top(y0)),I(xc+w/2,y1,top(y1)),I(xc-w/2,y1,top(y1))],ST.transl,"#7FA7C9",0.15);}
+    for(let x=-d+step;x<L+d;x+=step){ f.line(I(x,o,Hm),I(x,o+B/2,Hf),"#8796A5",0.08); f.line(I(x,o+B/2,Hf),I(x,o+B,Hm),"#8796A5",0.1); }
+    f.line(I(-d,o+B/2,Hf),I(L+d,o+B/2,Hf),"#445",0.5);
+    if(k>0) f.line(I(-d,o,Hm),I(L+d,o,Hm),"#2D3842",0.6);
+  }
   const zb=g.z0;
-  if(zb>0) f.poly([I(0,B,0),I(L,B,0),I(L,B,zb),I(0,B,zb)],ST.agg,"#7A6A55",0.2);
-  if(zb<Hm) f.poly([I(0,B,zb),I(L,B,zb),I(L,B,Hm),I(0,B,Hm)],ST.mur,"#556",0.2);
-  if(zb>0) for(let z=0.4;z<zb;z+=0.4) f.line(I(0,B,z),I(L,B,z),ST.aggL,0.08);
-  if(zb<Hm) for(let x=0.3;x<L;x+=Math.max(0.3,L/120)) f.line(I(x,B,zb),I(x,B,Hm),ST.murD,0.08);
-  // pignon (x = 0)
-  const gp=[I(0,0,0),I(0,B,0),I(0,B,Hm),I(0,B/2,Hf),I(0,0,Hm)];
+  if(zb>0) f.poly([I(0,W,0),I(L,W,0),I(L,W,zb),I(0,W,zb)],ST.agg,"#7A6A55",0.2);
+  if(zb<Hm) f.poly([I(0,W,zb),I(L,W,zb),I(L,W,Hm),I(0,W,Hm)],ST.mur,"#556",0.2);
+  if(zb>0) for(let z=0.4;z<zb;z+=0.4) f.line(I(0,W,z),I(L,W,z),ST.aggL,0.08);
+  if(zb<Hm) for(let x=0.3;x<L;x+=Math.max(0.3,L/120)) f.line(I(x,W,zb),I(x,W,Hm),ST.murD,0.08);
+  const gp=[I(0,0,0),I(0,W,0),I(0,W,Hm)]; for(let k=nn-1;k>=0;k--){gp.push(I(0,(k+0.5)*B,Hf)); gp.push(I(0,k*B,Hm));}
   f.poly(gp,"#C5D0DB","#556",0.2);
-  if(zb>0){ const zt=Math.min(zb,Hm); f.poly([I(0,0,0),I(0,B,0),I(0,B,zt),I(0,0,zt)],ST.agg,"#7A6A55",0.2);
-    if(g.aggFull) f.poly([I(0,0,Hm),I(0,B,Hm),I(0,B/2,Hf)],ST.agg,"#7A6A55",0.2);
-    for(let z=0.4;z<(g.aggFull?Hf:zt);z+=0.4){const ya=z<=Hm?0:(z-Hm)/p; f.line(I(0,ya,z),I(0,B-ya,z),ST.aggL,0.08);} }
-  if(g.kbard) for(let y=0.3;y<B;y+=Math.max(0.3,B/80)) f.line(I(0,y,zb),I(0,y,top(y)),"#A7B4C1",0.08);
-  // chéneau, descentes
-  f.line(I(-d,B,Hm),I(L+d,B,Hm),"#445",0.6);
-  const ns=g.ndesc/2; for(let k=1;k<=ns;k++){const x=(k-0.5)*L/ns; f.line(I(x,B+0.1,Hm),I(x,B+0.1,0.2),"#556",0.35);}
-  // portes
+  if(zb>0){ const zt=Math.min(zb,Hm); f.poly([I(0,0,0),I(0,W,0),I(0,W,zt),I(0,0,zt)],ST.agg,"#7A6A55",0.2);
+    for(let k=0;k<nn;k++){ if(g.aggFull) f.poly([I(0,k*B,Hm),I(0,(k+1)*B,Hm),I(0,(k+0.5)*B,Hf)],ST.agg,"#7A6A55",0.2);
+      for(let z=0.4;z<(g.aggFull?Hf:zt);z+=0.4){const ya=z<=Hm?0:(z-Hm)/p; f.line(I(0,k*B+ya,z),I(0,(k+1)*B-ya,z),ST.aggL,0.08);} } }
+  if(g.kbard) for(let y=0.3;y<W;y+=Math.max(0.3,W/100)) f.line(I(0,y,zb),I(0,y,top(y)),"#A7B4C1",0.08);
+  f.line(I(-d,W,Hm),I(L+d,W,Hm),"#445",0.6);
+  const ns=g.ndesc/2; for(let k=1;k<=ns;k++){const x=(k-0.5)*L/ns; f.line(I(x,W+0.1,Hm),I(x,W+0.1,0.2),"#556",0.35);}
   const porte=(pts,slats)=>{f.poly(pts,ST.porte,"#2D3842",0.3); slats.forEach(s=>f.line(s[0],s[1],"#56636F",0.1));};
-  for(const dd of g.doors.LP){const sl=[]; for(let z=0.25;z<dd.h;z+=0.25) sl.push([I(dd.xl,B,z),I(dd.xr,B,z)]);
-    porte([I(dd.xl,B,0),I(dd.xr,B,0),I(dd.xr,B,dd.h),I(dd.xl,B,dd.h)],sl);}
+  for(const dd of g.doors.LP){const sl=[]; for(let z=0.25;z<dd.h;z+=0.25) sl.push([I(dd.xl,W,z),I(dd.xr,W,z)]);
+    porte([I(dd.xl,W,0),I(dd.xr,W,0),I(dd.xr,W,dd.h),I(dd.xl,W,dd.h)],sl);}
   for(const dd of g.doors.PG){const sl=[]; for(let z=0.25;z<dd.h;z+=0.25) sl.push([I(0,dd.xl,z),I(0,dd.xr,z)]);
     porte([I(0,dd.xl,0),I(0,dd.xr,0),I(0,dd.xr,dd.h),I(0,dd.xl,dd.h)],sl);}
-  return {toit:I(L*0.6,B*0.7,top(B*0.7)),mur:I(L*0.8,B,Hm*0.55),pignon:I(0,B*0.2,Hm*0.6),
-    porte:g.doors.LP[0]?I(g.doors.LP[0].xc,B,g.doors.LP[0].h*0.5):(g.doors.PG[0]?I(0,g.doors.PG[0].xc,g.doors.PG[0].h*0.5):null),
-    transl:pct>0?I(1.5*er,B*0.25,top(B*0.25)):null};
+  const yN=(nn-1)*B;
+  return {toit:I(L*0.6,yN+B*0.7,top(yN+B*0.7)),mur:I(L*0.8,W,Hm*0.55),pignon:I(0,B*0.2,Hm*0.6),
+    porte:g.doors.LP[0]?I(g.doors.LP[0].xc,W,g.doors.LP[0].h*0.5):(g.doors.PG[0]?I(0,g.doors.PG[0].xc,g.doors.PG[0].h*0.5):null),
+    transl:pct>0?I(1.5*er,B*0.25,top(B*0.25)):null, noue:nn>1?I(L*0.35,B,Hm):null};
 }
 // ---------------------------------------------------------- plan de charpente (poster)
 function planCharpente(g,f){
-  const {B,L,er,nt}=g, u=Math.max(B,L)/60;
-  for(let i=0;i<=nt;i++) f.line([er*i,-3*u],[er*i,B+1.5*u],"#999",0.15,"2 1");
-  f.line([-3*u,0],[L+1.5*u,0],"#999",0.15,"2 1"); f.line([-3*u,B],[L+1.5*u,B],"#999",0.15,"2 1");
-  for(let j=0;j<g.np;j++){const y=j*(B/2)/Math.max(1,g.np-1); f.line([0,y],[L,y],ST.panne,0.2); f.line([0,B-y],[L,B-y],ST.panne,0.2);}
-  for(let m=1;m<=g.nbcv;m++){const b=bayBraced(g,m),xa=(b-1)*er,xb=b*er;
-    for(const v of [0,1]) for(let r=1;r<=g.npv;r++){const ya=v*B/2+(r-1)*(B/2)/g.npv, yb=ya+(B/2)/g.npv; f.line([xa,ya],[xb,yb],ST.cv,0.45); f.line([xa,yb],[xb,ya],ST.cv,0.45);}}
-  for(let i=0;i<=nt;i++) f.line([er*i,0],[er*i,B],ST.acier,0.9);
-  f.line([0,0],[L,0],ST.acier,0.6); f.line([0,B],[L,B],ST.acier,0.6); f.line([0,B/2],[L,B/2],"#444",0.4,"3 1.2");
-  for(let i=0;i<=nt;i++){ for(const y of [0,B]) f.poly([[er*i-u*0.35,y-u*0.35],[er*i+u*0.35,y-u*0.35],[er*i+u*0.35,y+u*0.35],[er*i-u*0.35,y+u*0.35]],"#2C3E50","#000",0.1);
+  const {B,W,L,er,nt,nn}=g, u=Math.max(W,L)/60;
+  for(let i=0;i<=nt;i++) f.line([er*i,-3*u],[er*i,W+1.5*u],"#999",0.15,"2 1");
+  for(let k=0;k<=nn;k++) f.line([-3*u,k*B],[L+1.5*u,k*B],"#999",0.15,"2 1");
+  for(let k=0;k<nn;k++){ const o=k*B;
+    for(let j=0;j<g.np;j++){const y=j*(B/2)/Math.max(1,g.np-1); f.line([0,o+y],[L,o+y],ST.panne,0.2); f.line([0,o+B-y],[L,o+B-y],ST.panne,0.2);}
+    for(let m=1;m<=g.nbcv;m++){const b=bayBraced(g,m),xa=(b-1)*er,xb=b*er;
+      for(const v of [0,1]) for(let r=1;r<=g.npv;r++){const ya=o+v*B/2+(r-1)*(B/2)/g.npv, yb=ya+(B/2)/g.npv; f.line([xa,ya],[xb,yb],ST.cv,0.45); f.line([xa,yb],[xb,ya],ST.cv,0.45);}}
+    f.line([0,o+B/2],[L,o+B/2],"#444",0.4,"3 1.2");
+    f.text([L/2,o+B/2],"faîtage",{anchor:"middle",size:2,dy:-0.8,col:"#444"});
+  }
+  for(let i=0;i<=nt;i++) f.line([er*i,0],[er*i,W],ST.acier,0.9);
+  for(let k=0;k<=nn;k++) f.line([0,k*B],[L,k*B],ST.acier,0.6);
+  for(let i=0;i<=nt;i++){ for(let k=0;k<=nn;k++){const y=k*B; f.poly([[er*i-u*0.35,y-u*0.35],[er*i+u*0.35,y-u*0.35],[er*i+u*0.35,y+u*0.35],[er*i-u*0.35,y+u*0.35]],"#2C3E50","#000",0.1);}
     f.circ([er*i,-4.5*u],1.9,"#fff","#333",0.25); f.text([er*i,-4.5*u],String(i+1),{anchor:"middle",dy:0.9,size:2.4,bold:true});
     if(i<nt) f.text([er*(i+0.5),-2*u],f2(er),{anchor:"middle",size:2,dy:0.7}); }
-  [["A",0],["B",B]].forEach(([t,y])=>{f.circ([-4.5*u,y],1.9,"#fff","#333",0.25); f.text([-4.5*u,y],t,{anchor:"middle",dy:0.9,size:2.4,bold:true});});
-  f.text([L/2,B/2],"faîtage",{anchor:"middle",size:2,dy:-0.8,col:"#444"});
+  for(let k=0;k<=nn;k++){const t="ABCDE"[k]; f.circ([-4.5*u,k*B],1.9,"#fff","#333",0.25); f.text([-4.5*u,k*B],t,{anchor:"middle",dy:0.9,size:2.4,bold:true});}
   f.text([L/2,-7*u],"Longueur "+f2(L)+" m – "+nt+" travées de "+f2(er)+" m",{anchor:"middle",size:2.3,dy:1});
-  f.text([-6.5*u,B/2],"Portée "+f2(B),{anchor:"middle",size:2.2});
+  f.text([-6.5*u,W/2],(nn>1?nn+" nefs de ":"Portée ")+f2(B),{anchor:"middle",size:2.2});
   return {panne:[L*0.3,B*0.15],croix:[(bayBraced(g,1)-0.5)*er,B*0.3]};
 }
 // ---------------------------------------------------------- nomenclature
 function nomenclature(g){
-  const kg=n=>KG[n]||0, cvv=g.B<=20?"L 60x6":"L 70x7", cvt=g.B<=20?"L 50x5":(g.B<=30?"L 60x6":"L 70x7");
+  const nn=g.nn, kg=n=>KG[n]||0, cvv=g.B<=20?"L 60x6":"L 70x7", cvt=g.B<=20?"L 50x5":(g.B<=30?"L 60x6":"L 70x7");
   const ldv=Math.hypot(g.er,g.Hm), ldt=Math.hypot(g.er,g.R1/g.npv), Lp=g.L+2*P.deb;
   const avgPig=g.nip>1?(g.Hm+g.p*(g.B/g.nip)*Math.floor(g.nip*g.nip/4)/(g.nip-1)):0;
-  const lisLP=2*g.nrows*g.L, lisPG=g.kbard?2*(g.B*(g.Hm-g.z0)+g.p*g.B*g.B/4)/P.elis:0;
+  const lisLP=2*g.nrows*g.L, lisPG=g.kbard?2*(g.W*(g.Hm-g.z0)+nn*g.p*g.B*g.B/4)/P.elis:0;
   const R=[];
-  R.push(["A","Poteaux de portique",g.ppot,2*g.N,g.Hm,kg(g.ppot)]);
+  R.push(["A","Poteaux de rive",g.ppot,2*g.N,g.Hm,kg(g.ppot)]);
+  if(nn>1) R.push(["A'","Poteaux de noue",g.ppot,g.N*(nn-1),g.Hm,kg(g.ppot)]);
   if(g.treil){
     const a=g.B/Math.max(1,g.npan);
-    R.push(["B","Fermes – membrures sup.",P.nacc+" "+g.pmsup,g.N,2*g.R1,kg(g.pmsup)*P.nacc]);
-    R.push(["B'","Fermes – membrures inf.",P.nacc+" "+g.pminf,g.N,g.B,kg(g.pminf)*P.nacc]);
-    R.push(["B''","Fermes – montants / diagonales","Cornières",g.N*(2*g.npan+1),Math.hypot(a,g.h0+g.p*g.B/4),4.5]);
+    R.push(["B","Fermes – membrures sup.",P.nacc+" "+g.pmsup,g.N*nn,2*g.R1,kg(g.pmsup)*P.nacc]);
+    R.push(["B'","Fermes – membrures inf.",P.nacc+" "+g.pminf,g.N*nn,g.B,kg(g.pminf)*P.nacc]);
+    R.push(["B''","Fermes – montants / diagonales","Cornières",g.N*nn*(2*g.npan+1),Math.hypot(a,g.h0+g.p*g.B/4),4.5]);
   } else {
-    R.push(["B","Traverses (2 versants)",g.ptrav,g.N,2*g.R1,kg(g.ptrav)]);
-    R.push(["B'","Jarrets",g.ptrav,2*g.N,g.lj,kg(g.ptrav)]);
+    R.push(["B","Traverses (2 versants)",g.ptrav,g.N*nn,2*g.R1,kg(g.ptrav)]);
+    R.push(["B'","Jarrets",g.ptrav,2*g.N*nn,g.lj,kg(g.ptrav)]);
   }
-  R.push(["C","Poteaux de pignon",g.ppp,2*(g.nip-1),avgPig,kg(g.ppp)]);
-  R.push(["D","Pannes",g.ppanne,2*g.np,Lp,kg(g.ppanne)]);
+  R.push(["C","Poteaux de pignon",g.ppp,2*nn*(g.nip-1),avgPig,kg(g.ppp)]);
+  R.push(["D","Pannes",g.ppanne,2*g.np*nn,Lp,kg(g.ppanne)]);
   if(g.kbard) R.push(["E","Lisses de bardage",g.plisse,Math.round((lisLP+lisPG)/g.er),g.er,kg(g.plisse)]);
   R.push(["F","Croix de Saint-André",cvv,4*g.nbcv,ldv,kg(cvv)]);
-  R.push(["G","Poutre au vent",cvt,4*g.nbcv*g.npv,ldt,kg(cvt)]);
-  R.push(["H","Liernes et bretelles","Rond 12",g.nt*g.nl*2*g.np,g.epanr,0.888]);
-  R.push(["I","Platines de pied","PL 450×350×20",2*g.N,null,24.7,true]);
-  R.push(["J","Tiges d'ancrage",P.dtige,8*g.N,+P.ltige,kg(P.dtige)]);
-  R.push(["K","Boulons HR M20","HR M20",24*g.N,null,0.45,true]);
+  R.push(["G","Poutre au vent",cvt,4*g.nbcv*g.npv*nn,ldt,kg(cvt)]);
+  R.push(["H","Liernes et bretelles","Rond 12",g.nt*g.nl*2*g.np*nn,g.epanr,0.888]);
+  R.push(["I","Platines de pied","PL 450×350×20",(nn+1)*g.N,null,24.7,true]);
+  R.push(["J","Tiges d'ancrage",P.dtige,4*(nn+1)*g.N,+P.ltige,kg(P.dtige)]);
+  R.push(["K","Boulons HR M20","HR M20",24*g.N*nn,null,0.45,true]);
   let tot=0; R.forEach(r=>{r.push(r[6]?r[3]*r[5]:r[3]*r[4]*r[5]); tot+=r[r.length-1];});
   return {R,tot};
 }
@@ -633,7 +652,7 @@ function tableNomenclature(g,x,y,w){
   o+=`<rect x="${x}" y="${yt}" width="${w}" height="${rh}" fill="#FBE5D6" stroke="#C9D1DB" stroke-width="0.15"/>
   <text x="${x+1}" y="${yt+3.6}" font-size="2.4" font-weight="bold" font-family="Arial">TOTAL INDICATIF (hors chutes)</text>
   <text x="${x+w-1}" y="${yt+3.6}" font-size="2.4" font-weight="bold" text-anchor="end" font-family="Arial">${Math.round(tot).toLocaleString("fr-FR")} kg</text>
-  <text x="${x}" y="${yt+rh+3.4}" font-size="2" font-style="italic" font-family="Arial">Soit ≈ ${f1(tot/(g.B*g.L))} kg/m². Métré détaillé : feuille QUANTITATIF_CHARPENTE du classeur.</text>`;
+  <text x="${x}" y="${yt+rh+3.4}" font-size="2" font-style="italic" font-family="Arial">Soit ≈ ${f1(tot/(g.W*g.L))} kg/m². Métré détaillé : feuille QUANTITATIF_CHARPENTE du classeur.</text>`;
   return o;
 }
 // ---------------------------------------------------------- détails d'assemblage
@@ -734,6 +753,7 @@ function pageEnsemble(g){
   f1_.call(cb.pignon,"Pignon",-10,6);
   if(cb.porte) f1_.call(cb.porte,"Porte",-8,10);
   if(cb.transl) f1_.call(cb.transl,"Translucides "+P.pct+" %",-12,-8);
+  if(cb.noue) f1_.call(cb.noue,"Chéneau central (noue)",-12,-14);
   const f2_=new Fig(); const cp=ossature(g,0,f2_);
   f2_.call(iso(...cp.trav),g.treil?"Ferme treillis":"Portique principal",-14,-8);
   f2_.call(iso(...cp.panne),"Pannes "+g.ppanne,12,-8);
@@ -795,7 +815,7 @@ const TITRES=["VUE EN PLAN – IMPLANTATION","COUPE TRANSVERSALE – PORTIQUE TY
 let DATE=new Date().toLocaleDateString("fr-FR");
 function dessiner(){
   const g=calc(), vues=[P1,P2,P3,P4,P5,P6,P7,pageEnsemble,pageEclate,pageDetails].map(f=>f(g)), NP=vues.length;
-  const gabTxt=`Gabarit ${P.gab} : portée ${f2(g.B)} m × longueur ${f2(g.L)} m – H sablière ${f2(g.H)} m – pente ${f1(P.p)} % – ${g.systeme} – façade : ${P.fac}`;
+  const gabTxt=`Gabarit ${P.gab}${g.nn>1?" – "+g.nn+" nefs":""} : portée ${f2(g.B)} m × longueur ${f2(g.L)} m – H sablière ${f2(g.H)} m – pente ${f1(P.p)} % – ${g.systeme} – façade : ${P.fac}`;
   document.getElementById("planches").innerHTML=vues.map((v,k)=>`
   <section class="page">
     <div class="bandeau">PLANCHE ${k+1} / ${NP} – ${TITRES[k]}</div>

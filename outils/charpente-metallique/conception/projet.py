@@ -133,7 +133,7 @@ class Projet:
 
         B, pente = num("B", 20.0), num("p", 16.0)
         p = cls(longueur=num("L", 40.0), entraxe=num("ep", 6.0), hauteur=num("H", 6.0),
-                nefs=[Nef(B, pente, kv.get("fint") == "Oui")],
+                nefs=[Nef(B, pente, kv.get("fint") == "Oui") for _ in range(max(1, min(4, int(num("nn", 1)))))],
                 jarret_ratio=num("rj", 10.0) / 100, entraxe_pannes=num("epan", 1.35),
                 entraxe_lisses=num("elis", 1.80))
         sys_treillis = B > 30 or (B > 20 and kv.get("sys") == "Ferme treillis")

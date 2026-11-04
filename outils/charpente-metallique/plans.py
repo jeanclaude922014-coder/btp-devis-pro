@@ -31,6 +31,7 @@ YMAX = 100
 MAXP, MAXIP, MAXPN, MAXPAN = 41, 13, 30, 30
 MAXL, MAXLP, MAXCV, MAXPV = 10, 16, 10, 6
 MAXC_LP, MAXC_PG, MAXD, MAXSKY, MAXEP = 32, 42, 4, 12, 16
+MAXN = 4
 
 BLEU, ORANGE, GRIS, ROUGE = "0070C0", "ED7D31", "7F7F7F", "C00000"
 MARRON, NOIR, LATERITE, TRANSL = "C9A27E", "000000", "C55A11", "9DC3E6"
@@ -151,6 +152,8 @@ def build(wb, M, names, st, section, page_setup, protect):
     L = sc("L", "{longueur}")
     H = sc("H", "{hauteur}")
     p = sc("p", "MAX(0.001,{pente})")
+    NN = sc("nn", "{nef}")
+    W = sc("W", "{Wt}")
     Hm, Hf, h0 = sc("Hm", "{Hm}"), sc("Hf", "{Hf}"), sc("h0", "{h0}")
     nt, er = sc("nt", "{nt}"), sc("er", "{er}")
     n_ip, eppr = sc("n_ip", "{n_ip}"), sc("e_ppr", "{e_ppr}")
@@ -185,7 +188,7 @@ def build(wb, M, names, st, section, page_setup, protect):
 
     # ---- baies (au plus 4 représentées par façade)
     doors = {}
-    for F, W, n_div, e_div in [("Long-pan", L, nt, er), ("Pignon", B, n_ip, eppr)]:
+    for F, Wf, n_div, e_div in [("Long-pan", L, nt, er), ("Pignon", B, n_ip, eppr)]:
         tag = "LP" if F == "Long-pan" else "PG"
         nC = sc(f"{tag}_nC", f'IF({{emp_pc}}="{F}",{{nb_pc}},0)')
         nQ = sc(f"{tag}_nQ", f'IF({{emp_pt}}="{F}",{{nb_pt}},0)')
@@ -197,9 +200,9 @@ def build(wb, M, names, st, section, page_setup, protect):
             h = sc(f"{tag}_h{k}", f"IF({k}<={nC},{{h_pc}},{{h_pt}})*{ex}")
             lo, hi = (f"IF({n_div}>=3,2,1)", f"IF({n_div}>=3,{n_div}-1,{n_div})") if tag == "LP" else ("1", n_div)
             pos = sc(f"{tag}_pos{k}", f"MAX({lo},MIN({hi},ROUND({k}*{n_div}/({nd}+1),0)))")
-            xc = sc(f"{tag}_xc{k}", f"IF({ex}=1,({pos}-0.5)*{e_div},{W})")
-            xl = sc(f"{tag}_xl{k}", f"IF({ex}=1,{xc}-{w}/2,{W})")
-            xr = sc(f"{tag}_xr{k}", f"IF({ex}=1,{xc}+{w}/2,{W})")
+            xc = sc(f"{tag}_xc{k}", f"IF({ex}=1,({pos}-0.5)*{e_div},{Wf})")
+            xl = sc(f"{tag}_xl{k}", f"IF({ex}=1,{xc}-{w}/2,{Wf})")
+            xr = sc(f"{tag}_xr{k}", f"IF({ex}=1,{xc}+{w}/2,{Wf})")
             t = tx(f"{tag}_txt{k}", f'IF({k}<={nC},"Porte coul. ","Portillon ")&FIXED({w},2,TRUE)&" × "&FIXED({h},2,TRUE)')
             lst.append(dict(ex=ex, w=w, h=h, xc=xc, xl=xl, xr=xr, t=t, coul=f"{k}<={nC}"))
         doors[tag] = lst
@@ -207,7 +210,8 @@ def build(wb, M, names, st, section, page_setup, protect):
 
     # ---- textes de cotes
     tL = tx("txt_L", '"Longueur "&FIXED({longueur},2,TRUE)&" m"')
-    tB = tx("txt_B", '"Portée "&FIXED({portee},2,TRUE)&" m"')
+    tB = tx("txt_B", 'IF({nef}>1,"Nef : ","Portée ")&FIXED({portee},2,TRUE)&" m"')
+    tW = tx("txt_W", '"Largeur totale "&FIXED({Wt},2,TRUE)&" m ("&{nef}&" nefs)"')
     tE = tx("txt_e", '"Entraxe "&FIXED({er},2,TRUE)&" m ("&{nt}&" travées)"')
     tH = tx("txt_H", '"H sablière "&FIXED({hauteur},2,TRUE)&" m"')
     tHm = tx("txt_Hm", '"H égout "&FIXED({Hm},2,TRUE)&" m"')
@@ -220,38 +224,48 @@ def build(wb, M, names, st, section, page_setup, protect):
 
     D_ = []
     # ========================================================================= P1 VUE EN PLAN
-    d = Drawing(co, 1, "VUE EN PLAN – IMPLANTATION", "0", L, "0", B, ml=20, mr=14, mb=16, mt=16)
+    d = Drawing(co, 1, "VUE EN PLAN – IMPLANTATION", "0", L, "0", W, ml=26, mr=14, mb=16, mt=16)
     D_.append(d)
     u = d.u
     pts = []
     for i in range(MAXP):
-        pts += seg(f"{er}*{i}", f"-4*{u}", f"{er}*{i}", f"{B}+4*{u}", f"{i}<={nt}")
-    pts += seg(f"-4*{u}", "0", f"{L}+4*{u}", "0") + seg(f"-4*{u}", B, f"{L}+4*{u}", B)
+        pts += seg(f"{er}*{i}", f"-4*{u}", f"{er}*{i}", f"{W}+4*{u}", f"{i}<={nt}")
+    for k in range(MAXN + 1):
+        pts += seg(f"-4*{u}", f"{k}*{B}", f"{L}+4*{u}", f"{k}*{B}", f"{k}<={NN}")
     co.ser(d, "Axes des files", pts, S(NOIR, 0.4, "lgDashDot"))
-    pts = rect(f"-{bfil}/2", f"-{bfil}/2", f"{L}+{bfil}/2", f"{B}+{bfil}/2") + \
-        rect(f"{bfil}/2", f"{bfil}/2", f"{L}-{bfil}/2", f"{B}-{bfil}/2")
+    pts = rect(f"-{bfil}/2", f"-{bfil}/2", f"{L}+{bfil}/2", f"{W}+{bfil}/2") + \
+        rect(f"{bfil}/2", f"{bfil}/2", f"{L}-{bfil}/2", f"{W}-{bfil}/2")
     co.ser(d, "Semelles filantes", pts, S(GRIS, 0.75, "dash"))
     pts = []
     for i in range(MAXP):
-        c = f"{i}<={nt}"
         x = f"{er}*{i}"
-        for y in ("0", B):
+        for k in range(MAXN + 1):
+            c = AND(f"{i}<={nt}", f"{k}<={NN}")
+            y = f"{k}*{B}"
             pts += rect(f"{x}-{a1}/2", f"{y}-{a1}/2", f"{x}+{a1}/2", f"{y}+{a1}/2", c)
-        pts += rect(f"{x}-{a1}/2", f"{B}/2-{a1}/2", f"{x}+{a1}/2", f"{B}/2+{a1}/2", AND(c, f"{fint}=1"))
-    for k in range(1, MAXIP):
-        c = f"{k}<={n_ip}-1"
-        for x in ("0", L):
-            pts += rect(f"{x}-{a2}/2", f"{k}*{eppr}-{a2}/2", f"{x}+{a2}/2", f"{k}*{eppr}+{a2}/2", c)
+            if k < MAXN:
+                yc = f"({k}+0.5)*{B}"
+                pts += rect(f"{x}-{a1}/2", f"{yc}-{a1}/2", f"{x}+{a1}/2", f"{yc}+{a1}/2",
+                            AND(f"{i}<={nt}", f"{k}<{NN}", f"{fint}=1"))
+    for k in range(MAXN):
+        for j in range(1, MAXIP):
+            c = AND(f"{j}<={n_ip}-1", f"{k}<{NN}")
+            y = f"{k}*{B}+{j}*{eppr}"
+            for x in ("0", L):
+                pts += rect(f"{x}-{a2}/2", f"{y}-{a2}/2", f"{x}+{a2}/2", f"{y}+{a2}/2", c)
     co.ser(d, "Semelles isolées", pts, S(GRIS, 1.0))
     pts = []
     for i in range(MAXP):
-        c = f"{i}<={nt}"
-        pts += [(f"{er}*{i}", "0", c), (f"{er}*{i}", B, c), (f"{er}*{i}", f"{B}/2", AND(c, f"{fint}=1"))]
+        for k in range(MAXN + 1):
+            pts.append((f"{er}*{i}", f"{k}*{B}", AND(f"{i}<={nt}", f"{k}<={NN}")))
+            if k < MAXN:
+                pts.append((f"{er}*{i}", f"({k}+0.5)*{B}", AND(f"{i}<={nt}", f"{k}<{NN}", f"{fint}=1")))
     co.ser(d, "Poteaux de portique", pts, S(BLEU, line=False, marker="square", msize=6))
     pts = []
-    for k in range(1, MAXIP):
-        c = f"{k}<={n_ip}-1"
-        pts += [("0", f"{k}*{eppr}", c), (L, f"{k}*{eppr}", c)]
+    for k in range(MAXN):
+        for j in range(1, MAXIP):
+            c = AND(f"{j}<={n_ip}-1", f"{k}<{NN}")
+            pts += [("0", f"{k}*{B}+{j}*{eppr}", c), (L, f"{k}*{B}+{j}*{eppr}", c)]
     co.ser(d, "Poteaux de pignon", pts, S(BLEU, line=False, marker="circle", msize=6))
     pts = []
     for dd in doors["LP"]:
@@ -265,63 +279,87 @@ def build(wb, M, names, st, section, page_setup, protect):
         co.lab(d, dd["t"], f"-2.5*{u}", dd["xc"], f"{dd['ex']}=1", pos="r", size=7)
     co.cote(d, "0", f"-11*{u}", L, f"-11*{u}", tL, True, pos="b")
     co.cote(d, f"-12*{u}", "0", f"-12*{u}", B, tB, False)
-    co.cote(d, "0", f"{B}+6*{u}", er, f"{B}+6*{u}", tE, True)
+    co.cote(d, f"-18*{u}", "0", f"-18*{u}", W, tW, False, cond=f"{NN}>1")
+    co.cote(d, "0", f"{W}+6*{u}", er, f"{W}+6*{u}", tE, True)
     for i in range(MAXP):
-        co.lab(d, str(i + 1), f"{er}*{i}", f"{B}+11*{u}", f"{i}<={nt}", pos="ctr", size=8, bold=True)
-    co.lab(d, "A", f"{L}+6*{u}", "0", pos="r", bold=True)
-    co.lab(d, "B", f"{L}+6*{u}", B, pos="r", bold=True)
+        co.lab(d, str(i + 1), f"{er}*{i}", f"{W}+11*{u}", f"{i}<={nt}", pos="ctr", size=8, bold=True)
+    for k in range(MAXN + 1):
+        co.lab(d, "ABCDE"[k], f"{L}+6*{u}", f"{k}*{B}", f"{k}<={NN}", pos="r", bold=True)
 
     # ========================================================================= P2 COUPE TRANSVERSALE
-    d = Drawing(co, 2, "COUPE TRANSVERSALE – PORTIQUE TYPE", "0", B, f"-{D}-0.1", Hf, ml=20, mr=20, mb=12, mt=8)
+    d = Drawing(co, 2, "COUPE TRANSVERSALE – PORTIQUE TYPE", "0", W, f"-{D}-0.1", Hf, ml=20, mr=20, mb=14, mt=8)
     D_.append(d)
     u = d.u
-    co.ser(d, "Sol / dallage", seg(f"-6*{u}", "0", f"{B}+6*{u}", "0"), S(NOIR, 1.0))
-    pts = seg("0", "0", "0", Hm) + seg(B, "0", B, Hm) + \
-        [("0", Hm), (f"{B}/2", Hf), (B, Hm), None] + \
-        seg(f"{B}/2", "0", f"{B}/2", f"IF({treil}=1,{H},{Hf})", f"{fint}=1") + \
-        seg("0", H, B, H, f"{treil}=1")
+    co.ser(d, "Sol / dallage", seg(f"-6*{u}", "0", f"{W}+6*{u}", "0"), S(NOIR, 1.0))
+    pts = []
+    for k in range(MAXN + 1):
+        pts += seg(f"{k}*{B}", "0", f"{k}*{B}", Hm, f"{k}<={NN}")
+    for k in range(MAXN):
+        c = f"{k}<{NN}"
+        x0 = f"{k}*{B}"
+        trav = [(x0, Hm, c), (f"{x0}+{B}/2", Hf, c), (f"{x0}+{B}", Hm, c)]
+        pts += (trav if k % 2 == 0 else trav[::-1]) + [None]   # sens alterné (évite un point de départ répété)
+        pts += seg(f"{x0}+{B}/2", "0", f"{x0}+{B}/2", f"IF({treil}=1,{H},{Hf})", AND(c, f"{fint}=1"))
+        pts += seg(x0, H, f"{x0}+{B}", H, AND(c, f"{treil}=1"))
     co.ser(d, "Ossature", pts, S(BLEU, 2.25))
     a = f"({B}/MAX(1,{npan}))"
-    top = lambda x: f"({Hm}+{p}*MIN({x},{B}-({x})))"
     pts = []
-    for j in range(1, MAXPAN):
-        x = f"{j}*{a}"
-        pts += seg(x, H, x, top(x), AND(f"{treil}=1", f"{j}<={npan}-1"))
-    for j in range(1, MAXPAN + 1):
-        x0, x1 = f"{j - 1}*{a}", f"{j}*{a}"
-        c = AND(f"{treil}=1", f"{j}<={npan}")
-        left = f"{j}<={npan}/2"
-        pts += seg(x0, f"IF({left},{top(x0)},{H})", x1, f"IF({left},{H},{top(x1)})", c)
+    for k in range(MAXN):
+        x0 = f"{k}*{B}"
+        top = lambda x: f"({Hm}+{p}*MIN({x},{B}-({x})))"
+        for j in range(1, MAXPAN):
+            x = f"{j}*{a}"
+            pts += seg(f"{x0}+{x}", H, f"{x0}+{x}", top(x), AND(f"{treil}=1", f"{j}<={npan}-1", f"{k}<{NN}"))
+        for j in range(1, MAXPAN + 1):
+            xa_, xb_ = f"{j - 1}*{a}", f"{j}*{a}"
+            c = AND(f"{treil}=1", f"{j}<={npan}", f"{k}<{NN}")
+            left = f"{j}<={npan}/2"
+            pts += seg(f"{x0}+{xa_}", f"IF({left},{top(xa_)},{H})", f"{x0}+{xb_}", f"IF({left},{H},{top(xb_)})", c)
     co.ser(d, "Treillis", pts, S(BLEU, 1.0))
-    c = f"{treil}=0"
-    pts = seg("0", f"{H}-{htr}", lj, f"{H}+{p}*{lj}", c) + seg(B, f"{H}-{htr}", f"{B}-{lj}", f"{H}+{p}*{lj}", c) + \
-        [(f"{B}/2-{lj}/2", f"{Hf}-{p}*{lj}/2", c), (f"{B}/2", f"{Hf}-{htr}", c),
-         (f"{B}/2+{lj}/2", f"{Hf}-{p}*{lj}/2", c), None]
+    pts = []
+    for k in range(MAXN):
+        c = AND(f"{treil}=0", f"{k}<{NN}")
+        x0 = f"{k}*{B}"
+        pts += seg(x0, f"{H}-{htr}", f"{x0}+{lj}", f"{H}+{p}*{lj}", c) + \
+            seg(f"{x0}+{B}", f"{H}-{htr}", f"{x0}+{B}-{lj}", f"{H}+{p}*{lj}", c) + \
+            [(f"{x0}+{B}/2-{lj}/2", f"{Hf}-{p}*{lj}/2", c), (f"{x0}+{B}/2", f"{Hf}-{htr}", c),
+             (f"{x0}+{B}/2+{lj}/2", f"{Hf}-{p}*{lj}/2", c), None]
     co.ser(d, "Jarrets", pts, S(BLEU, 1.5))
     pts = []
-    for j in range(MAXPN):
-        x = f"{j}*({B}/2)/MAX(1,{npn}-1)"
-        c = f"{j}<={npn}-1"
-        pts += [(x, f"{Hm}+{p}*{x}+1.2*{u}", c), (f"{B}-{x}", f"{Hm}+{p}*{x}+1.2*{u}", c)]
+    for k in range(MAXN):
+        x0 = f"{k}*{B}"
+        for j in range(MAXPN):
+            x = f"{j}*({B}/2)/MAX(1,{npn}-1)"
+            c = AND(f"{j}<={npn}-1", f"{k}<{NN}")
+            pts += [(f"{x0}+{x}", f"{Hm}+{p}*{x}+1.2*{u}", c), (f"{x0}+{B}-{x}", f"{Hm}+{p}*{x}+1.2*{u}", c)]
     co.ser(d, "Pannes", pts, S(BLEU, line=False, marker="square", msize=4))
-    co.ser(d, "Faîtage", [(f"{B}/2", f"{Hf}+3*{u}")], S(BLEU, line=False, marker="triangle", msize=7))
+    co.ser(d, "Faîtage", [(f"({k}+0.5)*{B}", f"{Hf}+3*{u}", f"{k}<{NN}") for k in range(MAXN)],
+           S(BLEU, line=False, marker="triangle", msize=7))
     pts = [(f"-3.5*{u}", f"{Hm}+1.5*{u}"), (f"-3.5*{u}", f"{Hm}-0.8*{u}"), (f"-0.3*{u}", f"{Hm}-0.8*{u}"),
            (f"-0.3*{u}", f"{Hm}+1.5*{u}"), None,
-           (f"{B}+3.5*{u}", f"{Hm}+1.5*{u}"), (f"{B}+3.5*{u}", f"{Hm}-0.8*{u}"), (f"{B}+0.3*{u}", f"{Hm}-0.8*{u}"),
-           (f"{B}+0.3*{u}", f"{Hm}+1.5*{u}"), None]
+           (f"{W}+3.5*{u}", f"{Hm}+1.5*{u}"), (f"{W}+3.5*{u}", f"{Hm}-0.8*{u}"), (f"{W}+0.3*{u}", f"{Hm}-0.8*{u}"),
+           (f"{W}+0.3*{u}", f"{Hm}+1.5*{u}"), None]
+    for k in range(1, MAXN):
+        c = f"{k}<{NN}"
+        x = f"{k}*{B}"
+        pts += [(f"{x}-1.6*{u}", f"{Hm}+1.0*{u}", c), (f"{x}-1.6*{u}", f"{Hm}-1.2*{u}", c),
+                (f"{x}+1.6*{u}", f"{Hm}-1.2*{u}", c), (f"{x}+1.6*{u}", f"{Hm}+1.0*{u}", c), None]
     co.ser(d, "Chéneaux", pts, S(BLEU, 1.25))
     pts = []
-    for x0, c in [("0", None), (B, None), (f"{B}/2", f"{fint}=1")]:
-        zs = f"(-{D}+{eprop})"
+    zs = f"(-{D}+{eprop})"
+    cols = [(f"{k}*{B}", f"{k}<={NN}") for k in range(MAXN + 1)] + \
+        [(f"({k}+0.5)*{B}", AND(f"{k}<{NN}", f"{fint}=1")) for k in range(MAXN)]
+    for x0, c in cols:
         pts += rect(f"{x0}-{a1}/2", zs, f"{x0}+{a1}/2", f"{zs}+{hs1}", c)
         pts += seg(f"{x0}-{f1}/2", f"{zs}+{hs1}", f"{x0}-{f1}/2", "0", c) + \
             seg(f"{x0}+{f1}/2", f"{zs}+{hs1}", f"{x0}+{f1}/2", "0", c)
     co.ser(d, "Fondations", pts, S(GRIS, 1.0))
     co.cote(d, f"-9*{u}", "0", f"-9*{u}", H, tH, False)
-    co.cote(d, f"{B}+9*{u}", "0", f"{B}+9*{u}", Hf, tHf, False, pos="r")
+    co.cote(d, f"{W}+9*{u}", "0", f"{W}+9*{u}", Hf, tHf, False, pos="r")
     co.cote(d, "0", f"-{D}-4*{u}", B, f"-{D}-4*{u}", tB, True, pos="b")
+    co.cote(d, "0", f"-{D}-10*{u}", W, f"-{D}-10*{u}", tW, True, cond=f"{NN}>1", pos="b")
     co.lab(d, tP, f"{B}/4", f"{Hm}+{p}*{B}/4+5*{u}", pos="t")
-    co.lab(d, tSys, f"{B}/2", f"{H}/2", pos="ctr", size=8)
+    co.lab(d, tSys, f"{W}/2", f"{H}/2", pos="ctr", size=8)
     co.lab(d, tPan, f"{B}/2", f"{Hf}+7*{u}", pos="t", size=7)
 
     # ========================================================================= P3 ÉLÉVATION LONG-PAN
@@ -376,33 +414,46 @@ def build(wb, M, names, st, section, page_setup, protect):
     co.cote(d, "0", f"{Hm}+{hacr}+4*{u}", er, f"{Hm}+{hacr}+4*{u}", tE, True)
 
     # ========================================================================= P4 ÉLÉVATION PIGNON
-    d = Drawing(co, 4, "ÉLÉVATION PIGNON", "0", B, "0", Hf, ml=20, mr=20, mb=12, mt=6)
+    d = Drawing(co, 4, "ÉLÉVATION PIGNON", "0", W, "0", Hf, ml=20, mr=20, mb=14, mt=6)
     D_.append(d)
     u = d.u
-    co.ser(d, "Sol", seg(f"-5*{u}", "0", f"{B}+5*{u}", "0"), S(NOIR, 1.0))
-    pts = [("0", "0"), ("0", Hm), (f"{B}/2", Hf), (B, Hm), (B, "0"), None]
-    for k in range(1, MAXIP):
-        y = f"{k}*{eppr}"
-        pts += seg(y, "0", y, f"{Hm}+{p}*MIN({y},{B}-{y})", f"{k}<={n_ip}-1")
+    co.ser(d, "Sol", seg(f"-5*{u}", "0", f"{W}+5*{u}", "0"), S(NOIR, 1.0))
+    pts = [("0", "0"), ("0", Hm)]
+    for k in range(MAXN):
+        c = f"{k}<{NN}"
+        pts += [(f"IF({c},({k}+0.5)*{B},{W})", f"IF({c},{Hf},{Hm})"), (f"IF({c},({k}+1)*{B},{W})", Hm)]
+    pts += [(W, "0"), None]
+    for k in range(MAXN):
+        for j in range(1, MAXIP):
+            y = f"{j}*{eppr}"
+            pts += seg(f"{k}*{B}+{y}", "0", f"{k}*{B}+{y}", f"{Hm}+{p}*MIN({y},{B}-{y})", AND(f"{j}<={n_ip}-1", f"{k}<{NN}"))
+    for k in range(1, MAXN):
+        pts += seg(f"{k}*{B}", "0", f"{k}*{B}", Hm, f"{k}<{NN}")
     co.ser(d, "Poteaux de pignon et rampants", pts, S(BLEU, 2.0))
-    xa = lambda z: f"IF({z}<={Hm},0,({z}-{Hm})/{p})"
-    xb = lambda z: f"({B}-{xa(z)})"
+    xa = lambda z, k: f"({k}*{B}+IF({z}<={Hm},0,({z}-{Hm})/{p}))"
+    xb = lambda z, k: f"(({k}+1)*{B}-IF({z}<={Hm},0,({z}-{Hm})/{p}))"
     pts = []
-    for k in range(MAXLP):
-        z = f"({z0}+{k}*{elis})"
-        pts += split_row(z, xa(z), xb(z), cuts("PG"), AND(f"{kbard}=1", f"{z}<{Hf}-0.3"), clamp=True)
+    for k in range(MAXN):
+        for q in range(MAXLP):
+            z = f"({z0}+{q}*{elis})"
+            c = AND(f"{kbard}=1", f"{z}<{Hf}-0.3", f"{k}<{NN}")
+            pts += split_row(z, xa(z, k), xb(z, k), cuts("PG"), c, clamp=True) if k == 0 else seg(xa(z, k), z, xb(z, k), z, c)
     co.ser(d, "Lisses", pts, S(BLEU, 0.6))
     pts = []
-    for k in range(1, MAXC_PG + 1):
-        z = f"({k}*{pas_c})"
-        ztop = f"IF({agg_full}=1,{Hf}-0.2,{hag})"
-        pts += split_row(z, xa(z), xb(z), cuts("PG"), AND(f"{kag}=1", f"{z}<{ztop}"), clamp=True)
+    for k in range(MAXN):
+        for q in range(1, MAXC_PG + 1):
+            z = f"({q}*{pas_c})"
+            ztop = f"IF({agg_full}=1,{Hf}-0.2,{hag})"
+            c = AND(f"{kag}=1", f"{z}<{ztop}", f"{k}<{NN}")
+            pts += split_row(z, xa(z, k), xb(z, k), cuts("PG"), c, clamp=True) if k == 0 else seg(xa(z, k), z, xb(z, k), z, c)
     co.ser(d, "Maçonnerie agglos", pts, S(MARRON, 0.5))
-    pts = seg("0", f"{hch}/2", B, f"{hch}/2", f"{kag}=1") + \
-        seg("0", f"{hag}/2", B, f"{hag}/2", f"{agg_full}=1") + \
-        seg("0", f"{hag}-{hch}/2", B, f"{hag}-{hch}/2", f"{kag}=1") + \
-        [("0", f"{Hm}-{hch}/2", f"{agg_full}=1"), (f"{B}/2", f"{Hf}-{hch}/2", f"{agg_full}=1"),
-         (B, f"{Hm}-{hch}/2", f"{agg_full}=1"), None]
+    pts = seg("0", f"{hch}/2", W, f"{hch}/2", f"{kag}=1") + \
+        seg("0", f"{hag}/2", W, f"{hag}/2", f"{agg_full}=1") + \
+        seg("0", f"{hag}-{hch}/2", W, f"{hag}-{hch}/2", f"{kag}=1")
+    for k in range(MAXN):
+        c = AND(f"{agg_full}=1", f"{k}<{NN}")
+        pts += [(f"{k}*{B}", f"{Hm}-{hch}/2", c), (f"({k}+0.5)*{B}", f"{Hf}-{hch}/2", c),
+                (f"({k}+1)*{B}", f"{Hm}-{hch}/2", c), None]
     co.ser(d, "Chaînages", pts, S(GRIS, 2.0))
     pts = []
     for dd in doors["PG"]:
@@ -419,61 +470,73 @@ def build(wb, M, names, st, section, page_setup, protect):
     for dd in doors["PG"]:
         co.lab(d, dd["t"], dd["xc"], f"{dd['h']}+0.15", f"{dd['ex']}=1", pos="t", size=7)
     co.cote(d, "0", f"-6*{u}", B, f"-6*{u}", tB, True, pos="b")
+    co.cote(d, "0", f"-12*{u}", W, f"-12*{u}", tW, True, cond=f"{NN}>1", pos="b")
     co.cote(d, f"-9*{u}", "0", f"-9*{u}", Hm, tHm, False)
-    co.cote(d, f"{B}+9*{u}", "0", f"{B}+9*{u}", Hf, tHf, False, pos="r")
-    co.lab(d, tPig, f"{B}/2", f"{Hf}+3*{u}", pos="t", size=7)
+    co.cote(d, f"{W}+9*{u}", "0", f"{W}+9*{u}", Hf, tHf, False, pos="r")
+    co.lab(d, tPig, f"{W}/2", f"{Hf}+3*{u}", pos="t", size=7)
 
     # ========================================================================= P5 PLAN DE TOITURE
-    d = Drawing(co, 5, "VUE EN PLAN TOITURE – CALEPINAGE", f"-{deb}", f"{L}+{deb}", "0", B, ml=20, mr=16, mb=14, mt=10)
+    d = Drawing(co, 5, "VUE EN PLAN TOITURE – CALEPINAGE", f"-{deb}", f"{L}+{deb}", "0", W, ml=26, mr=16, mb=14, mt=10)
     D_.append(d)
     u = d.u
-    co.ser(d, "Rives et égouts", rect(f"-{deb}", "0", f"{L}+{deb}", B), S(NOIR, 1.25))
+    co.ser(d, "Rives et égouts", rect(f"-{deb}", "0", f"{L}+{deb}", W), S(NOIR, 1.25))
     pts = []
-    for j in range(MAXPN):
-        y = f"{j}*({B}/2)/MAX(1,{npn}-1)"
-        c = f"{j}<={npn}-1"
-        pts += seg(f"-{deb}", y, f"{L}+{deb}", y, c) + seg(f"-{deb}", f"{B}-{y}", f"{L}+{deb}", f"{B}-{y}", c)
+    for k in range(MAXN):
+        for j in range(MAXPN):
+            y = f"{j}*({B}/2)/MAX(1,{npn}-1)"
+            c = AND(f"{j}<={npn}-1", f"{k}<{NN}")
+            pts += seg(f"-{deb}", f"{k}*{B}+{y}", f"{L}+{deb}", f"{k}*{B}+{y}", c) + \
+                seg(f"-{deb}", f"({k}+1)*{B}-{y}", f"{L}+{deb}", f"({k}+1)*{B}-{y}", c)
     co.ser(d, "Pannes", pts, S(BLEU, 0.5))
     pts = []
     for i in range(MAXP):
-        pts += seg(f"{er}*{i}", "0", f"{er}*{i}", B, f"{i}<={nt}")
+        pts += seg(f"{er}*{i}", "0", f"{er}*{i}", W, f"{i}<={nt}")
     co.ser(d, "Fermes / traverses", pts, S(BLEU, 1.75))
     pts = []
     for i in range(1, MAXP):
         for l in (1, 2):
             x = f"({i}-1)*{er}+{l}*{er}/({nl}+1)"
-            pts += seg(x, "0", x, B, AND(f"{i}<={nt}", f"{l}<={nl}"))
+            pts += seg(x, "0", x, W, AND(f"{i}<={nt}", f"{l}<={nl}"))
     co.ser(d, "Liernes", pts, S(BLEU, 0.5, "sysDot"))
-    co.ser(d, "Faîtière", seg(f"-{deb}", f"{B}/2", f"{L}+{deb}", f"{B}/2"), S(NOIR, 2.25, "dash"))
+    pts = []
+    for k in range(MAXN):
+        pts += seg(f"-{deb}", f"({k}+0.5)*{B}", f"{L}+{deb}", f"({k}+0.5)*{B}", f"{k}<{NN}")
+    co.ser(d, "Faîtières", pts, S(NOIR, 2.25, "dash"))
+    pts = []
+    for k in range(1, MAXN):
+        pts += seg(f"-{deb}", f"{k}*{B}", f"{L}+{deb}", f"{k}*{B}", f"{k}<{NN}")
+    co.ser(d, "Chéneaux centraux", pts, S("002060", 2.0))
     pts = []
     for m in range(1, MAXCV + 1):
         b = f"IF({m}=1,1,IF({m}={nbcv},{nt},5*({m}-1)))"
         xa_, xb_ = f"({b}-1)*{er}", f"{b}*{er}"
-        for v in (0, 1):
-            for r in range(1, MAXPV + 1):
-                ya = f"({v}*{B}/2+({r}-1)*({B}/2)/{npv})"
-                yb = f"({v}*{B}/2+{r}*({B}/2)/{npv})"
-                c = AND(f"{m}<={nbcv}", f"{r}<={npv}")
-                pts += seg(xa_, ya, xb_, yb, c) + seg(xa_, yb, xb_, ya, c)
+        for k in range(MAXN):
+            for v in (0, 1):
+                for r in range(1, MAXPV + 1):
+                    ya = f"({k}*{B}+{v}*{B}/2+({r}-1)*({B}/2)/{npv})"
+                    yb = f"({k}*{B}+{v}*{B}/2+{r}*({B}/2)/{npv})"
+                    c = AND(f"{m}<={nbcv}", f"{r}<={npv}", f"{k}<{NN}")
+                    pts += seg(xa_, ya, xb_, yb, c) + seg(xa_, yb, xb_, ya, c)
     co.ser(d, "Poutre au vent", pts, S(ORANGE, 1.0))
     pts = []
     for i in range(1, MAXP):
         xc = f"(({i}-0.5)*{er})"
         w = f"({pct}*{er})"
         xl_, xr_ = f"{xc}-{w}/2", f"{xc}+{w}/2"
-        for v in (0, 1):
-            ya, yb = f"({v}*{B}/2+0.6*{u})", f"({v}*{B}/2+{B}/2-0.6*{u})"
-            c = AND(f"{i}<={nt}", f"{pct}>0")
-            pts += rect(xl_, ya, xr_, yb, c)
-            hh = f"(({yb})-({ya}))"
-            pts += [(xl_, ya, c), (xr_, f"{ya}+{hh}/4", c), (xl_, f"{ya}+{hh}/2", c), (xr_, f"{ya}+3*{hh}/4", c),
-                    (xl_, yb, c), None]
+        for k in range(MAXN):
+            for v in (0, 1):
+                ya, yb = f"({k}*{B}+{v}*{B}/2+0.6*{u})", f"({k}*{B}+{v}*{B}/2+{B}/2-0.6*{u})"
+                c = AND(f"{i}<={nt}", f"{pct}>0", f"{k}<{NN}")
+                pts += rect(xl_, ya, xr_, yb, c)
+                hh = f"(({yb})-({ya}))"
+                pts += [(xl_, ya, c), (xr_, f"{ya}+{hh}/4", c), (xl_, f"{ya}+{hh}/2", c), (xr_, f"{ya}+3*{hh}/4", c),
+                        (xl_, yb, c), None]
     co.ser(d, "Translucides (hachurés)", pts, S(TRANSL, 0.75))
     pts = []
     for k in range(1, MAXSKY + 1):
         b = f"MAX(1,MIN({nt},ROUND({k}*{nt}/({nsky}+1),0)))"
         xc = f"(({b}-1)*{er}+0.25*{er})"
-        yc = f"IF(MOD({k},2)=1,{B}/4,3*{B}/4)"
+        yc = f"(MOD({k}-1,{NN})*{B}+IF(MOD({k},2)=1,{B}/4,3*{B}/4))"
         c = f"{k}<={nsky}"
         pts += rect(f"{xc}-{asky}/2", f"{yc}-{bsky}/2", f"{xc}+{asky}/2", f"{yc}+{bsky}/2", c)
         pts += rect(f"{xc}-{asky}/2-0.2", f"{yc}-{bsky}/2-0.2", f"{xc}+{asky}/2+0.2", f"{yc}+{bsky}/2+0.2", c)
@@ -482,10 +545,13 @@ def build(wb, M, names, st, section, page_setup, protect):
     for k in range(1, MAXEP + 1):
         x = f"({k}-0.5)*{L}/MAX(1,{ndesc}/2)"
         c = f"{k}<={ndesc}/2"
-        pts += [(x, "0", c), (x, B, c)]
+        pts += [(x, "0", c), (x, W, c)]
+        for q in range(1, MAXN):
+            pts.append((x, f"{q}*{B}", AND(c, f"{q}<{NN}")))
     co.ser(d, "Descentes EP", pts, S("002060", line=False, marker="circle", msize=6))
     co.cote(d, "0", f"-7*{u}", L, f"-7*{u}", tL, True, pos="b")
     co.cote(d, f"-{deb}-9*{u}", "0", f"-{deb}-9*{u}", B, tB, False)
+    co.cote(d, f"-{deb}-15*{u}", "0", f"-{deb}-15*{u}", W, tW, False, cond=f"{NN}>1")
     co.lab(d, "Faîtage", f"{L}+{deb}+2*{u}", f"{B}/2", pos="r", size=7)
     co.lab(d, tP, f"{L}+{deb}+2*{u}", f"{B}/4", pos="r", size=7)
     co.lab(d, "● descentes EP", f"{L}/2", f"-2.5*{u}", pos="b", size=7)
@@ -723,7 +789,7 @@ def build_plans_sheet(wb, M, names, drawings, st, page_setup, protect):
     BLOCK = 36
     legend = ("Couleurs : charpente en bleu · contreventements en orange · béton en gris · aciers en rouge · "
               "maçonnerie en marron clair · cotes et baies en noir · translucides en bleu clair · remblai en latérite")
-    gab = ('"Gabarit "&{gab}&" : portée "&FIXED({portee},2,TRUE)&" m × longueur "&FIXED({longueur},2,TRUE)'
+    gab = ('"Gabarit "&{gab}&IF({nef}>1," – "&{nef}&" nefs","")&" : portée "&FIXED({portee},2,TRUE)&" m × longueur "&FIXED({longueur},2,TRUE)'
            '&" m – H sablière "&FIXED({hauteur},2,TRUE)&" m – pente "&FIXED({pente}*100,1,TRUE)&" % – "&{systeme}&" – façade : "&{facade}')
     for k, d in enumerate(drawings):
         r0 = 1 + k * BLOCK
