@@ -297,6 +297,29 @@ Contrôle effectué sur 3 configurations, soit 168 grandeurs comparées. Les con
 
 L'écart relatif maximal entre le HTML et Excel recalculé par LibreOffice est de 4·10⁻¹⁵ : les résultats sont identiques.
 
+## Classeur Excel intégré au HTML
+
+`Generateur_Plans.html` contient le classeur complet (environ 500 ko, intégré en base64). Le bouton **« Classeur Excel »** de l'en-tête télécharge `Quantitatif_<projet>.xlsx` avec :
+- **les paramètres du projet en cours**, soit 89 cellules jaunes reliées : gabarit (ou ligne PERSONNALISÉ si la portée ou la longueur diffère), trames, ouvertures, façade, fondations, dallage, aciers, vent, charges, sol… C'est l'inverse du « CODE PLANS » ;
+- **les profilés retenus par le calcul EC3 du HTML** (poteaux et traverses), imposés dans PRÉDIMENSIONNEMENT. Le quantitatif et le devis correspondent ainsi aux plans ;
+- **les efforts du calcul aux éléments finis**, reportés dans les cellules jaunes de `FERRAILLAGE_SEMELLES`. La vérification Excel retrouve alors exactement la planche 15.
+
+Les valeurs en cache sont retirées. Le classeur se recalcule donc entièrement à l'ouverture, dans Excel comme dans LibreOffice. Une visionneuse qui ne calcule pas affiche des cellules vides.
+
+Navigateurs compatibles : Chrome / Edge 103+, Firefox 113+, Safari 16.4+. Tout fonctionne hors connexion.
+
+Contrôle effectué sur un projet personnalisé : 25 × 42 m, 2 nefs, pieds encastrés, semelles de 145 cm. Le classeur exporté a été recalculé par LibreOffice :
+- aucune cellule en erreur ;
+- gabarit et géométrie repris ;
+- profilés imposés ;
+- ferraillage identique au HTML (écart maximal de 3·10⁻⁸, dû à l'arrondi des efforts au millionième).
+
+Après une modification du générateur Excel, mettre à jour le classeur intégré :
+
+```bash
+python3 integrer_classeur.py          # régénère le classeur puis l'intègre au HTML
+```
+
 ## Régénérer le classeur
 
 ```bash
