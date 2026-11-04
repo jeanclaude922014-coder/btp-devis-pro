@@ -29,6 +29,12 @@ Deux possibilités :
      - **9 – Assemblage éclaté** : perspective éclatée de l'ossature avec étiquettes des éléments et profilés, et nomenclature des matériaux (repère, profil, nombre, longueur, poids indicatif).
      - **10 – Détails d'assemblage** : pied de poteau en perspective (platine, tiges d'ancrage, calage, fût, semelle ferraillée), assemblage de faîtage, jarret ou appui de ferme selon le système, attache de contreventement.
    - Ces planches de présentation n'existent que dans le HTML : les graphiques Excel ne permettent ni faces ombrées ni perspectives.
+   - **Calcul intégré au HTML** : le portique est calculé directement dans le navigateur, hors connexion et sans installation (éléments finis 2D, combinaisons EC0, vérifications EC3, choix automatique des profilés).
+     - Les résultats sont identiques au module Python, contrôlé sur 4 bâtiments, écart nul.
+     - Les planches 11 et 12 présentent la note de calcul : modèle, moments ELU, déformée, vérifications des barres, ELS, réactions d'appui pour les fondations et poids des portiques.
+     - Le bouton **« Note de calcul Word »** télécharge un vrai fichier .docx avec en-tête (champ « Établi par »), pied de page numéroté, diagrammes et tableaux.
+     - Les plans reprennent automatiquement les profilés calculés, sauf profilé imposé dans le panneau.
+     - Les paramètres de calcul (appuis, jarrets, charges, vent, acier, bracons) se règlent dans la section « Calcul EC3 du portique ». Le CODE PLANS d'Excel transmet aussi le vent, les charges et l'acier.
    - Le cartouche comporte : projet, lieu, date modifiable, mention « esquisse non contractuelle », « Bon pour accord / Date / Signature ».
 
 ## Structure du classeur

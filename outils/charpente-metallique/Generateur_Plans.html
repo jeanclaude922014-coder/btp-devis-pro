@@ -33,6 +33,15 @@ table.cart td{border:1px solid #000;padding:2px 4px;vertical-align:middle}
 .cart .leg{font-size:8px;font-style:italic}
 .cart input{border:0;font:inherit;width:100%;background:transparent}
 @media (max-width:900px){.layout{flex-direction:column}aside{width:100%;flex:none;position:static;max-height:none}.page{transform-origin:top left}}
+.pagehtml{height:148mm;overflow:hidden;font-size:8.2px;padding:1mm 2mm}
+.note h4{font-size:9px;color:#1F4E79;margin:4px 0 2px;border-bottom:1px solid #C55A11}
+.note table.t{border-collapse:collapse;width:100%;margin-bottom:2px}
+.note table.t td,.note table.t th{border:1px solid #BFC7D1;padding:1px 3px;text-align:left;vertical-align:top}
+.note table.t th{background:#1F4E79;color:#fff}
+.note td.ok{background:#C6EFCE;color:#006100;font-weight:bold}.note td.nc{background:#FFC7CE;color:#9C0006;font-weight:bold}
+.note .cols{display:flex;gap:6px}.note .cols>div{flex:1}
+.note .concl{font-weight:bold;font-size:9px;padding:3px 5px;margin-bottom:3px}.note .concl.ok{background:#C6EFCE;color:#006100}.note .concl.nc{background:#FFC7CE;color:#9C0006}
+.note .pt{font-style:italic;margin:1px 0}
 @page{size:A4 landscape;margin:8mm}
 @media print{
   body{background:#fff}
@@ -48,6 +57,7 @@ table.cart td{border:1px solid #000;padding:2px 4px;vertical-align:middle}
   <h1>Générateur de plans – bâtiment industriel en charpente métallique</h1>
   <div>
     <button class="btn" onclick="window.print()">Enregistrer en PDF / Imprimer</button>
+    <button class="btn sec" onclick="telechargerNote()">Note de calcul Word</button>
   </div>
 </header>
 <div class="layout">
@@ -71,6 +81,7 @@ const FORM = [
  ["Projet et gabarit",[
   ["projet","Projet / ouvrage","Bâtiment industriel","t"],
   ["lieu","Lieu","Abidjan","t"],
+  ["auteur","Établi par","Moulo Jean Claude","t"],
   ["gab","Gabarit",Object.keys(GABARITS),"s"],
   ["B","Portée d'une nef (m)",20],["nn","Nombre de nefs",["1","2","3","4"],"s"],["L","Longueur (m)",40],["H","Hauteur sous sablière (m)",6],["p","Pente (%)",16]]],
  ["Charpente",[
@@ -98,6 +109,13 @@ const FORM = [
   ["hasem","Quadrillage semelles",HA,"s",3],["msem","Maille semelles (m)",0.15],["nbf","Barres par fût",4],["hafut","Aciers fûts",HA,"s",3],
   ["hacad","Cadres",HA,"s",0],["ecad","Espacement cadres fût (m)",0.15],["nfil","Filants semelle",4],["hafil","Aciers filants",HA,"s",2],
   ["harep","Répartition",HA,"s",1],["erep","Espacement répartition (m)",0.2],["dtige","Tiges d'ancrage","Rond 24","t"],["ltige","Longueur tiges (m)",0.6]]],
+ ["Calcul EC3 du portique",[
+  ["appuis","Pieds de poteaux",["articulés","encastrés"],"s"],["jh","Hauteur jarret / h traverse",2.0],
+  ["fampot","Famille des poteaux de rive",["IPE","HEA"],"s"],["pint","Poteaux intérieurs (vide = auto)","","t"],
+  ["Gc","G couverture (kN/m²)",0.10],["Gp","G pannes (kN/m²)",0.06],["Q","Q toiture (kN/m²)",0.40],
+  ["vb","Vent : vb (m/s)",25],["ce","Vent : ce(z)",1.7],["fy","Acier fy (MPa)",["235","275","355"],"s"],
+  ["flt","Flèche traverse L / …",200],["dep","Déplacement tête H / …",150],
+  ["mpot","Bracons poteaux (× entraxe lisses)",2],["mtra","Bracons traverses (× entraxe pannes)",2]]],
  ["Mur agglos",[
   ["bch","Chaînage largeur (m)",0.15],["hch","Chaînage hauteur (m)",0.2],["brd","Raidisseur côté (m)",0.15],["nrd","Raidisseurs / panneau",3],
   ["hachl","Aciers longitudinaux",HA,"s",2],["hachc","Cadres",HA,"s",0],["echc","Espacement cadres (m)",0.2]]]
@@ -471,7 +489,7 @@ class Fig{
       for(let k=L.length-1;k>=0;k--){ if(L[k].yl>y0+h-2){L[k].yl=y0+h-2; if(k>0) L[k-1].yl=Math.min(L[k-1].yl,L[k].yl-3.8);} }
     }
     return this.it.map(i=>{
-      if(i.t==="p") return `<${i.close?"polygon":"polyline"} points="${i.pts.map(p=>X(p)+","+Y(p)).join(" ")}" fill="${i.fill}" stroke="${i.stroke}" stroke-width="${i.w}" stroke-linejoin="round" stroke-linecap="round"${i.dash?` stroke-dasharray="${i.dash}"`:""}/>`;
+      if(i.t==="p") return `<${i.close?"polygon":"polyline"} points="${i.pts.map(p=>X(p)+","+Y(p)).join(" ")}" fill="${i.fill}"${i.op?` fill-opacity="${i.op}"`:""} stroke="${i.stroke}" stroke-width="${i.w}" stroke-linejoin="round" stroke-linecap="round"${i.dash?` stroke-dasharray="${i.dash}"`:""}/>`;
       if(i.t==="c") return `<circle cx="${X(i.p)}" cy="${Y(i.p)}" r="${i.r}" fill="${i.fill}" stroke="${i.stroke}" stroke-width="${i.w}"/>`;
       if(i.t==="t") return T((+X(i.p)+(i.o.dx||0)).toFixed(2),(+Y(i.p)+(i.o.dy||0)).toFixed(2),i.s,i.o);
       const left=i.dx<0, size=(i.o.size||2.3), tw=i.s.length*size*0.5;
@@ -795,6 +813,383 @@ function pageDetails(g){
     ${panneau(w+g2,h+g2,w,h,"ATTACHE DE CONTREVENTEMENT",detailContrev(g).render(w+g2,h+g2+7,w,h-7,10))}</svg>`};
 }
 
+// ============================================================ CALCUL PORTIQUE (début) – EF 2D + EC3, transcrit du module Python conception/
+const SEC=(()=>{const T={};[
+["IPE 160",160,82,5.0,7.4,20.1,15.8,869.3,108.7,123.9,68.31,3.60,3960],["IPE 180",180,91,5.3,8.0,23.9,18.8,1317,146.3,166.4,100.9,4.79,7430],
+["IPE 200",200,100,5.6,8.5,28.5,22.4,1943,194.3,220.6,142.4,6.98,12990],["IPE 220",220,110,5.9,9.2,33.4,26.2,2772,252.0,285.4,204.9,9.07,22670],
+["IPE 240",240,120,6.2,9.8,39.1,30.7,3892,324.3,366.6,283.6,12.88,37390],["IPE 270",270,135,6.6,10.2,45.9,36.1,5790,428.9,484.0,419.9,15.94,70580],
+["IPE 300",300,150,7.1,10.7,53.8,42.2,8356,557.1,628.4,603.8,20.12,125900],["IPE 330",330,160,7.5,11.5,62.6,49.1,11770,713.1,804.3,788.1,28.15,199100],
+["IPE 360",360,170,8.0,12.7,72.7,57.1,16270,903.6,1019,1043,37.32,313600],["IPE 400",400,180,8.6,13.5,84.5,66.3,23130,1156,1307,1318,51.08,490000],
+["IPE 450",450,190,9.4,14.6,98.8,77.6,33740,1500,1702,1676,66.87,791000],["IPE 500",500,200,10.2,16.0,116.0,90.7,48200,1928,2194,2142,89.29,1249000],
+["IPE 550",550,210,11.1,17.2,134.0,106.0,67120,2441,2787,2668,123.2,1884000],["IPE 600",600,220,12.0,19.0,156.0,122.0,92080,3069,3512,3387,165.4,2846000],
+["HEA 160",152,160,6.0,9.0,38.8,30.4,1673,220.1,245.1,615.6,12.19,31410],["HEA 180",171,180,6.0,9.5,45.3,35.5,2510,293.6,324.9,924.6,14.80,60210],
+["HEA 200",190,200,6.5,10.0,53.8,42.3,3692,388.6,429.5,1336,20.98,108000],["HEA 220",210,220,7.0,11.0,64.3,50.5,5410,515.2,568.5,1955,28.46,193300],
+["HEA 240",230,240,7.5,12.0,76.8,60.3,7763,675.1,744.6,2769,41.55,328500],["HEA 260",250,260,7.5,12.5,86.8,68.2,10450,836.4,919.8,3668,52.37,516400],
+["HEA 280",270,280,8.0,13.0,97.3,76.4,13670,1013,1112,4763,62.10,785400],["HEA 300",290,300,8.5,14.0,112.5,88.3,18260,1260,1383,6310,85.17,1200000],
+["HEA 320",310,300,9.0,15.5,124.4,97.6,22930,1479,1628,6985,108.0,1512000],["HEA 340",330,300,9.5,16.5,133.5,105.0,27690,1678,1850,7436,127.2,1824000],
+["HEA 360",350,300,10.0,17.5,142.8,112.0,33090,1891,2088,7887,148.8,2177000],["HEA 400",390,300,11.0,19.0,159.0,125.0,45070,2311,2562,8564,189.0,2942000]
+].forEach(r=>{const [nom,h,b,tw,tf,A,kg,Iy,Wely,Wply,Iz,It,Iw]=r; T[nom]={nom,h,b,tw,tf,A,kg,Iy,Wely,Wply,Iz,It,Iw,iy:Math.sqrt(Iy/A),iz:Math.sqrt(Iz/A),Avz:h*tw/100};});return T;})();
+const L_IPE=Object.keys(SEC).filter(n=>n.startsWith("IPE")), L_HEA=Object.keys(SEC).filter(n=>n.startsWith("HEA"));
+const G_ACIER=81000;
+const CALC_GROUPES={poteau_rive:"Poteaux de rive",poteau_interieur:"Poteaux intérieurs",traverse:"Traverses"};
+
+function cModele(pr,prof){
+  const m={X:[],el:[],appuis:[],barres:{},tete:[]}, H=pr.hauteur, xs=[0];
+  pr.nefs.forEach(n=>xs.push(xs[xs.length-1]+n.portee));
+  const noeud=(x,y)=>{for(let k=0;k<m.X.length;k++) if(Math.abs(m.X[k][0]-x)<1e-6&&Math.abs(m.X[k][1]-y)<1e-6) return k; m.X.push([x,y]); return m.X.length-1;};
+  m.noeud=noeud;
+  const enc=pr.appuis.startsWith("encastr")?1:0;
+  const barre=(nom,groupe,pts,sec,jar)=>{const ids=[]; let Lb=0;
+    for(let k=0;k<pts.length-1;k++){const a=noeud(...pts[k]), b=noeud(...pts[k+1]), j=(jar&&k===0);
+      m.el.push({i:a,j:b,sec,groupe,barre:nom,kI:j?pr.jarret_hauteur**2:1,kA:j?(1+pr.jarret_hauteur)/2:1,jarret:j}); ids.push(m.el.length-1);
+      Lb+=Math.hypot(pts[k+1][0]-pts[k][0],pts[k+1][1]-pts[k][1]);}
+    m.barres[nom]={groupe,longueur:Lb,elements:ids,sec:sec.nom};};
+  xs.forEach((x,c)=>{const rive=c===0||c===xs.length-1, grp=rive?"poteau_rive":"poteau_interieur";
+    const pts=[]; for(let k=0;k<=6;k++) pts.push([x,H*k/6]);
+    barre("P"+(c+1),grp,pts,SEC[prof[grp]],false); m.appuis.push({nd:noeud(x,0),bl:[1,1,enc]}); m.tete.push(noeud(x,H));});
+  const st=SEC[prof.traverse];
+  pr.nefs.forEach((n,k)=>{const x0=xs[k],B=n.portee,pe=n.pente/100,Hf=H+pe*B/2,lj=Math.min(pr.jarret_ratio*B,B/2*0.45),nseg=7;
+    const versant=(xa,xb)=>{const pts=[[xa,H]], sg=xb>xa?1:-1, dist=[lj]; for(let t=1;t<nseg;t++) dist.push(lj+(B/2-lj)*t/(nseg-1));
+      dist.forEach(dd=>{const x=xa+sg*dd; pts.push([x,H+pe*Math.min(x-x0,x0+B-x)]);}); return pts;};
+    barre(`T${k+1}g`,"traverse",versant(x0,x0+B/2),st,true); barre(`T${k+1}d`,"traverse",versant(x0+B,x0+B/2),st,true);
+    if(n.poteau_faitage){const xm=x0+B/2, pts=[]; for(let q=0;q<=6;q++) pts.push([xm,Hf*q/6]);
+      barre(`PF${k+1}`,"poteau_interieur",pts,SEC[prof.poteau_interieur],false); m.appuis.push({nd:noeud(xm,0),bl:[1,1,enc]});}});
+  return m;
+}
+function geomEl(m,e){const [x1,y1]=m.X[e.i],[x2,y2]=m.X[e.j],L=Math.hypot(x2-x1,y2-y1); return [L,(x2-x1)/L,(y2-y1)/L];}
+function cCharges(pr,m){
+  const e=pr.entraxe_reel, cas={G:[],Q:[]}, v=pr.vent, qp=v.ce*0.5*1.25*v.vb**2/1000;
+  m.el.forEach((el,k)=>{const [L,c]=geomEl(m,el); cas.G.push([k,0,-el.sec.kg*9.81/1000*el.kA]);
+    if(el.groupe==="traverse"){cas.G.push([k,0,-(pr.G_couverture+pr.G_pannes)*e]); cas.Q.push([k,0,-pr.Q_toiture*e*Math.abs(c)]);}});
+  const xmin=Math.min(...m.X.map(p=>p[0])), xmax=Math.max(...m.X.map(p=>p[0]));
+  const nefDe=x=>{let a=0; for(let k=0;k<pr.nefs.length;k++){if(x<=a+pr.nefs[k].portee+1e-9) return k; a+=pr.nefs[k].portee;} return pr.nefs.length-1;};
+  for(const sens of ["gauche","droite"]) for(const [cpi,lab] of [[v.cpi_surpression,"cpi+"],[v.cpi_depression,"cpi-"]]){
+    const Lc=[];
+    m.el.forEach((el,k)=>{const [Lk]=geomEl(m,el), [x1,y1]=m.X[el.i], [x2,y2]=m.X[el.j]; let n_out, cpe;
+      if(el.groupe.startsWith("poteau")&&Math.abs(x1-x2)<1e-9){
+        if(Math.abs(x1-xmin)<1e-6){n_out=[-1,0]; cpe=sens==="gauche"?v.cpe_mur_au_vent:v.cpe_mur_sous_vent;}
+        else if(Math.abs(x1-xmax)<1e-6){n_out=[1,0]; cpe=sens==="droite"?v.cpe_mur_au_vent:v.cpe_mur_sous_vent;}
+        else return;
+      } else if(el.groupe==="traverse"){
+        let dx=x2-x1, dy=y2-y1; if(dx<0){dx=-dx; dy=-dy;} const t=[dx/Lk,dy/Lk]; n_out=[-t[1],t[0]];
+        const nef=nefDe((x1+x2)/2), premier=(nef===0&&sens==="gauche")||(nef===pr.nefs.length-1&&sens==="droite");
+        const monte=(t[1]>0&&sens==="gauche")||(t[1]<0&&sens==="droite");
+        cpe=(premier&&monte)?v.cpe_toit_au_vent:v.cpe_toit_sous_vent;
+      } else return;
+      const w=-(cpe-cpi)*qp*e; Lc.push([k,w*n_out[0],w*n_out[1]]);});
+    cas[`W ${sens} ${lab}`]=Lc;}
+  return cas;
+}
+function cCombis(cas){
+  const vents=Object.keys(cas).filter(c=>c.startsWith("W")), elu={"ELU 1,35G + 1,5Q":{G:1.35,Q:1.5}}, els={"ELS G + Q":{G:1,Q:1}};
+  vents.forEach(w=>{elu[`ELU 1,35G + 1,5${w}`]={G:1.35,[w]:1.5}; elu[`ELU 1,0G + 1,5${w}`]={G:1.0,[w]:1.5};});
+  vents.forEach(w=>{els[`ELS G + ${w}`]={G:1,[w]:1};});
+  return {elu,els};
+}
+function kLocal(E,A,I,L){const a=E*A/L,b=E*I/L**3;
+  return [[a,0,0,-a,0,0],[0,12*b,6*b*L,0,-12*b,6*b*L],[0,6*b*L,4*b*L*L,0,-6*b*L,2*b*L*L],
+          [-a,0,0,a,0,0],[0,-12*b,-6*b*L,0,12*b,-6*b*L],[0,6*b*L,2*b*L*L,0,-6*b*L,4*b*L*L]];}
+function matT(c,s){const t=Array.from({length:6},()=>new Array(6).fill(0)); for(const k of [0,3]){t[k][k]=c;t[k][k+1]=s;t[k+1][k]=-s;t[k+1][k+1]=c;t[k+2][k+2]=1;} return t;}
+const mv=(M,v)=>M.map(r=>r.reduce((s,x,j)=>s+x*v[j],0));
+const mtv=(M,v)=>{const o=new Array(6).fill(0); for(let i=0;i<6;i++) for(let j=0;j<6;j++) o[j]+=M[i][j]*v[i]; return o;};
+// analyse : assemblage, factorisation LU unique, résolution de tous les cas
+function cAnalyser(pr,prof){
+  const m=cModele(pr,prof), cas=cCharges(pr,m), E=pr.E*1000, n=m.X.length, N3=3*n;
+  const K=Array.from({length:N3},()=>new Float64Array(N3)), data=[];
+  m.el.forEach(el=>{const [L,c,s]=geomEl(m,el), A=el.sec.A*1e-4*el.kA, I=el.sec.Iy*1e-8*el.kI;
+    const kl=kLocal(E,A,I,L), T=matT(c,s), dofs=[3*el.i,3*el.i+1,3*el.i+2,3*el.j,3*el.j+1,3*el.j+2];
+    const kT=kl.map(r=>{const o=new Array(6).fill(0); for(let j=0;j<6;j++) for(let q=0;q<6;q++) o[j]+=r[q]*T[q][j]; return o;});
+    for(let a=0;a<6;a++) for(let b=0;b<6;b++){let s_=0; for(let q=0;q<6;q++) s_+=T[q][a]*kT[q][b]; K[dofs[a]][dofs[b]]+=s_;}
+    data.push({dofs,kl,T,L,c,s});});
+  const fixe=new Set(); m.appuis.forEach(a=>a.bl.forEach((b,d)=>{if(b) fixe.add(3*a.nd+d);}));
+  const lib=[]; for(let d=0;d<N3;d++) if(!fixe.has(d)) lib.push(d);
+  const nl=lib.length, A=lib.map(i=>Float64Array.from(lib.map(j=>K[i][j]))), piv=new Int32Array(nl);
+  for(let k=0;k<nl;k++){let p=k,mx=Math.abs(A[k][k]); for(let i=k+1;i<nl;i++) if(Math.abs(A[i][k])>mx){mx=Math.abs(A[i][k]);p=i;}
+    piv[k]=p; if(p!==k){const t=A[k];A[k]=A[p];A[p]=t;}
+    const akk=A[k][k]; for(let i=k+1;i<nl;i++){const f=A[i][k]/akk; if(f!==0){A[i][k]=f; const Ai=A[i],Ak=A[k]; for(let j=k+1;j<nl;j++) Ai[j]-=f*Ak[j];} else A[i][k]=0;}}
+  const solve=b=>{const x=Float64Array.from(b); for(let k=0;k<nl;k++){const p=piv[k]; if(p!==k){const t=x[k];x[k]=x[p];x[p]=t;}}
+    for(let i=0;i<nl;i++){let s_=x[i]; for(let j=0;j<i;j++) s_-=A[i][j]*x[j]; x[i]=s_;}
+    for(let i=nl-1;i>=0;i--){let s_=x[i]; for(let j=i+1;j<nl;j++) s_-=A[i][j]*x[j]; x[i]=s_/A[i][i];} return x;};
+  const resCas={};
+  for(const [nom,ch] of Object.entries(cas)){
+    const q={}; ch.forEach(([k,qx,qy])=>{const a=q[k]||[0,0]; q[k]=[a[0]+qx,a[1]+qy];});
+    const F=new Float64Array(N3), Peqs=[];
+    data.forEach((d,k)=>{const [qx,qy]=q[k]||[0,0], qa=d.c*qx+d.s*qy, qpp=-d.s*qx+d.c*qy, L=d.L;
+      const P_=[qa*L/2,qpp*L/2,qpp*L*L/12,qa*L/2,qpp*L/2,-qpp*L*L/12]; Peqs.push({P_,qpp,L});
+      const g=mtv(d.T,P_); d.dofs.forEach((dd,a)=>F[dd]+=g[a]);});
+    const x=solve(lib.map(i=>F[i])), U=new Float64Array(N3); lib.forEach((d,k)=>U[d]=x[k]);
+    const eff=data.map((d,k)=>{const ue=d.dofs.map(dd=>U[dd]), f=mv(d.kl,mv(d.T,ue)).map((v_,a)=>v_-Peqs[k].P_[a]);
+      const Mi=-f[2],Mj=f[5]; return {Ni:-f[0],Vi:f[1],Mi,Nj:f[3],Vj:-f[4],Mj,Mmid:(Mi+Mj)/2-Peqs[k].qpp*Peqs[k].L**2/8};});
+    const reac={}; m.appuis.forEach(a=>{const r=[0,0,0]; for(let d=0;d<3;d++){const row=K[3*a.nd+d]; let s_=0; for(let j=0;j<N3;j++) s_+=row[j]*U[j]; r[d]=s_-F[3*a.nd+d];} reac[a.nd]=r;});
+    resCas[nom]={U,eff,reac};}
+  const {elu,els}=cCombis(cas);
+  const comb=co=>{const U=new Float64Array(N3), eff=m.el.map(()=>({Ni:0,Vi:0,Mi:0,Nj:0,Vj:0,Mj:0,Mmid:0})), reac={};
+    m.appuis.forEach(a=>reac[a.nd]=[0,0,0]);
+    for(const [c,f] of Object.entries(co)){const r=resCas[c]; for(let i=0;i<N3;i++) U[i]+=f*r.U[i];
+      eff.forEach((e,k)=>{for(const key in e) e[key]+=f*r.eff[k][key];}); for(const nd in reac) for(let d=0;d<3;d++) reac[nd][d]+=f*r.reac[nd][d];}
+    return {U,eff,reac};};
+  const R={modele:m,cas,resCas,defElu:elu,defEls:els,elu:{},els:{}};
+  for(const k in elu) R.elu[k]=comb(elu[k]); for(const k in els) R.els[k]=comb(els[k]);
+  return R;
+}
+// ---------------------------------------------------------- EC3
+const CRB={a:0.21,b:0.34,c:0.49};
+function chiEC3(l,a){if(l<=0.2) return 1; const ph=0.5*(1+a*(l-0.2)+l*l); return Math.min(1,1/(ph+Math.sqrt(Math.max(ph*ph-l*l,0))));}
+function mcrEC3(s,L,C1,E){const Lm=L*1000, Iz=s.Iz*1e4, Iw=s.Iw*1e6, It=s.It*1e4, a=Math.PI**2*E*Iz/Lm**2;
+  return C1*a*Math.sqrt(Iw/Iz+Lm*Lm*G_ACIER*It/(Math.PI**2*E*Iz))/1e6;}
+function longueursEC3(pr,groupe,Lb){
+  if(groupe.startsWith("poteau")){const art=pr.appuis.startsWith("articul"), Lz=Math.min(Lb,pr.maintien_poteau*pr.entraxe_lisses);
+    return {Ly:(art?2.0:1.2)*Lb,Lz,LLT:Lz,C1:art?1.77:1.0};}
+  const Llt=Math.min(Lb,pr.maintien_traverse*pr.entraxe_pannes); return {Ly:Lb,Lz:Llt,LLT:Llt,C1:1.0};
+}
+function verifierBarre(pr,s,groupe,Lb,efforts){
+  const fy=pr.fy,E=pr.E, Npl=s.A*fy/10, Mpl=s.Wply*fy/1000, Vpl=s.Avz*fy/Math.sqrt(3)/10, aw=Math.min(0.5,(s.A-2*s.b*s.tf/100)/s.A);
+  const lg=longueursEC3(pr,groupe,Lb), l1=93.9*Math.sqrt(235/fy), ly=lg.Ly*100/(s.iy*l1), lz=lg.Lz*100/(s.iz*l1);
+  const cy=chiEC3(ly,s.h/s.b>1.2?CRB.a:CRB.b), cz=chiEC3(lz,s.h/s.b>1.2?CRB.b:CRB.c), Mcr=mcrEC3(s,lg.LLT,lg.C1,E);
+  const llt=Math.sqrt(Mpl/Mcr), clt=chiEC3(llt,s.h/s.b<=2?CRB.a:CRB.b); let w=null;
+  for(const [N,V,M] of efforts){const Nc=Math.max(0,-N), n=Math.abs(N)/(Npl/pr.gM0), MN=n<1?Math.min(Mpl,Mpl*(1-n)/(1-0.5*aw)):0;
+    const rs=MN>0?Math.abs(M)/(MN/pr.gM0):9.99, rv=Math.abs(V)/(Vpl/pr.gM0), ny=Nc/(cy*Npl/pr.gM1), nz=Nc/(cz*Npl/pr.gM1);
+    const kyy=ly>0.2?0.9*(1+Math.min(ly-0.2,0.8)*ny):0.9, kzy=lz>=0.4?Math.max(1-0.1*lz/(0.6-0.25)*nz,1-0.1/(0.6-0.25)*nz):0.6+lz;
+    const Mb=clt*Mpl/pr.gM1, r61=ny+kyy*Math.abs(M)/Mb, r62=nz+kzy*Math.abs(M)/Mb, d={N,V,M,r_sec:rs,r_v:rv,r61,r62,ratio:Math.max(rs,rv,r61,r62)};
+    if(!w||d.ratio>w.ratio) w=d;}
+  return Object.assign(w,{Npl,Mpl,Vpl,chi_y:cy,chi_z:cz,chi_lt:clt,Mcr,lam_y:ly,lam_z:lz,lam_lt:llt},lg);
+}
+function cVerifier(pr,prof){
+  const R=cAnalyser(pr,prof), m=R.modele, barres={};
+  for(const [nom,b] of Object.entries(m.barres)){const s=SEC[b.sec]; let best=null;
+    for(const [cn,r] of Object.entries(R.elu)){const eff=[];
+      b.elements.forEach(k=>{if(m.el[k].jarret) return; const e=r.eff[k]; eff.push([e.Ni,e.Vi,e.Mi],[e.Nj,e.Vj,e.Mj],[(e.Ni+e.Nj)/2,0,e.Mmid]);});
+      const d=verifierBarre(pr,s,b.groupe,b.longueur,eff); d.combinaison=cn; if(!best||d.ratio>best.ratio) best=d;}
+    barres[nom]=Object.assign({groupe:b.groupe,sec:b.sec,longueur:b.longueur},best);}
+  const els=[]; let acc=0; const H=pr.hauteur;
+  pr.nefs.forEach((n,k)=>{const xa=acc,xb=acc+n.portee; acc=xb; const lim=n.portee/pr.fleche_traverse*1000; let fm=0,cm="";
+    for(const [cn,r] of Object.entries(R.els)){ if(cn.includes("W")) continue; const U=r.U, va=U[3*m.noeud(xa,H)+1], vb=U[3*m.noeud(xb,H)+1];
+      m.X.forEach(([x,y],nd)=>{if(x>xa-1e-6&&x<xb+1e-6&&y>H-1e-6){const ref=va+(vb-va)*(x-xa)/(xb-xa), f=Math.abs(U[3*nd+1]-ref)*1000; if(f>fm){fm=f;cm=cn;}}});}
+    els.push({verif:`Flèche de la traverse – nef ${k+1}`,valeur:fm,limite:lim,combinaison:cm,groupe:"traverse",ratio:fm/lim});});
+  const lim=H/pr.deplacement_tete*1000; let dm=0,cm="";
+  for(const [cn,r] of Object.entries(R.els)) m.tete.forEach(nd=>{const d=Math.abs(r.U[3*nd])*1000; if(d>dm){dm=d;cm=cn;}});
+  els.push({verif:"Déplacement horizontal en tête de poteau",valeur:dm,limite:lim,combinaison:cm,groupe:"poteau_rive",ratio:dm/lim});
+  const ratios={}; [...Object.values(barres),...els].forEach(d=>{ratios[d.groupe]=Math.max(ratios[d.groupe]||0,d.ratio);});
+  return {R,barres,els,ratios};
+}
+function cDimensionner(pr){
+  const fam=pr.famille_poteaux.toUpperCase()==="HEA"?L_HEA:L_IPE, listes={poteau_rive:fam,poteau_interieur:L_HEA,traverse:L_IPE};
+  const imp={poteau_rive:pr.poteau_rive,poteau_interieur:pr.poteau_interieur,traverse:pr.traverse}, idx={};
+  for(const g in listes){ if(imp[g]!=="auto"&&SEC[imp[g]]) idx[g]=null; else {const i=listes[g].indexOf("IPE 200"); idx[g]=i>=0?i:0;} }
+  const prof=()=>{const o={}; for(const g in listes) o[g]=idx[g]===null?imp[g]:listes[g][idx[g]]; return o;};
+  let v=null, profils=prof();
+  for(let it=0;it<60;it++){ v=cVerifier(pr,profils);
+    const trop=Object.keys(v.ratios).filter(g=>v.ratios[g]>1&&idx[g]!==null&&idx[g]!==undefined); if(!trop.length) break;
+    const g=trop.reduce((a,b)=>v.ratios[a]>=v.ratios[b]?a:b);
+    if(idx[g]+1<listes[g].length) idx[g]++;
+    else if(g==="poteau_rive"&&idx.traverse!==null&&idx.traverse+1<L_IPE.length) idx.traverse++;
+    else break;
+    profils=prof();}
+  const aInt=pr.nefs.length>1||pr.nefs.some(n=>n.poteau_faitage);
+  v.profils=Object.assign({},profils); if(!aInt) v.profils.poteau_interieur="—";
+  return v;
+}
+// ============================================================ CALCUL PORTIQUE (fin)
+
+// ============================================================ NOTE DE CALCUL (planches 11-12 et export Word)
+let CALC=null, CALC_PR=null;
+function projetCalc(g){
+  const imp=(v)=>{const s=String(v||"").trim(); return SEC[s]?s:"auto";};
+  return {nom:P.projet,lieu:P.lieu,auteur:P.auteur||"Moulo Jean Claude",hauteur:g.H,longueur:g.L,entraxe_reel:g.er,nb_travees:g.nt,
+    nefs:Array.from({length:g.nn},()=>({portee:g.B,pente:+P.p,poteau_faitage:g.fint})),
+    appuis:P.appuis,jarret_ratio:P.rj/100,jarret_hauteur:+P.jh,entraxe_pannes:+P.epan,entraxe_lisses:+P.elis,
+    poteau_rive:imp(P.ppot),poteau_interieur:imp(P.pint),traverse:imp(P.ptrav),famille_poteaux:P.fampot,
+    G_couverture:+P.Gc,G_pannes:+P.Gp,Q_toiture:+P.Q,
+    vent:{vb:+P.vb,ce:+P.ce,cpe_mur_au_vent:0.8,cpe_mur_sous_vent:-0.3,cpe_toit_au_vent:-0.9,cpe_toit_sous_vent:-0.5,cpi_surpression:0.2,cpi_depression:-0.3},
+    fy:+P.fy,E:210000,gM0:1,gM1:1,fleche_traverse:+P.flt,deplacement_tete:+P.dep,maintien_poteau:+P.mpot,maintien_traverse:+P.mtra};
+}
+function lancerCalcul(g){
+  try{ CALC_PR=projetCalc(g); CALC=cDimensionner(CALC_PR); }catch(e){ CALC=null; console.error(e); }
+  if(CALC&&!g.treil){            // les plans reprennent les profilés calculés (sauf forçage)
+    if(!SEC[String(P.ppot).trim()]) g.ppot=CALC.profils.poteau_rive;
+    if(!SEC[String(P.ptrav).trim()]) g.ptrav=CALC.profils.traverse;
+    g.htrav=SEC[g.ptrav].h/1000; g.hpot=SEC[g.ppot].h/1000;
+  }
+}
+const fmt=(x,d=2)=>(+x).toLocaleString("fr-FR",{minimumFractionDigits:d,maximumFractionDigits:d});
+function figStructure(f,m,col){
+  m.el.forEach(e=>{const a=m.X[e.i],b=m.X[e.j]; f.line(a,b,col||({poteau_rive:"#1F4E79",poteau_interieur:"#2E75B6",traverse:"#0070C0"})[e.groupe],e.jarret?1.1:0.7);});
+  m.appuis.forEach(a=>{const [x,y]=m.X[a.nd]; if(a.bl[2]) f.line([x-0.5,y],[x+0.5,y],"#000",1.2); else f.poly([[x,y],[x-0.35,y-0.55],[x+0.35,y-0.55]],"#555","#555",0.1);});
+}
+function figModele(R){
+  const f=new Fig(), m=R.modele; figStructure(f,m);
+  for(const [nom,b] of Object.entries(m.barres)){const e=m.el[b.elements[Math.floor(b.elements.length/2)]], a=m.X[e.i], c=m.X[e.j];
+    const xm=(a[0]+c[0])/2, ym=(a[1]+c[1])/2, pot=b.groupe.startsWith("poteau");
+    const xmaxM=Math.max(...m.X.map(q=>q[0])), droite=pot&&Math.abs(xm-xmaxM)<1e-6;
+    f.text([xm,ym],nom+" – "+b.sec,{size:2.1,anchor:pot?(droite?"end":"start"):"middle",dx:pot?(droite?-1.2:1.2):0,dy:pot?0:-2.2});}
+  const xs=[...new Set(m.appuis.map(a=>m.X[a.nd][0]))].sort((a,b)=>a-b);
+  for(let k=0;k<xs.length-1;k++) f.text([(xs[k]+xs[k+1])/2,-1.2],fmt(xs[k+1]-xs[k])+" m",{size:2.1,anchor:"middle"});
+  f.line([xs[0],-0.9],[xs[xs.length-1],-0.9],"#000",0.15);
+  return f;
+}
+function figDiagramme(R,comb,cle,coul,ensemble="elu"){
+  const f=new Fig(), m=R.modele, eff=R[ensemble][comb].eff; figStructure(f,m,"#AAA");
+  let vmax=1e-9; eff.forEach(e=>{vmax=Math.max(vmax,Math.abs(e[cle+"i"]),Math.abs(e[cle+"j"])); if(cle==="M") vmax=Math.max(vmax,Math.abs(e.Mmid));});
+  const W=Math.max(...m.X.map(p=>p[0]))-Math.min(...m.X.map(p=>p[0])), Hh=Math.max(...m.X.map(p=>p[1])), s=Math.max(W,Hh)*0.12/vmax;
+  const cand=[];
+  m.el.forEach((el,k)=>{const e=eff[k], [x1,y1]=m.X[el.i], [x2,y2]=m.X[el.j], L=Math.hypot(x2-x1,y2-y1), nx=-(y2-y1)/L, ny=(x2-x1)/L, sg=cle==="M"?-1:1;
+    const vals=cle==="M"?[[0,e.Mi],[0.5,e.Mmid],[1,e.Mj]]:[[0,e[cle+"i"]],[1,e[cle+"j"]]];
+    const pts=vals.map(([t,v])=>[x1+t*(x2-x1)+sg*v*s*nx,y1+t*(y2-y1)+sg*v*s*ny]);
+    f.poly([[x1,y1],...pts,[x2,y2]],coul,"none",0,true); f.line(pts[0],pts[pts.length-1],coul,0.2);
+    if(pts.length===3){f.line(pts[0],pts[1],coul,0.3); f.line(pts[1],pts[2],coul,0.3);}
+    cand.push([Math.abs(e[cle+"i"]),e[cle+"i"],x1,y1],[Math.abs(e[cle+"j"]),e[cle+"j"],x2,y2]);});
+  cand.sort((a,b)=>b[0]-a[0]); const vus=[];
+  for(const [,v,x,y] of cand){ if(vus.every(([a,b])=>Math.hypot(x-a,y-b)>Math.max(W,Hh)*0.15)){f.text([x,y],fmt(v,1),{size:2.2,anchor:"middle",dy:-1,bold:true}); vus.push([x,y]);} if(vus.length>=6) break;}
+  f.it.forEach(i=>{if(i.t==="p"&&i.fill===coul&&i.close) i.op=0.35;});
+  return f;
+}
+function figDeformee(R,comb){
+  const f=new Fig(), m=R.modele, U=R.els[comb].U; figStructure(f,m,"#BBB");
+  let dmax=1e-9; for(let k=0;k<m.X.length;k++) dmax=Math.max(dmax,Math.hypot(U[3*k],U[3*k+1]));
+  const W=Math.max(...m.X.map(p=>p[0])), amp=Math.max(W,8)*0.08/dmax;
+  m.el.forEach(el=>{const [x1,y1]=m.X[el.i],[x2,y2]=m.X[el.j]; f.line([x1+amp*U[3*el.i],y1+amp*U[3*el.i+1]],[x2+amp*U[3*el.j],y2+amp*U[3*el.j+1]],"#C00000",0.8);});
+  return {f,amp,dmax};
+}
+function combVentCritique(R){return Object.keys(R.elu).filter(k=>k.includes("1,0G")).reduce((a,b)=>Math.max(...R.elu[a].eff.map(e=>Math.abs(e.Mi)))>=Math.max(...R.elu[b].eff.map(e=>Math.abs(e.Mi)))?a:b);}
+function pageCalcFigures(g){
+  if(!CALC) return {svg:()=>`<svg viewBox="0 0 ${VW} ${VH}"><text x="10" y="20" font-size="5">Calcul indisponible.</text></svg>`};
+  const R=CALC.R, g2=3, w=(VW-g2)/2, h=(VH-g2)/2, cw=combVentCritique(R), dfo=figDeformee(R,"ELS G + Q");
+  const op=s=>s;
+  const warn=g.treil?`<text x="4" y="${VH-2}" font-size="2.6" fill="#C00000" font-family="Arial">⚠ Système retenu : ferme treillis – ce calcul de portique à âme pleine est donné à titre de comparaison.</text>`:"";
+  return {svg:()=>op(`<svg viewBox="0 0 ${VW} ${VH}" xmlns="http://www.w3.org/2000/svg">
+    ${panneau(0,0,w,h,"MODÈLE DE CALCUL ET PROFILÉS RETENUS",figModele(R).render(0,7,w,h-7,5))}
+    ${panneau(w+g2,0,w,h,"MOMENTS ELU 1,35G + 1,5Q (kN·m)",figDiagramme(R,"ELU 1,35G + 1,5Q","M","#C00000").render(w+g2,7,w,h-7,5))}
+    ${panneau(0,h+g2,w,h,"MOMENTS "+cw.replace("ELU ","ELU ")+" (kN·m)",figDiagramme(R,cw,"M","#7030A0").render(0,h+g2+7,w,h-7,5))}
+    ${panneau(w+g2,h+g2,w,h,"DÉFORMÉE ELS G + Q (× "+Math.round(dfo.amp)+") – "+fmt(dfo.dmax*1000,1)+" mm",dfo.f.render(w+g2,h+g2+7,w,h-7,5))}${warn}</svg>`)};
+}
+function tableauxCalc(g){
+  const v=CALC, pr=CALC_PR, R=v.R, m=R.modele, ok=x=>x<=1;
+  const okG=[...Object.values(v.barres),...v.els].every(d=>ok(d.ratio));
+  const st=r=>`<td class="${ok(r)?"ok":"nc"}">${ok(r)?"OK":"NON CONFORME"}</td>`;
+  const qp=pr.vent.ce*0.5*1.25*pr.vent.vb**2/1000;
+  let h=`<div class="concl ${okG?"ok":"nc"}">${okG?"CONCLUSION : toutes les vérifications EC3 sont satisfaites.":"CONCLUSION : des vérifications ne sont pas satisfaites – augmenter les profilés concernés."}${g.treil?" (Système retenu : ferme treillis – calcul à âme pleine donné à titre de comparaison.)":""}</div>
+  <div class="cols"><div><h4>Hypothèses</h4><table class="t"><tr><td>Ouvrage</td><td>${g.nn} nef(s) de ${fmt(g.B)} m – L ${fmt(g.L)} m – H ${fmt(g.H)} m – pente ${fmt(P.p,1)} % – portiques à ${fmt(g.er)} m</td></tr>
+  <tr><td>Appuis / jarrets</td><td>${pr.appuis} – jarrets ${fmt(pr.jarret_ratio*100,0)} % de la portée, hauteur ${fmt(pr.jarret_hauteur,1)} h</td></tr>
+  <tr><td>Charges</td><td>G couverture ${fmt(pr.G_couverture)} + pannes ${fmt(pr.G_pannes)} kN/m² + poids propre ; Q ${fmt(pr.Q_toiture)} kN/m²</td></tr>
+  <tr><td>Vent EC1</td><td>vb ${fmt(pr.vent.vb,1)} m/s, ce ${fmt(pr.vent.ce)} → qp ${fmt(qp,3)} kN/m² ; cpe 0,8 / −0,3 / −0,9 / −0,5 ; cpi +0,2 / −0,3</td></tr>
+  <tr><td>Acier</td><td>S${pr.fy} – γM0 = γM1 = 1,0 – bracons : poteaux ${fmt(pr.maintien_poteau*pr.entraxe_lisses)} m, traverses ${fmt(pr.maintien_traverse*pr.entraxe_pannes)} m</td></tr>
+  <tr><td>Combinaisons</td><td>${Object.keys(R.defElu).length} ELU (1,35G+1,5Q ; 1,35G+1,5W ; 1,0G+1,5W) – ${Object.keys(R.defEls).length} ELS</td></tr></table>
+  <h4>États limites de service</h4><table class="t"><tr><th>Vérification</th><th>Valeur</th><th>Limite</th><th>Taux</th><th></th></tr>
+  ${v.els.map(e=>`<tr><td>${e.verif}<br><i>${e.combinaison}</i></td><td>${fmt(e.valeur,1)} mm</td><td>${fmt(e.limite,1)} mm</td><td>${fmt(e.ratio)}</td>${st(e.ratio)}</tr>`).join("")}</table></div>
+  <div><h4>Réactions d'appui (fondations)</h4><table class="t"><tr><th>Appui</th><th>V max (kN)</th><th>V min (kN)</th><th>|H| max (kN)</th></tr>
+  ${m.appuis.map(a=>{let vM=-1e9,vm=1e9,hM=0; for(const r of [...Object.values(R.elu),...Object.values(R.els)]){const q=r.reac[a.nd]; vM=Math.max(vM,q[1]); vm=Math.min(vm,q[1]); hM=Math.max(hM,Math.abs(q[0]));}
+    return `<tr><td>x = ${fmt(m.X[a.nd][0])} m</td><td>${fmt(vM,1)}</td><td>${fmt(vm,1)}</td><td>${fmt(hM,1)}</td></tr>`;}).join("")}</table>
+  <p class="pt">V &lt; 0 : soulèvement à reprendre par le poids de la semelle.</p>
+  <h4>Poids des portiques</h4><table class="t">${(()=>{let t=0; const rows=Object.entries(m.barres).map(([n,b])=>{const kg=SEC[b.sec].kg*b.longueur; t+=kg; return `<tr><td>${n}</td><td>${b.sec}</td><td>${fmt(b.longueur)} m</td><td>${fmt(kg,0)} kg</td></tr>`;}).join("");
+    return rows+`<tr><td colspan="3"><b>Total ${g.nt+1} portiques (hors jarrets, platines)</b></td><td><b>${fmt(t*(g.nt+1),0)} kg</b></td></tr>`;})()}</table></div></div>
+  <h4>Vérifications des barres – EN 1993-1-1 (section 6.2.9.1, cisaillement 6.2.6, stabilité 6.3.3 annexe B, déversement 6.3.2.2)</h4>
+  <table class="t"><tr><th>Barre</th><th>Profilé</th><th>Combinaison déterminante</th><th>N (kN)</th><th>M (kN·m)</th><th>χy / χz / χLT</th><th>Section</th><th>6.61</th><th>6.62</th><th>Taux</th><th></th></tr>
+  ${Object.entries(v.barres).map(([n,d])=>`<tr><td>${n}</td><td>${d.sec}</td><td>${d.combinaison}</td><td>${fmt(d.N,1)}</td><td>${fmt(d.M,1)}</td><td>${fmt(d.chi_y,2)} / ${fmt(d.chi_z,2)} / ${fmt(d.chi_lt,2)}</td><td>${fmt(d.r_sec)}</td><td>${fmt(d.r61)}</td><td>${fmt(d.r62)}</td><td><b>${fmt(d.ratio)}</b></td>${st(d.ratio)}</tr>`).join("")}</table>`;
+  return h;
+}
+function pageCalcTableaux(g){
+  if(!CALC) return {svg:()=>`<svg viewBox="0 0 ${VW} ${VH}"><text x="10" y="20" font-size="5">Calcul indisponible.</text></svg>`};
+  return {html:`<div class="note">${tableauxCalc(g)}</div>`};
+}
+// ---------------------------------------------------------- export Word (.docx natif, sans bibliothèque)
+const CRC=(()=>{const t=new Uint32Array(256); for(let n=0;n<256;n++){let c=n; for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; t[n]=c>>>0;} return t;})();
+function crc32(b){let c=0xFFFFFFFF; for(let i=0;i<b.length;i++) c=CRC[(c^b[i])&0xFF]^(c>>>8); return (c^0xFFFFFFFF)>>>0;}
+function zipStore(files){   // files : [{nom, data: Uint8Array}] – archive ZIP sans compression
+  const enc=new TextEncoder(), parts=[], cd=[]; let off=0;
+  const u16=v=>[v&255,(v>>8)&255], u32=v=>[v&255,(v>>8)&255,(v>>16)&255,(v>>>24)&255];
+  for(const f of files){const nm=enc.encode(f.nom), c=crc32(f.data), n=f.data.length;
+    const lh=new Uint8Array([0x50,0x4b,3,4,...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(c),...u32(n),...u32(n),...u16(nm.length),...u16(0)]);
+    parts.push(lh,nm,f.data);
+    cd.push(new Uint8Array([0x50,0x4b,1,2,...u16(20),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(c),...u32(n),...u32(n),...u16(nm.length),...u16(0),...u16(0),...u16(0),...u16(0),...u32(0),...u32(off)]),nm);
+    off+=lh.length+nm.length+n;}
+  const cdLen=cd.reduce((s,a)=>s+a.length,0);
+  const end=new Uint8Array([0x50,0x4b,5,6,...u16(0),...u16(0),...u16(files.length),...u16(files.length),...u32(cdLen),...u32(off),...u16(0)]);
+  const all=[...parts,...cd,end], tot=all.reduce((s,a)=>s+a.length,0), out=new Uint8Array(tot); let p=0; all.forEach(a=>{out.set(a,p); p+=a.length;}); return out;
+}
+function svgVersPng(svg,wpx,hpx){
+  return new Promise((ok,ko)=>{const img=new Image(); img.onload=()=>{const c=document.createElement("canvas"); c.width=wpx; c.height=hpx;
+    const x=c.getContext("2d"); x.fillStyle="#fff"; x.fillRect(0,0,wpx,hpx); x.drawImage(img,0,0,wpx,hpx);
+    const b64=c.toDataURL("image/png").split(",")[1], bin=atob(b64), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); ok(u);};
+    img.onerror=()=>ko(new Error("conversion d'une figure en image impossible")); img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);});
+}
+const xe=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+function wRun(t,o={}){return `<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/>${o.b?"<w:b/>":""}${o.i?"<w:i/>":""}${o.c?`<w:color w:val="${o.c}"/>`:""}<w:sz w:val="${(o.sz||10)*2}"/></w:rPr><w:t xml:space="preserve">${xe(t)}</w:t></w:r>`;}
+function wP(t,o={}){return `<w:p><w:pPr>${o.jc?`<w:jc w:val="${o.jc}"/>`:""}<w:spacing w:after="${o.after??80}"/></w:pPr>${wRun(t,o)}</w:p>`;}
+function wH(t,lvl=1){return wP(t,{b:true,sz:lvl===1?13:11,c:lvl===1?"1F4E79":"C55A11",after:100});}
+function wTable(header,rows,widths){
+  const cell=(t,o={})=>`<w:tc><w:tcPr><w:tcW w:w="${o.w||1500}" w:type="dxa"/>${o.fill?`<w:shd w:val="clear" w:color="auto" w:fill="${o.fill}"/>`:""}</w:tcPr>${String(t).split("\n").map(x=>wP(x,{sz:8,b:o.b,c:o.c,after:0})).join("")}</w:tc>`;
+  const brd=`<w:tblBorders>${["top","left","bottom","right","insideH","insideV"].map(s=>`<w:${s} w:val="single" w:sz="4" w:color="A6A6A6"/>`).join("")}</w:tblBorders>`;
+  return `<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/>${brd}</w:tblPr>`+
+    `<w:tr>${header.map((h,k)=>cell(h,{w:widths[k],fill:"1F4E79",c:"FFFFFF",b:true})).join("")}</w:tr>`+
+    rows.map(r=>`<w:tr>${r.map((t,k)=>cell(t,{w:widths[k],fill:t==="OK"?"C6EFCE":(t==="NON CONFORME"?"FFC7CE":null)})).join("")}</w:tr>`).join("")+`</w:tbl>`+wP("",{after:60});
+}
+function wImg(rid,id,cmW,cmH){const cx=Math.round(cmW*360000), cy=Math.round(cmH*360000);
+  return `<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${id}" name="Figure ${id}"/>`+
+  `<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">`+
+  `<pic:nvPicPr><pic:cNvPr id="${id}" name="figure${id}.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>`+
+  `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;}
+async function noteDocxOctets(){
+  if(!CALC) throw new Error("calcul indisponible");
+  const g=calc(); lancerCalcul(g);
+  const v=CALC, pr=CALC_PR, R=v.R, m=R.modele, aut=pr.auteur, date=new Date().toLocaleDateString("fr-FR");
+  const figSvg=(f,w=170,h=80)=>`<svg xmlns="http://www.w3.org/2000/svg" width="${w*8}" height="${h*8}" viewBox="0 0 ${w} ${h}">${f.render(0,0,w,h,4)}</svg>`;
+  const cw=combVentCritique(R), dfo=figDeformee(R,"ELS G + Q");
+  const figs=[[figModele(R),"Modèle de calcul et profilés retenus"],[figDiagramme(R,"ELU 1,35G + 1,5Q","M","#C00000"),"Moments fléchissants – ELU 1,35G + 1,5Q (kN·m)"],
+    [figDiagramme(R,cw,"M","#7030A0"),"Moments fléchissants – "+cw+" (kN·m)"],[figDiagramme(R,"ELU 1,35G + 1,5Q","N","#2E75B6"),"Efforts normaux – ELU 1,35G + 1,5Q (kN)"],
+    [dfo.f,`Déformée ELS G + Q – amplification × ${Math.round(dfo.amp)} – ${fmt(dfo.dmax*1000,1)} mm`]];
+  const pngs=[]; for(const [f] of figs) pngs.push(await svgVersPng(figSvg(f),1360,640));
+  const okG=[...Object.values(v.barres),...v.els].every(d=>d.ratio<=1), qp=pr.vent.ce*0.5*1.25*pr.vent.vb**2/1000;
+  let b="";
+  b+=wP("NOTE DE CALCUL",{b:true,sz:20,c:"1F4E79",jc:"center",after:0})+wP("PORTIQUE EN CHARPENTE MÉTALLIQUE",{b:true,sz:16,c:"1F4E79",jc:"center",after:200});
+  b+=wP(`${pr.nom} – ${pr.lieu}`,{sz:12,jc:"center",after:200});
+  b+=wTable(["Rubrique","Valeur"],[["Ouvrage",`${g.nn} nef(s) de ${fmt(g.B)} m – longueur ${fmt(g.L)} m – H sablière ${fmt(g.H)} m – pente ${fmt(P.p,1)} % – portiques tous les ${fmt(g.er)} m`],
+    ["Établi par",aut],["Date",date],["Normes","EN 1993-1-1 (EC3), EN 1991-1-1 et 1-4 (EC1), EN 1990 (EC0) ; fondations : BAEL 91 mod. 99 / EC2"],
+    ["Méthode","Éléments finis 2D (méthode des déplacements) – générateur de plans, calcul intégré"]],[2600,7000]);
+  b+=wP(okG?"CONCLUSION : toutes les vérifications sont satisfaites.":"CONCLUSION : des vérifications ne sont pas satisfaites – voir § 5 et § 6.",{b:true,sz:11,c:okG?"006100":"C00000"});
+  if(g.treil) b+=wP("⚠ Système retenu : ferme treillis – ce calcul de portique à âme pleine est donné à titre de comparaison.",{i:true,sz:9,c:"C00000"});
+  b+=wTable(["Élément","Profilé retenu","Taux maximal"],Object.keys(CALC_GROUPES).filter(k=>v.profils[k]&&v.profils[k]!=="—").map(k=>[CALC_GROUPES[k],v.profils[k],fmt(v.ratios[k]||0)]),[3500,3000,3100]);
+  b+=wH("1. Hypothèses");
+  b+=wTable(["Donnée","Valeur"],[["Appuis",pr.appuis],["Jarrets",`longueur ${fmt(pr.jarret_ratio*100,0)} % de la portée, hauteur ${fmt(pr.jarret_hauteur,1)} × h traverse`],
+    ["Charges permanentes",`couverture ${fmt(pr.G_couverture)} kN/m², pannes ${fmt(pr.G_pannes)} kN/m², poids propre calculé`],["Exploitation toiture",`${fmt(pr.Q_toiture)} kN/m² (catégorie H, ψ0 = 0)`],
+    ["Vent EC1",`vb = ${fmt(pr.vent.vb,1)} m/s, ce = ${fmt(pr.vent.ce)}, qp = ${fmt(qp,3)} kN/m² ; cpe parois 0,8 / −0,3, toiture −0,9 / −0,5 ; cpi +0,2 / −0,3`],
+    ["Acier",`S${pr.fy}, E = 210 000 MPa, γM0 = γM1 = 1,0`],["Maintiens latéraux",`poteaux tous les ${fmt(pr.maintien_poteau*pr.entraxe_lisses)} m, traverses tous les ${fmt(pr.maintien_traverse*pr.entraxe_pannes)} m (bracons)`],
+    ["Neige","sans objet (Côte d'Ivoire)"]],[3000,6600]);
+  b+=wP("La vitesse de vent est une valeur par défaut à confirmer par les données météorologiques locales.",{i:true,sz:8});
+  b+=wH("2. Combinaisons (EN 1990)")+wTable(["Combinaison","Coefficients"],[...Object.entries(R.defElu),...Object.entries(R.defEls)].map(([k,d])=>[k,Object.entries(d).map(([n,c])=>fmt(c,2)+"·"+n).join(" + ")]),[4800,4800]);
+  b+=wH("3. Modèle et sollicitations");
+  figs.forEach(([,t],k)=>{b+=wImg("rIdImg"+(k+1),k+1,16.5,7.8)+wP(t,{i:true,sz:8,jc:"center"});});
+  b+=wH("4. Réactions d'appui");
+  b+=wTable(["Appui","V max (kN)","V min (kN)","|H| max (kN)"],m.appuis.map(a=>{let vM=-1e9,vm=1e9,hM=0; for(const r of [...Object.values(R.elu),...Object.values(R.els)]){const q=r.reac[a.nd]; vM=Math.max(vM,q[1]); vm=Math.min(vm,q[1]); hM=Math.max(hM,Math.abs(q[0]));}
+    return ["x = "+fmt(m.X[a.nd][0])+" m",fmt(vM,1),fmt(vm,1),fmt(hM,1)];}),[2400,2400,2400,2400]);
+  b+=wH("5. Vérifications des barres (EN 1993-1-1)");
+  b+=wP("Section (6.2.9.1) : M ≤ M_N,Rd ; cisaillement (6.2.6) ; stabilité (6.3.3, annexe B) : équations 6.61 et 6.62 ; déversement par la méthode générale (6.3.2.2) avec M_cr de la poutre bi-symétrique.",{sz:8});
+  b+=wTable(["Barre","Profilé","Combinaison","N (kN)","M (kN·m)","χy/χz/χLT","Sect.","6.61","6.62","Taux","Statut"],
+    Object.entries(v.barres).map(([n,d])=>[n,d.sec,d.combinaison,fmt(d.N,1),fmt(d.M,1),`${fmt(d.chi_y,2)}/${fmt(d.chi_z,2)}/${fmt(d.chi_lt,2)}`,fmt(d.r_sec),fmt(d.r61),fmt(d.r62),fmt(d.ratio),d.ratio<=1?"OK":"NON CONFORME"]),
+    [600,850,2200,700,800,1100,600,600,600,650,1100]);
+  b+=wH("6. États limites de service")+wTable(["Vérification","Combinaison","Valeur","Limite","Taux","Statut"],
+    v.els.map(e=>[e.verif,e.combinaison,fmt(e.valeur,1)+" mm",fmt(e.limite,1)+" mm",fmt(e.ratio),e.ratio<=1?"OK":"NON CONFORME"]),[2900,2300,1100,1100,800,1400]);
+  b+=wH("7. Conclusion")+wP((okG?"Le portique est justifié avec les profilés retenus. ":"Certaines vérifications ne sont pas satisfaites. ")+"Assemblages, bracons et fondations à justifier séparément. Note de prédimensionnement à viser avant exécution.",{sz:10});
+  b+=wTable(["Établi par","Vérifié par","Visa"],[[aut+"\n\n\n","",""]],[3200,3200,3200]);
+  const NS='xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"';
+  const doc=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${NS}><w:body>${b}<w:sectPr><w:headerReference w:type="default" r:id="rIdH"/><w:footerReference w:type="default" r:id="rIdF"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1300" w:right="1134" w:bottom="1000" w:left="1134" w:header="567" w:footer="450" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  const hdr=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr ${NS}><w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="8" w:space="1" w:color="C55A11"/></w:pBdr></w:pPr>${wRun(aut.toUpperCase()+" – Technicien génie civil BTP – Abidjan",{b:true,sz:9,c:"1F4E79"})}<w:r><w:br/></w:r>${wRun("Note de calcul – "+pr.nom,{sz:8})}</w:p></w:hdr>`;
+  const fld=f=>`<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> ${f} </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>1</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>`;
+  const ftr=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr ${NS}><w:p><w:pPr><w:jc w:val="center"/></w:pPr>${wRun("EC3 / EC1 / EC0 – Prédimensionnement – page ",{sz:8})}${fld("PAGE")}${wRun(" / ",{sz:8})}${fld("NUMPAGES")}</w:p></w:ftr>`;
+  const rels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdH" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/><Relationship Id="rIdF" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>${pngs.map((_,k)=>`<Relationship Id="rIdImg${k+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/figure${k+1}.png"/>`).join("")}</Relationships>`;
+  const ct=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>`;
+  const core=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${xe("Note de calcul – "+pr.nom)}</dc:title><dc:creator>${xe(aut)}</dc:creator></cp:coreProperties>`;
+  const root=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>`;
+  const E_=new TextEncoder();
+  return zipStore([{nom:"[Content_Types].xml",data:E_.encode(ct)},{nom:"_rels/.rels",data:E_.encode(root)},{nom:"docProps/core.xml",data:E_.encode(core)},
+    {nom:"word/document.xml",data:E_.encode(doc)},{nom:"word/_rels/document.xml.rels",data:E_.encode(rels)},{nom:"word/header1.xml",data:E_.encode(hdr)},
+    {nom:"word/footer1.xml",data:E_.encode(ftr)},...pngs.map((u,k)=>({nom:`word/media/figure${k+1}.png`,data:u}))]);
+}
+async function telechargerNote(){
+  try{ const u=await noteDocxOctets(), bl=new Blob([u],{type:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(bl); a.download="Note_de_calcul_portique.docx"; document.body.appendChild(a); a.click(); a.remove();
+  }catch(e){ alert("Note Word impossible : "+e.message); }
+}
+
 // ============================================================ planches + cartouches
 const LEG="Couleurs : charpente en bleu · contreventements en orange · béton en gris · aciers en rouge · maçonnerie en marron clair · cotes et baies en noir · translucides hachurés en bleu clair · remblai en latérite";
 function legende(k,g){
@@ -804,6 +1199,8 @@ function legende(k,g){
     case 5: return `Aciers : semelles isolées ${P.hasem} maille ${P.msem*100} cm ; fûts ${P.nbf} ${P.hafut} + cadres ${P.hacad} e = ${P.ecad*100} cm ; semelle filante ${P.nfil} ${P.hafil} + ${P.harep} e = ${P.erep*100} cm ; dallage ${P.ferr} ${P.hix} (X) / ${P.hiy} (Y)${g.kdbl?` + nappe sup. ${P.hsx} / ${P.hsy} + chaises`:""}, maille ${g.maille*100} cm.`;
     case 7: return `Perspectives isométriques sans échelle. Ossature : poteaux ${g.ppot}, ${g.treil?"fermes treillis":"traverses "+g.ptrav}, pannes ${g.ppanne}, ${g.kbard?"lisses "+g.plisse+", ":""}contreventements en orange.`;
     case 8: return `Vue éclatée : pannes et poutre au vent soulevées, portique de rive et lisses du long-pan avant écartés pour la lisibilité. Nomenclature indicative.`;
+    case 10: return CALC?`Calcul par éléments finis 2D (méthode des déplacements) – profilés retenus : poteaux de rive ${CALC.profils.poteau_rive}, traverses ${CALC.profils.traverse}${CALC.profils.poteau_interieur!=="—"?", poteaux intérieurs "+CALC.profils.poteau_interieur:""}. Jarrets non vérifiés (hauteur ${P.jh} h).`:"Calcul indisponible.";
+    case 11: return `Vérifications EN 1993-1-1 ; combinaisons EN 1990 ; vent EC1 simplifié (vb ${P.vb} m/s à confirmer). Assemblages, bracons et fondations à justifier séparément.`;
     case 9: return `Détails types sans échelle – épaisseurs et boulonnerie à confirmer par la note de calcul des assemblages (EC3-1-8).`;
     case 6: return `Sections : chaînages ${P.bch*100} × ${P.hch*100} cm et raidisseurs ${P.brd*100} × ${P.brd*100} cm – 4 ${P.hachl} + cadres ${P.hachc} e = ${P.echc*100} cm ; linteaux idem avec appuis de 20 cm.`;
     default: return `Croix de Saint-André dans les travées d'extrémité et une travée sur 5 (${g.nbcv} travées). ${g.kbard?`Lisses ${g.plisse} e = ${f2(P.elis)} m`:"Façade maçonnée : lisses sans objet"}${g.kag?` ; maçonnerie agglos 15 creux sur ${f2(g.z0)} m.`:"."}`;
@@ -811,22 +1208,24 @@ function legende(k,g){
 }
 const TITRES=["VUE EN PLAN – IMPLANTATION","COUPE TRANSVERSALE – PORTIQUE TYPE","ÉLÉVATION LONG-PAN","ÉLÉVATION PIGNON",
   "VUE EN PLAN TOITURE – CALEPINAGE","COUPE DE FONDATION ET DALLAGE (DÉTAIL)","ÉLÉVATION MUR AGGLOS – PANNEAU TYPE",
-  "VUE D'ENSEMBLE – PERSPECTIVES ET PLAN DE CHARPENTE","ASSEMBLAGE ÉCLATÉ ET NOMENCLATURE","DÉTAILS D'ASSEMBLAGE"];
+  "VUE D'ENSEMBLE – PERSPECTIVES ET PLAN DE CHARPENTE","ASSEMBLAGE ÉCLATÉ ET NOMENCLATURE","DÉTAILS D'ASSEMBLAGE",
+  "NOTE DE CALCUL – MODÈLE ET SOLLICITATIONS","NOTE DE CALCUL – VÉRIFICATIONS EC3, ELS ET RÉACTIONS"];
 let DATE=new Date().toLocaleDateString("fr-FR");
 function dessiner(){
-  const g=calc(), vues=[P1,P2,P3,P4,P5,P6,P7,pageEnsemble,pageEclate,pageDetails].map(f=>f(g)), NP=vues.length;
+  const g=calc(); lancerCalcul(g);
+  const vues=[P1,P2,P3,P4,P5,P6,P7,pageEnsemble,pageEclate,pageDetails,pageCalcFigures,pageCalcTableaux].map(f=>f(g)), NP=vues.length;
   const gabTxt=`Gabarit ${P.gab}${g.nn>1?" – "+g.nn+" nefs":""} : portée ${f2(g.B)} m × longueur ${f2(g.L)} m – H sablière ${f2(g.H)} m – pente ${f1(P.p)} % – ${g.systeme} – façade : ${P.fac}`;
   document.getElementById("planches").innerHTML=vues.map((v,k)=>`
   <section class="page">
     <div class="bandeau">PLANCHE ${k+1} / ${NP} – ${TITRES[k]}</div>
-    ${v.svg()}
+    ${v.html!==undefined?`<div class="pagehtml">${v.html}</div>`:v.svg()}
     <table class="cart">
       <tr><td colspan="3" class="t">${TITRES[k]}</td><td style="width:16%;text-align:center"><b>Planche n° ${k+1} / ${NP}</b></td><td style="width:16%">Date : <input value="${DATE}" onchange="DATE=this.value"></td></tr>
       <tr><td colspan="3">${esc(P.projet)} – ${esc(P.lieu)} · ${esc(gabTxt)}</td><td colspan="2" class="nc">ESQUISSE NON CONTRACTUELLE</td></tr>
       <tr><td colspan="3" class="leg">${LEG}</td><td colspan="2" class="bpa">BON POUR ACCORD</td></tr>
       <tr><td colspan="3" rowspan="2" style="font-size:9px">${esc(legende(k,g))}</td><td>Date :</td><td></td></tr>
       <tr><td style="height:9mm">Signature :</td><td></td></tr>
-      <tr><td colspan="5" class="leg">${k>=7?"Perspectives et détails sans échelle":"Échelle automatique (même échelle en X et en Y)"} – cotes en mètres – EC3 / EC1 / BAEL 91 mod. 99 / EC2 – esquisse de prédimensionnement à confirmer par note de calcul.</td></tr>
+      <tr><td colspan="5" class="leg">${k>=10?"Note de calcul de prédimensionnement – à viser avant exécution":k>=7?"Perspectives et détails sans échelle":"Échelle automatique (même échelle en X et en Y)"} – cotes en mètres – EC3 / EC1 / BAEL 91 mod. 99 / EC2 – esquisse de prédimensionnement à confirmer par note de calcul.</td></tr>
     </table>
   </section>`).join("");
 }

@@ -1874,6 +1874,7 @@ CODE_KEYS = [  # clé du générateur HTML, expression, n = numérique / t = tex
     ("hafil", "{ha_fil}", "t"), ("harep", "{ha_rep}", "t"), ("erep", "{e_rep}", "n"), ("dtige", "{d_tige_port}", "t"),
     ("ltige", "{l_tige_port}", "n"), ("bch", "{b_ch}", "n"), ("hch", "{h_ch}", "n"), ("brd", "{b_rd}", "n"),
     ("nrd", "{nb_rd}", "n"), ("hachl", "{ha_chl}", "t"), ("hachc", "{ha_chc}", "t"), ("echc", "{e_chc}", "n"),
+    ("vb", "{vb}", "n"), ("ce", "{ce}", "n"), ("Gc", "{G_couv}", "n"), ("Q", "{Q_toit}", "n"), ("fy", "{fy}", "n"),
 ]
 
 
