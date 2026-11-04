@@ -1125,7 +1125,7 @@ function elevationGC(ctx: Ctx): View {
   const murT = ctx.study.heads.headWall.H > 0.3;
   const Hb = Hout + gr;
   const G = GARDE_CORPS;
-  const c = inp.cover;
+  const c = t.gcCover;
   const posts = gardeCorpsPosts(B);
   const yb = Hout - inp.es - 0.6;
   return {
@@ -1186,7 +1186,7 @@ function elevationGC(ctx: Ctx): View {
 
 function coupeGC(ctx: Ctx, which: "lisse" | "poteau" | "poteauInt"): View {
   const G = GARDE_CORPS;
-  const c = ctx.study.input.cover;
+  const c = ctx.study.input.tetes.gcCover;
   // Coupe 1-1 : lisse ; 2-2 : poteau principal 20 × 20 ; 3-3 : poteau intermédiaire 15 × 20 (15 le long de la lisse).
   const w = which === "lisse" ? G.lisseW : which === "poteau" ? G.post : G.postInt;
   const h = which === "lisse" ? G.lisseH : G.ep;

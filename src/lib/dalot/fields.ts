@@ -231,6 +231,7 @@ export const FIELDS: FieldDef[] = [
   { key: "guideRoueL", section: "tetes", group: "Équipements", label: "Largeur du guide-roue", unit: "m", kind: "number", default: 0.25, min: 0.15, max: 0.6, step: 0.01 },
   { key: "guideRoues", section: "tetes", group: "Équipements", label: "Guide-roues sur murs de tête", kind: "bool", default: true, help: "Toujours présent quand il y a des murs en aile : il assure le raccord entre les voiles et les ailes." },
   { key: "gardeCorps", section: "tetes", group: "Équipements", label: "Garde-corps en béton armé (poteaux et lisse)", kind: "bool", default: true, help: "Prévu sur tous les dalots (sécurité des usagers, pratique des marchés AGEROUTE / BNETD) : garde-corps de 1,00 m sur les deux rives, posé sur le guide-roue ; poteaux 20 × 20 tous les 1,00 m environ, lisse 20 × 15. Le décocher fait apparaître une réserve dans la note." },
+  { key: "gcCover", section: "tetes", group: "Équipements", label: "Enrobage des armatures du garde-corps", unit: "m", kind: "number", default: 0.025, min: 0.015, max: 0.05, step: 0.005, visibleIf: (v) => v.gardeCorps !== false, help: "2,5 cm comme le plan type (cadres 15 × 15 dans les poteaux 20 × 20) ; l'enrobage du projet reste appliqué au corps et aux têtes." },
 
   // ── Talus du remblai ──────────────────────────────────────
   { key: "talusActif", section: "talus", group: "Stabilité du remblai d'accès", label: "Vérifier la stabilité du talus (Fellenius)", kind: "bool", default: true },
@@ -328,7 +329,7 @@ export type DalotInput = {
   tanDiff: number; pas: number;
   tetes: {
     murs: boolean; angle: number; long: number; ep: number; semelle: number; semEp: number; patin: number; beche: number;
-    murTeteEp: number; revanche: number; radierLong: number; debord: number; becheProf: number; becheEp: number; guideRoues: boolean; gardeCorps: boolean; grH: number; grL: number;
+    murTeteEp: number; revanche: number; radierLong: number; debord: number; becheProf: number; becheEp: number; guideRoues: boolean; gardeCorps: boolean; gcCover: number; grH: number; grL: number;
   };
   talus: { actif: boolean; pente: number; phi: number; c: number };
   hydro: {
@@ -418,7 +419,7 @@ export function toInput(spec: DalotSpec): DalotInput {
       murTeteEp: num(v.murTeteEp, 0.2), revanche: num(v.murTeteRevanche, 0.2),
       radierLong: num(v.radierTeteLong, 2.2), debord: Math.max(0, num(v.radierDebord, 0)), becheProf: num(v.becheProf, 0.8), becheEp: num(v.becheEp, 0.25),
       // Avec des murs en aile, un guide-roue (ou le mur de tête) est toujours présent : il fait le raccord voile / aile.
-      guideRoues: v.guideRoues === true || v.teteMurs === true, gardeCorps: v.gardeCorps !== false,
+      guideRoues: v.guideRoues === true || v.teteMurs === true, gardeCorps: v.gardeCorps !== false, gcCover: num(v.gcCover, 0.025),
       grH: num(v.guideRoueH, 0.2), grL: num(v.guideRoueL, 0.25),
     },
     talus: { actif: v.talusActif === true, pente: num(v.talusPente, 1.5), phi: num(v.talusPhi, 30), c: num(v.talusC, 0) },

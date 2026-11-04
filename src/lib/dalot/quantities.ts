@@ -161,6 +161,7 @@ export function computeQuantities(inp: DalotInput, mat: Materials, groups: Group
   if (t.gardeCorps) {
     const gc = GARDE_CORPS;
     const GC: BarPart = "GARDE-CORPS";
+    const c = t.gcCover; // enrobage propre au garde-corps
     const posts = gardeCorpsPosts(B);
     const nM = posts.filter((p) => p.main).length, nI = posts.length - nM;
     const bay = posts.length > 2 ? 2 * (posts[1].x - posts[0].x) - gc.post : B - 2 * gc.post; // lisse entre poteaux principaux

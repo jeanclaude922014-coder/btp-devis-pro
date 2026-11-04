@@ -182,7 +182,7 @@ export async function buildNoteDocx(study: Study, images: NoteImages, kind: Note
   // 3. Contexte ivoirien
   body.push(H1("3. Contexte local et hypothèses climatiques"),
     P("L'ouvrage est situé en climat tropical humide (Côte d'Ivoire) : fortes températures, saison des pluies marquée, sols latéritiques. Les dispositions suivantes sont retenues :"),
-    BULLET(`Enrobage de ${f(inp.cover * 100, 0)} cm et fissuration ${mat.fissuration === "tres_prejudiciable" ? "très préjudiciable" : "préjudiciable"} (ouvrage hydraulique enterré, alternance humidification / séchage).`),
+    BULLET(`Enrobage de ${f(inp.cover * 100, 0)} cm et fissuration ${mat.fissuration === "tres_prejudiciable" ? "très préjudiciable" : "préjudiciable"} (ouvrage hydraulique enterré, alternance humidification / séchage)${inp.tetes.gardeCorps ? ` ; garde-corps hors d'eau : enrobage de ${f(inp.tetes.gcCover * 100, 1)} cm` : ""}.`),
     BULLET("Ciment CPJ 42,5 ; cure humide d'au moins 7 jours, bétonnage aux heures fraîches, protection contre la dessiccation (forte chaleur)."),
     BULLET("Remblai en latérite sélectionnée (CBR ≥ 30), compacté à 95 % de l'OPM par couches de 20 cm, monté symétriquement des deux côtés de l'ouvrage."),
     BULLET("Bêches parafouilles et radiers de tête contre l'affouillement en période de crue ; parements enterrés badigeonnés au bitume."));

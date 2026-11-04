@@ -504,6 +504,7 @@ export function buildScene(study: Study, o: Scene3DOptions, gov: Governing | nul
       if (t.gardeCorps) {
         const G = GARDE_CORPS;
         const yg = gcBase;
+        const c = t.gcCover;
         for (const zc of ends.map((e) => gcZ(e.z0, e.s))) {
           for (const q of gardeCorpsPosts(B)) {
             const rx = q.w / 2 - c, rz = G.ep / 2 - c;

@@ -63,6 +63,7 @@ export function studyToXlsx(study: Study): Uint8Array {
   put("fc28", "Résistance du béton à 28 jours", "fc28", IN(inp.fc28), "MPa");
   put("fe", "Limite élastique des aciers", "fe", IN(inp.fe), "MPa");
   put("c", "Enrobage", "c", IN(inp.cover), "m");
+  if (inp.tetes.gardeCorps) put("cgc", "Enrobage du garde-corps", "c gc", IN(inp.tetes.gcCover), "m");
   put("ft28", "Résistance à la traction", "ft28", R(`0.6+0.06*${P.fc28}`), "MPa", "BAEL A.2.1,12");
   put("fbu", "Résistance de calcul du béton", "fbu", R(`0.85*${P.fc28}/1.5`), "MPa", "BAEL A.4.3,41 (θ = 1)");
   put("fsu", "Résistance de calcul des aciers", "fsu", R(`${P.fe}/1.15`), "MPa", "BAEL A.4.3,2");
