@@ -1,0 +1,54 @@
+{
+  "nom": "Bâtiment industriel 2 nefs (croquis iPad)",
+  "lieu": "Abidjan (Côte d'Ivoire)",
+  "client": "",
+  "auteur": "Moulo Jean Claude",
+  "longueur": 75.0,
+  "entraxe": 5.0,
+  "hauteur": 6.25,
+  "nefs": [
+    {
+      "portee": 15.9,
+      "pente": 32.0,
+      "poteau_faitage": false
+    },
+    {
+      "portee": 15.2,
+      "pente": 33.5,
+      "poteau_faitage": false
+    }
+  ],
+  "appuis": "articulés",
+  "jarret_ratio": 0.1,
+  "jarret_hauteur": 2.0,
+  "entraxe_pannes": 1.35,
+  "entraxe_lisses": 1.8,
+  "poteau_rive": "auto",
+  "poteau_interieur": "auto",
+  "traverse": "auto",
+  "famille_poteaux": "IPE",
+  "G_couverture": 0.1,
+  "G_pannes": 0.06,
+  "Q_toiture": 0.4,
+  "vent": {
+    "vb": 25.0,
+    "ce": 1.7,
+    "cpe_mur_au_vent": 0.8,
+    "cpe_mur_sous_vent": -0.3,
+    "cpe_toit_au_vent": -0.9,
+    "cpe_toit_sous_vent": -0.5,
+    "cpi_surpression": 0.2,
+    "cpi_depression": -0.3
+  },
+  "fy": 235.0,
+  "E": 210000.0,
+  "gM0": 1.0,
+  "gM1": 1.0,
+  "fleche_traverse": 200.0,
+  "deplacement_tete": 150.0,
+  "maintien_poteau": 2.0,
+  "maintien_traverse": 2.0,
+  "extra": {
+    "source": "Lecture du croquis : 2 nefs 15,9 + 15,2 m, H rive 6,25 m, faîtage 8,8 m, 15 travées de 5 m, jarrets 660×300, traverses IPE 300, poteaux IPE 400 / IPE 450 au centre (profilés du croquis non imposés : choix automatique)"
+  }
+}
