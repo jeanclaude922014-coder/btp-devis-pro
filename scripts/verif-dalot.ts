@@ -61,7 +61,8 @@ else console.log("OK   ouvrage de démonstration conforme (hors origine des donn
 
 // 4. Dossiers de plans sur les modèles types : 8 planches et perspectives 3D, cotes de la vue en plan.
 for (const [id, model, ids] of [
-  ["r200x200", "cafe", ["garde", "vue-plan", "coupes", "ferraillage", "nomenclature", "ferraillage-tete", "mur-aile", "grille-tete", "perspectives-3d", "perspectives-charges"]],
+  // Garde-corps sur tous les dalots : planche de ferraillage et nomenclature en fin de dossier du modèle cafe.
+  ["r200x200", "cafe", ["garde", "vue-plan", "coupes", "ferraillage", "nomenclature", "ferraillage-tete", "mur-aile", "grille-tete", "garde-corps", "nomenclature-gc", "perspectives-3d", "perspectives-charges"]],
   ["r3x400x400", "paia", ["titre", "coffrage", "corps", "nomenclature-corps", "garde-corps", "nomenclature-gc", "tetes", "nomenclature-tetes", "perspectives-3d", "perspectives-charges"]],
 ] as const) {
   const res = runStudy(specFromPreset(id));
