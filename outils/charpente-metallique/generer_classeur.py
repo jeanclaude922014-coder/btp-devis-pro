@@ -20,6 +20,7 @@ from openpyxl.worksheet.pagebreak import Break
 from moteur import Model, absref
 import plans
 import finaliser
+import ferraillage_semelles
 
 # ----------------------------------------------------------------------------- noms
 ACC, PAR, BP, BA = "ACCUEIL", "PARAMÈTRES", "BASE_PROFILÉS", "BASE_ACIERS"
@@ -565,6 +566,10 @@ def build_parametres(wb):
     P.p("Q_dal", "Charge d'exploitation du dallage", 10.0, "kN/m²", "stockage / circulation légère")
     P.p("fe", "Limite d'élasticité des aciers HA (FeE500)", 500, "MPa", "BAEL")
     P.p("gs", "Coefficient γs des aciers", 1.15, "", "BAEL")
+    P.p("fc28", "Béton des fondations : fc28 (= fck)", 25, "MPa", "C25/30 – dosage 350 kg/m³")
+    P.p("phi_sol", "Angle de frottement du sol (latérite)", 30, "°", "à confirmer par étude géotechnique")
+    P.p("fiss", "Fissuration des fondations", "Préjudiciable", "", "sol humide : préjudiciable",
+        items=["Peu préjudiciable", "Préjudiciable", "Très préjudiciable"])
     P.p("As_ch", "Section minimale des chaînages", 1.60, "cm²", "règle de bonne pratique")
 
     P.sec("11. PRIX UNITAIRES (FCFA HT, rendu Abidjan)")
@@ -1875,6 +1880,8 @@ CODE_KEYS = [  # clé du générateur HTML, expression, n = numérique / t = tex
     ("ltige", "{l_tige_port}", "n"), ("bch", "{b_ch}", "n"), ("hch", "{h_ch}", "n"), ("brd", "{b_rd}", "n"),
     ("nrd", "{nb_rd}", "n"), ("hachl", "{ha_chl}", "t"), ("hachc", "{ha_chc}", "t"), ("echc", "{e_chc}", "n"),
     ("vb", "{vb}", "n"), ("ce", "{ce}", "n"), ("Gc", "{G_couv}", "n"), ("Q", "{Q_toit}", "n"), ("fy", "{fy}", "n"),
+    ("hs2", "{h_s2}", "n"), ("f2p", "{f2}", "n"), ("qadm", "{sig_adm}", "n"), ("gt", "{g_terre}", "n"), ("fe", "{fe}", "n"),
+    ("csem", "{c_fond}", "n"), ("ret", "{retour}", "n"), ("ab_fck", "{fc28}", "n"), ("phis", "{phi_sol}", "n"), ("fiss", "{fiss}", "t"),
 ]
 
 
@@ -1914,13 +1921,16 @@ def main(out, gabarit="20 × 40", recalc=True, plans_seuls=False, params=None, p
     build_go(wb)
     build_dqe(wb)
     build_verif(wb)
+    ferraillage_semelles.build(wb, M, dict(st=st, title=title, header=header, section=section, yellow=yellow, XA=XA,
+                               page_setup=page_setup, FILL=FILL, FormulaRule=FormulaRule, Font=Font, FONT=FONT,
+                               C_BLEU_CLAIR=C_BLEU_CLAIR, NF_2=NF_2))
     assign_erows()
     build_recap(wb)
     build_accueil(acc, G_RANGE, alerts)
     plans.build(wb, M, dict(PL=PL, CO=CO, PAR=PAR), st, section, page_setup, protect)
     build_engine(wb)
     write_all(wb)
-    order = [ACC, PAR, BP, BA, PRE, QC, GO, DQE, REC, VER, PL, CO, CA]
+    order = [ACC, PAR, BP, BA, PRE, QC, GO, DQE, REC, VER, ferraillage_semelles.FS, PL, CO, CA]
     wb._sheets = [wb[n] for n in order]
     for n in order:
         if proteger and n != CA:

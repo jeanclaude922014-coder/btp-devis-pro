@@ -236,6 +236,67 @@ Contenu du fichier IFC :
 
 Contrôle : le fichier du gabarit 20 × 40 m a été relu avec ifcopenshell, et les 202 éléments sont géométriquement valides.
 
+## Ferraillage des semelles isolées (BAEL 91 mod. 99 / EC2)
+
+Les semelles isolées sont calculées dans les deux outils, avec les mêmes formules.
+
+**Dans `Generateur_Plans.html`** (section « Ferraillage des semelles » du formulaire) :
+- **Planche 14 :** pour chaque type de semelle, vue en plan et coupe A-A. On y voit la nappe inférieure, la nappe supérieure en cas de soulèvement, le fût (barres longitudinales et cadres), les crochets et les repères ① à ⑥. La planche contient aussi la nomenclature des aciers (nombre, longueur, façonnage, poids) et le ratio en kg/m³.
+- **Planche 15 :** note de calcul des fondations.
+- **Note Word :** § 8 « Fondations », avec le plan de ferraillage et la nomenclature.
+- **Types de semelles :**
+  - S1 : poteaux de rive ;
+  - S2 : poteaux intérieurs (noues, file centrale) ;
+  - S3 : poteaux de pignon.
+- **Efforts :**
+  - S1 et S2 : réactions du calcul aux éléments finis du portique ;
+  - pour le sol, on retient le couple N / M de la même combinaison qui donne la plus forte contrainte ;
+  - S3 : surface reprise par chaque poteau de pignon.
+- **Modes de ferraillage :**
+  - *Calculé* : plus petit Ø (HA10 à HA20) donnant un espacement ≥ 10 cm, et barres de fût proposées ;
+  - *Imposé* : quadrillage et fût saisis dans le formulaire.
+
+**Vérifications :**
+
+| N° | Vérification | Référence |
+|---|---|---|
+| 1-2 | Contrainte sur le sol σ3/4 ≤ σ adm (ELS) et ≤ 1,5 σ adm (ELU) | Fascicule 62 titre V |
+| 3 | Rigidité (a − b) / 4 ≤ d | méthode des bielles |
+| 4 | As = kf Nu' (a − b) / (8 d fsu) ≥ ρmin a d. Majoration kf de 1,10 ou 1,50 selon la fissuration | BAEL A.6.1 ; EC2 9.2.1.1 |
+| 5 | Nappe supérieure en cas de soulèvement | – |
+| 6 | Espacement ≤ 25 cm | – |
+| 7 | Poinçonnement au contour situé à d | EC2 6.4.4 |
+| 8 | Soulèvement Nt ≤ 0,9 P (sinon, côté de semelle nécessaire) | EC0, EQU |
+| 9 | Glissement H ≤ (N + P) tan φ / 1,2 + butée / 2 | – |
+| 10 | Renversement | – |
+| 11 | Fût : As ≥ max(0,2 % B ; 4 cm²/m) | BAEL A.8.1.21 |
+| 12 | Fût : espacement des cadres | BAEL A.8.1.3 |
+| – | Ancrage ls ≤ a/4, sinon crochets | BAEL A.6.1.23 |
+
+Le sol latéritique est pris par défaut avec σ adm = 0,20 MPa et φ = 30°. **Ces valeurs sont à confirmer par une étude géotechnique.**
+
+**Dans le classeur Excel**, la feuille `FERRAILLAGE_SEMELLES` refait tout le calcul en formules visibles, une colonne par type de semelle :
+- géométrie ;
+- efforts ;
+- poids propre ;
+- contraintes ;
+- tableau de choix du diamètre ;
+- nappe supérieure ;
+- poinçonnement ;
+- glissement ;
+- fût ;
+- 13 vérifications avec taux et statut ;
+- nomenclature.
+
+Elle compare aussi le ferraillage prévu dans PARAMÈTRES (`ha_sem`, `m_sem`) à la section requise. Par défaut, les efforts sont estimés. Pour une **vérification croisée**, il suffit de reporter dans les cellules jaunes les efforts de la planche 15 du générateur HTML.
+
+Contrôle effectué sur 3 configurations, soit 168 grandeurs comparées. Les configurations testées sont :
+- le gabarit 20 × 40 ;
+- 2 nefs, pieds encastrés, FeE400, C30, fissuration très préjudiciable ;
+- 30 × 40 avec 2 nefs et une file centrale.
+
+L'écart relatif maximal entre le HTML et Excel recalculé par LibreOffice est de 4·10⁻¹⁵ : les résultats sont identiques.
+
 ## Régénérer le classeur
 
 ```bash

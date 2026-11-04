@@ -146,9 +146,13 @@ const FORM = [
   ["edal","Dallage",["20 cm","15 cm"],"s"],["erem","Remblai latérite",["20 cm","40 cm"],"s"],["esab","Lit de sable (m)",0.05],
   ["ferr","Ferraillage dallage",["Nappe simple","Nappe double"],"s"],["hix","Nappe inf. X",["HA10","HA8","HA12"],"s"],["hiy","Nappe inf. Y",["HA10","HA8","HA12"],"s"],
   ["hsx","Nappe sup. X",["HA8","HA10","HA12"],"s"],["hsy","Nappe sup. Y",["HA8","HA10","HA12"],"s"],["maille","Maille dallage",["20 cm","15 cm","25 cm"],"s"],
-  ["hasem","Quadrillage semelles",HA,"s",3],["msem","Maille semelles (m)",0.15],["nbf","Barres par fût",4],["hafut","Aciers fûts",HA,"s",3],
+  ["hasem","Quadrillage semelles (mode imposé)",HA,"s",3],["msem","Maille semelles – mode imposé (m)",0.15],["nbf","Barres par fût",4],["hafut","Aciers fûts",HA,"s",3],
   ["hacad","Cadres",HA,"s",0],["ecad","Espacement cadres fût (m)",0.15],["nfil","Filants semelle",4],["hafil","Aciers filants",HA,"s",2],
   ["harep","Répartition",HA,"s",1],["erep","Espacement répartition (m)",0.2],["dtige","Tiges d'ancrage","Rond 24","t"],["ltige","Longueur tiges (m)",0.6]]],
+ ["Ferraillage des semelles (BAEL / EC2)",[
+  ["fsem","Ferraillage des semelles",["Calculé","Imposé"],"s"],["qadm","Contrainte admissible du sol ELS (MPa)",0.20],["phis","Angle de frottement du sol φ (°)",30],
+  ["gt","Poids volumique des terres (kN/m³)",18],["fe","Acier HA : fe (MPa)",["500","400"],"s"],["fiss","Fissuration",["Préjudiciable","Très préjudiciable","Peu préjudiciable"],"s"],
+  ["csem","Enrobage des semelles (m)",0.05],["ret","Retours d'ancrage (m)",0.15],["hs2","Semelle pignon hauteur (m)",0.30],["f2p","Fût pignon côté (m)",0.30]]],
  ["Calcul EC3 du portique",[
   ["appuis","Pieds de poteaux",["articulés","encastrés"],"s"],["jh","Hauteur jarret / h traverse",2.0],
   ["fampot","Famille des poteaux de rive",["IPE","HEA"],"s"],["pint","Poteaux intérieurs (vide = auto)","","t"],
@@ -451,7 +455,8 @@ function P6(g){
   v.seg(-bf/2+cf,zb,bf/2-cf,zb,C.rouge,0.35);
   for(let k=0;k<+P.nfil;k++) v.dot(-bf/2+cf+k*(bf-2*cf)/Math.max(1,P.nfil-1),zb+0.02,C.rouge,0.45);
   v.pl([[xB-a1/2+cf,zb+0.15],[xB-a1/2+cf,zb],[xB+a1/2-cf,zb],[xB+a1/2-cf,zb+0.15]],C.rouge,0.35);
-  const nq=Math.floor((a1-2*cf)/P.msem+1e-9); for(let k=0;k<=nq;k++) v.dot(xB-a1/2+cf+k*P.msem,zb+0.02,C.rouge,0.4);
+  const s1=g.SEM&&g.SEM.types.find(t=>t.id==="S1"), nq1=s1?s1.inf.n:Math.floor((a1-2*cf)/P.msem+1e-9)+1, eq1=s1?s1.inf.e:+P.msem;
+  for(let k=0;k<nq1;k++) v.dot(xB-a1/2+cf+k*eq1,zb+0.02,C.rouge,0.4);
   for(const sg of [-1,1]){const xb=xB+sg*(f1v/2-cf); v.pl([[xb+sg*0.15,zb+0.02],[xb,zb+0.02],[xb,zft-cf]],C.rouge,0.35);
     const xt=xB+sg*(f1v/2-0.10); v.seg(xt,zft+0.06,xt,zft-P.ltige+0.06,C.rouge,0.5);}
   for(let z=zsi+0.05;z<zft-cf;z+=+P.ecad) v.seg(xB-f1v/2+cf,z,xB+f1v/2-cf,z,C.rouge,0.25);
@@ -471,8 +476,8 @@ function P6(g){
     [zs+0.005,"Polyane sur lit de sable "+Math.round(P.esab*100)+" cm",xE],
     [zr/2,"Remblai latérite compactée 95 % OPM – "+Math.round(g.erem*100)+" cm",xE],
     [0,"TN (terrain naturel)",-0.075],
-    [(zsi+zft)/2,"Fût "+Math.round(f1v*100)+" × "+Math.round(f1v*100)+" h "+f2(P.hfut)+" m – "+P.nbf+" "+P.hafut+" + cadres "+P.hacad+" e = "+Math.round(P.ecad*100),xB+f1v/2],
-    [zp+cf,"Quadrillage "+P.hasem+" maille "+Math.round(P.msem*100)+" cm",xB+a1/2-cf],
+    [(zsi+zft)/2,"Fût "+Math.round(f1v*100)+" × "+Math.round(f1v*100)+" h "+f2(P.hfut)+" m – "+(s1?s1.fut.n+" HA"+s1.fut.d:P.nbf+" "+P.hafut)+" + cadres "+P.hacad+" e = "+Math.round(P.ecad*100),xB+f1v/2],
+    [zp+cf,s1?"Quadrillage "+txtNappe(s1.inf)+" (planche 14)":"Quadrillage "+P.hasem+" maille "+Math.round(P.msem*100)+" cm",xB+a1/2-cf],
     [(zp+zsi)/2,"Semelle isolée béton armé 350 kg/m³ sur propreté 150 kg/m³",xB+a1/2]];
   reps.forEach(([z,t,xa],k)=>{const yl=ytop-k*6.5*u; v.pl([[xa,z],[xE+1*u,z],[xE+4*u,yl]],C.noir,0.15); v.txt(xE+5*u,yl,t,{anchor:"start",size:2.4,dy:0.8});});
   return v;
@@ -1057,6 +1062,7 @@ function lancerCalcul(g){
     if(!SEC[String(P.ptrav).trim()]) g.ptrav=CALC.profils.traverse;
     g.htrav=SEC[g.ptrav].h/1000; g.hpot=SEC[g.ppot].h/1000;
   }
+  try{ g.SEM=semellesCalc(g); }catch(e){ g.SEM=null; console.error(e); }
 }
 const fmt=(x,d=2)=>(+x).toLocaleString("fr-FR",{minimumFractionDigits:d,maximumFractionDigits:d});
 function figStructure(f,m,col){
@@ -1221,7 +1227,19 @@ async function noteDocxOctets(){
       b+=wTable(["Donnée","Valeur"],bl.donnees,[2200,7400]);
       b+=wTable(["Vérification","Ed","Rd","Taux","Statut"],bl.verifs.map(v=>[v[0],fmt(v[1]),fmt(v[2])+(v[3]==="–"?"":" "+v[3]),fmt(v[1]/v[2]),statutV(v)]),[4600,1200,1500,900,1400]);
       b+=wP(bl.note,{i:true,sz:8});}); }
-  b+=wH("8. Conclusion")+wP((okG?"Le portique est justifié avec les profilés retenus. ":"Certaines vérifications ne sont pas satisfaites. ")+(AS?(AS.ok?"Les assemblages vérifiés (jarret, faîtage, pied de poteau, contreventement) sont satisfaisants. ":"Certains assemblages ne sont pas satisfaisants (§ 7). "):"")+"Bracons et fondations à justifier séparément. Note de prédimensionnement à viser avant exécution.",{sz:10});
+  const SEM=g.SEM;
+  if(SEM&&SEM.types.length){ b+=wH("8. Fondations – ferraillage des semelles isolées (BAEL 91 mod. 99 / EC2)");
+    b+=wP(`Sol latéritique : σ adm = ${fmt(+P.qadm)} MPa à l'ELS et 1,5 σ adm à l'ELU (Fascicule 62 titre V), φ = ${P.phis}°, γ terres = ${P.gt} kN/m³ – valeurs à confirmer par une étude géotechnique. Méthode des bielles, aciers minimaux EC2 9.2.1.1 et BAEL (non-fragilité), poinçonnement EC2 6.4.4, majoration de ${fmt((SEM.types[0].kf-1)*100,0)} % pour fissuration ${P.fiss.toLowerCase()} (sol humide).`,{sz:8});
+    b+=wImg("rIdImg"+(pngs.length+1),pngs.length+1,16.5,8.9)+wP("Plan de ferraillage des semelles et nomenclature des aciers",{i:true,sz:8,jc:"center"});
+    pngs.push(await svgVersPng(pageFerrSemelles(g).svg().replace("<svg ",`<svg width="${VW*6}" height="${VH*6}" `),VW*6,VH*6));
+    blocsSemelles(SEM).forEach(bl=>{b+=wH(bl.titre,2)+wP(bl.ref,{i:true,sz:8});
+      b+=wTable(["Donnée","Valeur"],bl.donnees,[2200,7400]);
+      b+=wTable(["Vérification","Ed","Rd / limite","Taux","Statut"],bl.verifs.map(v=>[v[0],fmt(v[1]),fmt(v[2])+" "+v[3],fmt(v[2]>0?v[1]/v[2]:0),statutV(v)]),[4600,1200,1500,900,1400]);
+      b+=wP(bl.note,{i:true,sz:8});});
+    b+=wTable(["Type","Rep.","Désignation","Ø","Nb / semelle","L (m)","Nb semelles","Poids (kg)"],
+      [...SEM.types.flatMap(t=>t.bars.map(r=>[t.id,r[0],r[1]+" ("+r[5]+")","HA"+r[2],String(r[3]),fmt(r[4]),String(t.nb),fmt(t.nb*r[6],1)])),["Total","","Béton armé "+fmt(SEM.vb)+" m³ – "+fmt(SEM.kg/SEM.vb,0)+" kg/m³","","","","",fmt(SEM.kg,1)]],
+      [700,600,3400,700,1100,900,1100,1100]); }
+  b+=wH("9. Conclusion")+wP((okG?"Le portique est justifié avec les profilés retenus. ":"Certaines vérifications ne sont pas satisfaites. ")+(AS?(AS.ok?"Les assemblages vérifiés (jarret, faîtage, pied de poteau, contreventement) sont satisfaisants. ":"Certains assemblages ne sont pas satisfaisants (§ 7). "):"")+(SEM&&SEM.types.length?(SEM.ok?"Les semelles isolées sont justifiées (§ 8). ":"Certaines semelles ne sont pas justifiées (§ 8). ")+"Bracons à justifier séparément.":"Bracons et fondations à justifier séparément.")+" Note de prédimensionnement à viser avant exécution.",{sz:10});
   b+=wTable(["Établi par","Vérifié par","Visa"],[[aut+"\n\n\n","",""]],[3200,3200,3200]);
   const NS='xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"';
   const doc=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${NS}><w:body>${b}<w:sectPr><w:headerReference w:type="default" r:id="rIdH"/><w:footerReference w:type="default" r:id="rIdF"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1300" w:right="1134" w:bottom="1000" w:left="1134" w:header="567" w:footer="450" w:gutter="0"/></w:sectPr></w:body></w:document>`;
@@ -1247,7 +1265,7 @@ async function telechargerNote(){
 const DPI_EXPORT=200, PW=297, PH=210;   // A4 paysage en mm
 function vuesCourantes(){
   const g=calc(); lancerCalcul(g);
-  const vues=[P1,P2,P3,P4,P5,P6,P7,pageEnsemble,pageEclate,pageDetails,pageCalcFigures,pageCalcTableaux,pageAssemblages].map(f=>f(g));
+  const vues=[P1,P2,P3,P4,P5,P6,P7,pageEnsemble,pageEclate,pageDetails,pageCalcFigures,pageCalcTableaux,pageAssemblages,pageFerrSemelles,pageNoteSemelles].map(f=>f(g));
   return {g,vues};
 }
 function texteGabarit(g){return `Gabarit ${P.gab}${g.nn>1?" – "+g.nn+" nefs":""} : portée ${f2(g.B)} m × longueur ${f2(g.L)} m – H sablière ${f2(g.H)} m – pente ${f1(P.p)} % – ${g.systeme} – façade : ${P.fac}`;}
@@ -1267,7 +1285,7 @@ function cartoucheSVG(k,NP,g,x,y,w){
   o+=sRc(x,Y[3],c1,h[3]+h[4])+couper(legende(k,g),165).slice(0,4).map((t,i)=>sTx(x+1.5,Y[3]+2.8+i*2.5,t,{fs:2.15})).join("");
   o+=sRc(x+c1,Y[3],c2,h[3])+sTx(x+c1+1.2,Y[3]+3.4,"Date :",{fs:2.5})+sRc(x+c1+c2,Y[3],c2,h[3]);
   o+=sRc(x+c1,Y[4],c2,h[4])+sTx(x+c1+1.2,Y[4]+3.8,"Signature :",{fs:2.5})+sRc(x+c1+c2,Y[4],c2,h[4]);
-  const pied=(k>=10?"Note de calcul de prédimensionnement – à viser avant exécution":k>=7?"Perspectives et détails sans échelle":"Échelle automatique (même échelle en X et en Y)")+" – cotes en mètres – EC3 / EC1 / BAEL 91 mod. 99 / EC2 – esquisse de prédimensionnement à confirmer par note de calcul.";
+  const pied=(k===13?"Échelle indiquée sur la planche":k>=10?"Note de calcul de prédimensionnement – à viser avant exécution":k>=7?"Perspectives et détails sans échelle":"Échelle automatique (même échelle en X et en Y)")+" – cotes en mètres – EC3 / EC1 / BAEL 91 mod. 99 / EC2 – esquisse de prédimensionnement à confirmer par note de calcul.";
   o+=sRc(x,Y[5],w,h[5])+sTx(x+1.5,Y[5]+3,pied,{fs:1.9,i:true});
   return o;
 }
@@ -1493,6 +1511,193 @@ function assemblagesSVG(g){
   return o;
 }
 
+// ============================================================ FERRAILLAGE DES SEMELLES ISOLÉES (BAEL 91 mod. 99 / EC2) – début
+// Mêmes formules que la feuille FERRAILLAGE_SEMELLES du classeur Excel (vérification croisée).
+const HA_KG={6:0.222,8:0.395,10:0.617,12:0.888,14:1.208,16:1.578,20:2.466,25:3.853};
+const HA_AS=d=>Math.PI*d*d/400;                       // cm²
+const HA_CAND=[10,12,14,16,20], S_MAX=0.25, S_MIN=0.10, G_BETON=25;
+const K_FISS={"Peu préjudiciable":1,"Préjudiciable":1.1,"Très préjudiciable":1.5};
+const ceilE=x=>Math.ceil(x-1e-9);
+function diamHA(s){return parseInt(String(s).replace(/\D/g,""))||12;}
+// choix d'une nappe : plus petit diamètre donnant un espacement ≥ 10 cm
+function barres(d,Areq,a,c){const lb=a-2*c-d/1000, n=Math.max(2,ceilE(Areq/HA_AS(d)),ceilE(lb/S_MAX)+1); return {d,n,e:lb/(n-1),As:n*HA_AS(d)};}
+function nappe(Areq,a,c){   // Areq : nombre (fixe) ou fonction du diamètre (la hauteur utile dépend de Ø)
+  const L=HA_CAND.map(d=>barres(d,typeof Areq==="function"?Areq(d):Areq,a,c));
+  return L.find(q=>q.e>=S_MIN-1e-9)||L[L.length-1];
+}
+function semelleBA(o){
+  // o : {id, nom, nb, a, h, b, hf, eff:{Nser,Mser,Nu,Mu,Nt,Nmin,Hu}}
+  const a=o.a, h=o.h, b=o.b, hf=o.hf, E={...o.eff}, c=+P.csem, fc=+P.ab_fck, fe=+P.fe, fsu=fe/1.15, kf=K_FISS[P.fiss]||1.1;
+  const qa=+P.qadm, gt=+P.gt, phi=+P.phis*Math.PI/180, ret=+P.ret, D=+P.D, ep=+P.eprop;
+  const hsol=Math.max(0,D-ep-h), Wf=G_BETON*(a*a*h+b*b*hf)+gt*(a*a-b*b)*hsol;
+  const sig=(N,M)=>{if(N<=0) return 0; const e=Math.abs(M)/N; return (e<=a/6?N/(a*a)*(1+3*e/a):(e<a/2?N/(2*a*(a/2-e)):99e3))/1000;};
+  // couples N / M concomitants : on retient la combinaison qui donne la plus forte contrainte sur le sol
+  if(E.ELS){let s=-1; E.ELS.forEach(([N,M])=>{const v=sig(N+Wf,M); if(v>s){s=v; E.Nser=N; E.Mser=M;}});}
+  if(E.ELU){let s=-1; E.ELU.forEach(([N,M])=>{const v=sig(N+1.35*Wf,M); if(v>s){s=v; E.Nu=N; E.Mu=M;}});}
+  const sELS=sig(E.Nser+Wf,E.Mser), sELU=sig(E.Nu+1.35*Wf,E.Mu);
+  const Nuf=E.Nu+1.35*G_BETON*b*b*hf, e0=E.Nu>0?Math.abs(E.Mu)/E.Nu:0, Np=e0<=a/24?Nuf:Nuf*(1+3*e0/a);
+  const ft=0.6+0.06*fc, fctm=0.3*Math.pow(fc,2/3), rmin=Math.max(0.26*fctm/fe,0.0013,0.23*ft/fe);
+  const Areq=d=>{const dd=h-c-d/1000; return Math.max(kf*Np*(a-b)/(8*dd*fsu)*10, rmin*a*dd*1e4);};
+  let inf;
+  if(P.fsem==="Imposé"){const d=diamHA(P.hasem), n=Math.floor((a-2*c)/+P.msem+1e-9)+1; inf={d,n,e:+P.msem,As:n*HA_AS(d)};}
+  else inf=nappe(Areq,a,c);
+  const d=h-c-inf.d/1000, Ar=Areq(inf.d), Asb=kf*Np*(a-b)/(8*d*fsu)*10, Amin=rmin*a*d*1e4;
+  // nappe supérieure (soulèvement : la semelle travaille à l'envers sous le poids des terres)
+  const Asup=E.Nt>0?kf*E.Nt*(a-b)/(8*d*fsu)*10:0, sup=E.Nt>0?nappe(Asup,a,c):null;
+  // poinçonnement EC2 6.4.4 (contour à a = d)
+  const Acr=b*b+4*b*d+Math.PI*d*d, u=4*b+2*Math.PI*d;
+  const Vred=Acr>=a*a?0:Nuf*(1-Acr/(a*a)), vEd=Vred/(u*d)/1000;
+  const rho=Math.min(0.02,inf.As/(a*d*1e4)), k=Math.min(2,1+Math.sqrt(0.2/d));
+  const vRd=Math.max(0.12*k*Math.pow(100*rho*fc,1/3),0.035*Math.pow(k,1.5)*Math.sqrt(fc))*2;
+  // soulèvement, glissement
+  // glissement : frottement (même combinaison) + butée des terres mobilisée à 50 %
+  const kst=0.9, Kp=Math.tan(Math.PI/4+phi/2)**2, Hemb=Math.max(0,D-ep), Rbut=0.5*Kp*gt*Hemb*Hemb*a/2;
+  let gl={H:0,N:0,R:1,r:0}; (E.HV||[[E.Hu,E.Nmin]]).forEach(([H,N])=>{const R=Math.max(0,N+Wf)*Math.tan(phi)/1.2+Rbut, r=Math.abs(H)/R; if(r>gl.r) gl={H:Math.abs(H),N,R,r};});
+  const Rgl=gl.R;
+  const areq=Math.ceil(Math.sqrt(Math.max(0,(E.Nt/kst-G_BETON*b*b*hf+gt*b*b*hsol)/(G_BETON*h+gt*hsol)))/0.05-1e-9)*0.05;
+  // ancrage BAEL A.6.1.23 : ls = Ø fe / (4 τsu), τsu = 0,6 ψs² ft28
+  const tsu=0.6*1.5*1.5*ft, ls=inf.d/1000*fe/(4*tsu), croch=ls>a/4;
+  // fût : BAEL A.8.1.21 – Amin = max(0,2 % B ; 4 cm²/m de périmètre)
+  const Afmin=Math.max(0.002*b*b*1e4,4*4*b);
+  let fut={n:+P.nbf,d:diamHA(P.hafut)};
+  if(P.fsem!=="Imposé"){const c_=[]; for(const n of [4,6,8]) for(const d of [12,14,16,20]) if(n*HA_AS(d)>=Afmin-1e-9) c_.push({n,d,A:n*HA_AS(d)});
+    c_.sort((x,y)=>x.A-y.A||x.n-y.n); if(c_.length) fut={n:c_[0].n,d:c_[0].d};}
+  const dl=fut.d, Afut=fut.n*HA_AS(dl), ecmax=Math.min(0.40,b+0.10,15*dl/1000);
+  const verifs=[
+    ["Contrainte sur le sol à l'ELS (σ3/4 ≤ σ adm)",sELS,qa,"MPa"],
+    ["Contrainte sur le sol à l'ELU (σ3/4 ≤ 1,5 σ adm – Fasc. 62-V)",sELU,1.5*qa,"MPa"],
+    ["Rigidité (méthode des bielles) : (a − b) / 4 ≤ d",(a-b)/4,d,"m"],
+    ["Nappe inférieure : As requise ≤ As prévue (chaque sens)",Ar,inf.As,"cm²"],
+    ["Espacement des barres ≤ 25 cm",inf.e,S_MAX,"m"],
+    ["Poinçonnement EC2 6.4.4 : vEd ≤ vRd (contour à d)",vEd,vRd,"MPa"],
+    ["Soulèvement (EQU) : Nt ≤ 0,9 × poids fondation + terres",E.Nt,kst*Wf,"kN"],
+    ["Glissement : H ≤ (N + P) tan φ / 1,2 + butée / 2",gl.H,Rgl,"kN"],
+    ["Renversement : M ≤ (N + P) a / 2 / 1,5",Math.abs(E.Mu),Math.max(0,E.Nu+Wf)*a/2/1.5,"kN·m"],
+    ["Fût : As ≥ max(0,2 % B ; 4 cm²/m) – BAEL A.8.1.21",Afmin,Afut,"cm²"],
+    ["Fût : espacement des cadres ≤ min(40 cm ; b + 10 ; 15 Øl)",+P.ecad,ecmax,"m"]];
+  if(sup) verifs.splice(4,0,["Nappe supérieure (soulèvement) : As requise ≤ As prévue",Asup,sup.As,"cm²"]);
+  // nomenclature des aciers (par semelle)
+  const Lb=a-2*c+(croch?2*ret:0), nc=Math.floor(hf/+P.ecad+1e-9)+1, dc=diamHA(P.hacad);
+  const bars=[["1","Nappe inférieure – sens X",inf.d,inf.n,Lb,croch?"crochets relevés":"droite"],["2","Nappe inférieure – sens Y",inf.d,inf.n,Lb,croch?"crochets relevés":"droite"]];
+  if(sup){bars.push(["3","Nappe supérieure – sens X",sup.d,sup.n,a-2*c+2*ret,"retours"]); bars.push(["4","Nappe supérieure – sens Y",sup.d,sup.n,a-2*c+2*ret,"retours"]);}
+  bars.push(["5","Fût – barres longitudinales",dl,fut.n,hf+h-c+ret,"pied en équerre"]);
+  bars.push(["6","Fût – cadres",dc,nc,4*(b-2*c)+2*0.10,"cadre fermé"]);
+  bars.forEach(r=>{r.push(r[3]*r[4]*HA_KG[r[2]]);});
+  const kg=bars.reduce((s,r)=>s+r[6],0), vb=a*a*h+b*b*hf;
+  return {...o,eff:E,c,fc,fe,fsu,kf,qa,hsol,Wf,sELS,sELU,Nuf,e0,Np,ft,fctm,rmin,inf,d,Ar,Asb,Amin,Asup,sup,Acr,u,Vred,vEd,vRd,rho,k,Rgl,areq,tsu,ls,croch,dl,fut,Kp,Hemb,Rbut,gl,Afut,Afmin,ecmax,verifs,bars,kg,vb,
+    ok:verifs.every(v=>v[1]<=v[2]+1e-9)};
+}
+function effortsSemelles(g){
+  const T=[];
+  if(CALC){const R=CALC.R, m=R.modele, xs=m.appuis.map(a=>m.X[a.nd][0]), x0=Math.min(...xs), x1=Math.max(...xs);
+    const grp=sel=>{const ap=m.appuis.filter(sel); if(!ap.length) return null; const e={Nser:0,Mser:0,Nu:0,Mu:0,Nt:0,Nmin:1e9,Hu:0,HV:[],ELS:[],ELU:[]}, enc=P.appuis==="encastrés";
+      ap.forEach(a=>{for(const r of Object.values(R.els)){const q=r.reac[a.nd]; e.Nser=Math.max(e.Nser,q[1]); e.Mser=Math.max(e.Mser,Math.abs(q[2]||0)); e.ELS.push([q[1],enc?Math.abs(q[2]||0):0]);}
+        for(const r of Object.values(R.elu)){const q=r.reac[a.nd]; e.Nu=Math.max(e.Nu,q[1]); e.Mu=Math.max(e.Mu,Math.abs(q[2]||0)); e.Nt=Math.max(e.Nt,-q[1]); e.Nmin=Math.min(e.Nmin,q[1]); e.Hu=Math.max(e.Hu,Math.abs(q[0])); e.HV.push([q[0],q[1]]); e.ELU.push([q[1],enc?Math.abs(q[2]||0):0]);}});
+      if(!enc){e.Mser=0; e.Mu=0;} return e;};
+    const rive=grp(a=>{const x=m.X[a.nd][0]; return Math.abs(x-x0)<1e-6||Math.abs(x-x1)<1e-6;}), inte=grp(a=>{const x=m.X[a.nd][0]; return Math.abs(x-x0)>1e-6&&Math.abs(x-x1)>1e-6;});
+    T.push({id:"S1",nom:"Semelle S1 – poteaux de rive (portiques)",nb:2*(g.nt+1),a:+P.a1,h:+P.hs1,b:+P.f1,hf:+P.hfut,eff:rive,src:"réactions du calcul EF du portique"});
+    const nInt=(g.nt+1)*(g.nn-1)+(g.fint?(g.nt+1)*g.nn:0);
+    if(inte&&nInt>0) T.push({id:"S2",nom:"Semelle S2 – poteaux intérieurs (noues, faîtage)",nb:nInt,a:+P.a1,h:+P.hs1,b:+P.f1,hf:+P.hfut,eff:inte,src:"réactions du calcul EF du portique"});
+  }
+  const nP=2*g.nn*(g.nip-1);
+  if(nP>0){const A=g.eppr*g.er/2, qp=(+P.ce)*0.5*1.25*(+P.vb)**2/1000, Gk=(+P.Gc+(+P.Gp))*A+(KG[g.ppp]||26)*g.Hf*9.81/1000, Qk=(+P.Q)*A, Wk=qp*1.1*A;
+    T.push({id:"S3",nom:"Semelle S3 – poteaux de pignon",nb:nP,a:+P.a2,h:+P.hs2,b:+P.f2p,hf:+P.hfut,src:`surface reprise ${fmt(A)} m² (${fmt(g.eppr)} × ${fmt(g.er)} / 2)`,
+      eff:{Nser:Gk+Qk,Mser:0,Nu:1.35*Gk+1.5*Qk,Mu:0,Nt:Math.max(0,1.5*Wk-Gk),Nmin:Gk-1.5*Wk,Hu:1.5*qp*1.1*g.eppr*g.Hf/2,
+        HV:[[0,1.35*Gk+1.5*Qk],[1.5*qp*1.1*g.eppr*g.Hf/2,Gk-1.5*Wk]]}});}
+  return T;
+}
+function semellesCalc(g){
+  const T=effortsSemelles(g).map(semelleBA);
+  return {types:T, ok:T.every(t=>t.ok), kg:T.reduce((s,t)=>s+t.nb*t.kg,0), vb:T.reduce((s,t)=>s+t.nb*t.vb,0)};
+}
+function txtNappe(q){return `${q.n} HA${q.d} e = ${fmt(q.e*100,1)} cm`;}
+function blocsSemelles(S){
+  return S.types.map(t=>({titre:`${t.nom} – ${t.nb} u – ${Math.round(t.a*100)} × ${Math.round(t.a*100)} × ${Math.round(t.h*100)} cm`,
+    ref:"BAEL 91 mod. 99 (méthode des bielles, A.6.1, A.8.1) – EN 1992-1-1 (9.2.1.1, 6.4.4) – Fascicule 62 titre V",
+    donnees:[["Efforts",`ELS : N = ${fmt(t.eff.Nser,1)} kN${t.eff.Mser?`, M = ${fmt(t.eff.Mser,1)} kN·m`:""} ; ELU : N = ${fmt(t.eff.Nu,1)} kN${t.eff.Mu?`, M = ${fmt(t.eff.Mu,1)} kN·m`:""}, H = ${fmt(t.eff.Hu,1)} kN ; soulèvement Nt = ${fmt(t.eff.Nt,1)} kN (${t.src})`],
+      ["Géométrie",`a = ${fmt(t.a)} m, h = ${fmt(t.h)} m, fût ${fmt(t.b)} × ${fmt(t.b)} × ${fmt(t.hf)} m, terres ${fmt(t.hsol)} m ; poids fondation + terres P = ${fmt(t.Wf,1)} kN`],
+      ["Matériaux",`béton fc28 = ${t.fc} MPa (ft28 = ${fmt(t.ft)} MPa) ; acier FeE${t.fe} (fsu = ${fmt(t.fsu,0)} MPa) ; enrobage ${fmt(t.c*100,0)} cm ; fissuration ${P.fiss} (× ${fmt(t.kf,2)})`],
+      ["Bielles",`Nu' = ${fmt(t.Np,1)} kN (fût compris${t.e0>t.a/24?", excentricité e0 = "+fmt(t.e0,3)+" m":""}) ; d = ${fmt(t.d,3)} m ; As = kf Nu' (a − b) / (8 d fsu) = ${fmt(t.Asb)} cm² ; As min = ${fmt(t.Amin)} cm² (ρmin ${fmt(t.rmin*100,3)} %)`],
+      ["Ferraillage",`nappe inférieure ${txtNappe(t.inf)} dans chaque sens (${fmt(t.inf.As)} cm²)${t.sup?` ; nappe supérieure ${txtNappe(t.sup)}`:""} ; fût ${t.fut.n} HA${t.dl} + cadres HA${diamHA(P.hacad)} e = ${fmt(+P.ecad*100,0)} cm`],
+      ["Glissement",`couple déterminant H = ${fmt(t.gl.H,1)} kN avec N = ${fmt(t.gl.N,1)} kN ; butée Kp = ${fmt(t.Kp,2)} sur ${fmt(t.Hemb)} m : ${fmt(t.Rbut,1)} kN (50 %)`],
+      ["Ancrage",`ls = ${fmt(t.ls,2)} m ${t.croch?"> a / 4 : crochets (retours relevés) obligatoires":"≤ a / 4 : barres droites"}`]],
+    verifs:t.verifs,
+    note:(t.eff.Nt>0.9*t.Wf?`Soulèvement non équilibré : porter la semelle à ${fmt(t.areq*100,0)} × ${fmt(t.areq*100,0)} cm (même hauteur), ou la relier par des longrines. `:"")
+      +(t.verifs.some(v=>v[0].startsWith("Glissement")&&v[1]>v[2])?"Effort horizontal à reprendre par le dallage (fût noyé dans le dallage) ou par une longrine. ":"")+`Acier : ${fmt(t.kg,1)} kg par semelle (${fmt(t.kg/t.vb,0)} kg/m³) – ${fmt(t.nb*t.kg,0)} kg pour les ${t.nb} semelles.`}));
+}
+// ---------------------------------------------------------- planche 14 : plan de ferraillage des semelles
+function pageFerrSemelles(g){
+  return {svg:()=>{const S=g.SEM||semellesCalc(g);
+    let o=`<svg viewBox="0 0 ${VW} ${VH}" xmlns="http://www.w3.org/2000/svg">`;
+    const T=S.types, nT=T.length; if(!nT) return o+sTx(10,20,"Aucune semelle.",{fs:5})+"</svg>";
+    const cw=VW/nT, Hmx=Math.max(...T.map(t=>t.h+t.hf+(+P.eprop))), amx=Math.max(...T.map(t=>t.a));
+    const sMax=Math.min((cw-14)/(2*amx+0.25),70/(Hmx+0.1)), den=[10,15,20,25,30,40,50,75,100].find(q=>1000/q<=sMax)||100, s=1000/den;
+    const R="#C00000", rond=(x,y,t)=>`<circle cx="${x}" cy="${y}" r="1.6" fill="#fff" stroke="${R}" stroke-width="0.2"/>`+sTx(x,y+0.75,t,{fs:2,b:true,c:R,a:"middle"});
+    T.forEach((t,k)=>{const x0=k*cw, a=t.a*s, b=t.b*s, c=t.c*s, h=t.h*s, hf=t.hf*s, ep=(+P.eprop)*s;
+      o+=sTx(x0+cw/2,4,`${t.id} – ${t.nb} semelles ${Math.round(t.a*100)} × ${Math.round(t.a*100)} × ${Math.round(t.h*100)}`,{fs:2.6,b:true,c:"#1F4E79",a:"middle"});
+      o+=sTx(x0+cw/2,7.2,t.nom.split("–")[1].trim(),{fs:1.8,i:true,a:"middle"});
+      // vue en plan
+      const px=x0+5, py=14; o+=sTx(px+a/2,py-2,"VUE EN PLAN",{fs:2,b:true,a:"middle"});
+      o+=sRc(px,py,a,a,"#E7E6E6","#7F7F7F",0.3)+sRc(px+(a-b)/2,py+(a-b)/2,b,b,"#BFBFBF","#595959",0.3);
+      const n=t.inf.n, lb=(t.a-2*t.c-t.inf.d/1000)*s;
+      for(let i=0;i<n;i++){const q=c+t.inf.d/2000*s+i*lb/(n-1);
+        o+=`<line x1="${px+c}" y1="${py+q}" x2="${px+a-c}" y2="${py+q}" stroke="${R}" stroke-width="0.3"/><line x1="${px+q}" y1="${py+c}" x2="${px+q}" y2="${py+a-c}" stroke="${R}" stroke-width="0.3" stroke-dasharray="1.2 0.5"/>`;}
+      o+=rond(px+a+2.5,py+c+lb*0.25,"1")+rond(px+c+lb*0.25,py+a+2.5,"2");
+      o+=`<line x1="${px}" y1="${py+a+5.5}" x2="${px+a}" y2="${py+a+5.5}" stroke="#000" stroke-width="0.2"/>`+sTx(px+a/2,py+a+5,`${fmt(t.a)} m`,{fs:2,a:"middle"});
+      o+=sTx(px,py+a+9,`① ${txtNappe(t.inf)} (sens X)`,{fs:1.9,c:R})+sTx(px,py+a+11.8,`② ${txtNappe(t.inf)} (sens Y)`,{fs:1.9,c:R});
+      if(t.sup) o+=sTx(px,py+a+14.6,`③④ nappe sup. ${txtNappe(t.sup)}`,{fs:1.9,c:R});
+      // coupe
+      const cx=px+a+9, zb=py+Hmx*s+4, Y=z=>zb-z*s;   // z en m depuis le fond de fouille
+      o+=sTx(cx+a/2,py-2,"COUPE A-A",{fs:2,b:true,a:"middle"});
+      o+=sRc(cx-0.05*s,Y(+P.eprop),a+0.1*s,ep,"#F2F2F2","#7F7F7F",0.2);
+      const z1=+P.eprop, z2=z1+t.h, z3=z2+t.hf;
+      o+=sRc(cx,Y(z2),a,h,"#E7E6E6","#7F7F7F",0.35)+sRc(cx+(a-b)/2,Y(z3),b,hf,"#E7E6E6","#7F7F7F",0.35);
+      const zr=z1+t.c, ret=t.croch?Math.min(+P.ret,t.h-2*t.c)*s:0;
+      o+=`<polyline points="${cx+c},${Y(zr)-ret} ${cx+c},${Y(zr)} ${cx+a-c},${Y(zr)} ${cx+a-c},${Y(zr)-ret}" fill="none" stroke="${R}" stroke-width="0.45"/>`;
+      for(let i=0;i<n;i++){const q=c+t.inf.d/2000*s+i*lb/(n-1); o+=`<circle cx="${cx+q}" cy="${Y(zr)-0.7}" r="0.45" fill="${R}"/>`;}
+      if(t.sup){const zs=z2-t.c, rs=Math.min(+P.ret,t.h-2*t.c)*s; o+=`<polyline points="${cx+c},${Y(zs)+rs} ${cx+c},${Y(zs)} ${cx+a-c},${Y(zs)} ${cx+a-c},${Y(zs)+rs}" fill="none" stroke="${R}" stroke-width="0.4" stroke-dasharray="1.5 0.5"/>`+rond(cx+a/2,Y(zs)-2,"3");}
+      for(const sg of [-1,1]){const xb=cx+a/2+sg*(b/2-c); o+=`<polyline points="${xb+sg*Math.min(+P.ret*s,a/2-b/2)},${Y(zr)-1.2} ${xb},${Y(zr)-1.2} ${xb},${Y(z3)+0.8}" fill="none" stroke="${R}" stroke-width="0.45"/>`;}
+      for(let z=z2+0.05;z<z3-0.02;z+=+P.ecad) o+=`<line x1="${cx+(a-b)/2+c}" y1="${Y(z)}" x2="${cx+(a+b)/2-c}" y2="${Y(z)}" stroke="${R}" stroke-width="0.25"/>`;
+      o+=rond(cx+a+2.5,Y(zr)-1,"1")+rond(cx+(a+b)/2+2.5,Y((z2+z3)/2),"5")+rond(cx+(a-b)/2-2.5,Y((z2+z3)/2)+3,"6");
+      const cv=(x,ya,yb,tx)=>`<line x1="${x}" y1="${ya}" x2="${x}" y2="${yb}" stroke="#000" stroke-width="0.2"/><line x1="${x-0.8}" y1="${ya}" x2="${x+0.8}" y2="${ya}" stroke="#000" stroke-width="0.2"/><line x1="${x-0.8}" y1="${yb}" x2="${x+0.8}" y2="${yb}" stroke="#000" stroke-width="0.2"/>`+`<text x="${x-0.8}" y="${(ya+yb)/2}" font-size="1.8" font-family="Arial" text-anchor="middle" transform="rotate(-90 ${x-0.8} ${(ya+yb)/2})">${tx}</text>`;
+      o+=cv(cx-2.5,Y(z2),Y(z1),fmt(t.h))+cv(cx+(a-b)/2-5.5,Y(z3),Y(z2),fmt(t.hf));
+      o+=sTx(cx,zb+3.2,`Fût ${Math.round(t.b*100)} × ${Math.round(t.b*100)} : ⑤ ${t.fut.n} HA${t.dl} – ⑥ cadres HA${diamHA(P.hacad)} e = ${fmt(+P.ecad*100,0)}`,{fs:1.8,c:R});
+      o+=sTx(cx,zb+5.8,`Enrobage ${fmt(t.c*100,0)} cm – ${t.croch?"crochets relevés (ls > a/4)":"barres droites"} – propreté ${fmt(+P.eprop*100,0)} cm`,{fs:1.8,i:true});
+    });
+    // nomenclature
+    const yN=94; o+=sTx(0,yN-1,`NOMENCLATURE DES ACIERS – FeE${P.fe} – échelle des vues 1/${den} (A4)`,{fs:2.5,b:true,c:"#1F4E79"});
+    const rows=[]; T.forEach(t=>t.bars.forEach(r=>rows.push([t.id,r[0],r[1],"HA"+r[2],String(r[3]),fmt(r[4]),r[5],String(t.nb),fmt(t.nb*r[3]*r[4],1),fmt(t.nb*r[6],1)])));
+    rows.push(["Total","","Béton armé "+fmt(S.vb,2)+" m³ – ratio "+fmt(S.kg/S.vb,0)+" kg/m³","","","","","","",fmt(S.kg,1)]);
+    const tb=svgTab(0,yN,[12,9,62,13,17,15,30,15,22,18].map(w=>w*VW/213),["Type","Rep.","Désignation","Ø","Nb / sem.","L (m)","Façonnage","Nb sem.","L totale (m)","Poids (kg)"],rows,1.6,2.25);
+    o+=tb.svg; o+=sTx(VW-1,VH-1.5,S.ok?"Toutes les vérifications BAEL / EC2 sont satisfaites (planche 15).":"Au moins une vérification n'est pas satisfaite : voir la planche 15.",{fs:2,b:true,a:"end",c:S.ok?"#006100":"#9C0006"});
+    return o+"</svg>";}};
+}
+// ---------------------------------------------------------- planche 15 : note de calcul des fondations
+function pageNoteSemelles(g){
+  const S=g.SEM||semellesCalc(g), B=blocsSemelles(S);
+  const bloc=b=>`<div class="asb"><h4>${esc(b.titre)}</h4><div class="ref">${esc(b.ref)}</div>
+    <table class="t">${b.donnees.map(d=>`<tr><td style="width:18%">${esc(d[0])}</td><td>${esc(d[1])}</td></tr>`).join("")}</table>
+    <table class="t"><tr><th>Vérification</th><th>Ed</th><th>Rd / limite</th><th>Taux</th><th></th></tr>
+    ${b.verifs.map(v=>`<tr><td>${esc(v[0])}</td><td>${fmt(v[1],2)}</td><td>${fmt(v[2],2)} ${v[3]}</td><td><b>${fmt(v[2]>0?v[1]/v[2]:0)}</b></td><td class="${statutV(v)==="OK"?"ok":"nc"}">${statutV(v)}</td></tr>`).join("")}</table>
+    <div class="pt">${esc(b.note)}</div></div>`;
+  const hyp=`<table class="t"><tr><td>Sol</td><td>latérite – σ adm (ELS) = ${fmt(+P.qadm)} MPa, σ ELU = 1,5 σ adm ; φ = ${P.phis}° ; γ terres = ${P.gt} kN/m³ – <b>à confirmer par étude géotechnique</b></td></tr>
+    <tr><td>Méthode</td><td>bielles (BAEL A.6.1 / Fascicule 62-V) ; As min = max(0,26 fctm / fyk ; 0,13 % ; 0,23 ft28 / fe) × a d ; ferraillage ${P.fsem==="Imposé"?"imposé (PARAMÈTRES)":"calculé (plus petit Ø donnant e ≥ 10 cm)"}</td></tr></table>`;
+  return {html:`<div class="note"><div class="concl ${S.ok?"ok":"nc"}">${S.ok?"CONCLUSION : les semelles isolées sont justifiées (BAEL 91 mod. 99 / EC2).":"CONCLUSION : au moins une vérification de semelle n'est pas satisfaite – voir les lignes NON CONFORME."}</div>
+    <h4>Hypothèses</h4>${hyp}<div class="asg">${B.map(bloc).join("")}</div>
+    <p class="pt">Vérification croisée : feuille FERRAILLAGE_SEMELLES du classeur Excel (mêmes formules ; saisir les efforts ci-dessus dans les cellules jaunes).</p></div>`,
+    svgNote:g2=>{const S2=g2.SEM||semellesCalc(g2), B2=blocsSemelles(S2);
+      let o=sRc(0,0.5,VW,5,S2.ok?"#C6EFCE":"#FFC7CE","none")+sTx(2,4,S2.ok?"CONCLUSION : les semelles isolées sont justifiées (BAEL 91 mod. 99 / EC2).":"CONCLUSION : au moins une vérification de semelle n'est pas satisfaite.",{fs:2.7,b:true,c:S2.ok?"#006100":"#9C0006"});
+      o+=sTx(0,9.5,`Sol latéritique : σ adm = ${fmt(+P.qadm)} MPa (ELS), 1,5 σ adm (ELU), φ = ${P.phis}° – à confirmer par étude géotechnique. Méthode des bielles, As min EC2 9.2.1.1, poinçonnement EC2 6.4.4.`,{fs:1.8,i:true});
+      const nc=Math.min(3,B2.length), wc=(VW-4*(nc-1))/nc; let ys=Array(nc).fill(12);
+      B2.forEach((b,k)=>{const col=k%nc, x=col*(wc+4); let y=ys[col];
+        o+=sTx(x,y+2.4,b.titre,{fs:2.4,b:true,c:"#1F4E79"}); y+=4;
+        let t=svgTab(x,y,[17,wc-17],null,b.donnees,1.8,2.55); o+=t.svg; y+=t.h+0.8;
+        t=svgTab(x,y,[wc-55,12,17,9,17],["Vérification","Ed","Rd","Taux",""],b.verifs.map(v=>[v[0],fmt(v[1]),fmt(v[2])+" "+v[3],fmt(v[2]>0?v[1]/v[2]:0),statutV(v)]),1.8,2.55);
+        o+=t.svg; y+=t.h+0.8; couper(b.note,Math.floor(wc/0.9)).forEach((l,i)=>{o+=sTx(x,y+2.2+i*2.4,l,{fs:1.8,i:true});}); ys[col]=y+6;});
+      return o;}};
+}
+// ============================================================ FERRAILLAGE DES SEMELLES – fin
+
 // ============================================================ MAQUETTE 3D (modèle commun : visualiseur, OBJ, DXF 3D, IFC)
 // Repère : x le long du bâtiment (0 → L), y en travers (0 → W), z vertical (0 = dallage)
 const CALQUES3D={ossature:"Ossature principale",secondaire:"Pannes et lisses",contrev:"Contreventements",fondations:"Fondations",couverture:"Couverture",facades:"Façades"};
@@ -1511,8 +1716,8 @@ function modele3D(g){
   const barre=(a,b,prof,calque,ifc,wx,ratioGrp,nom)=>{M.push({a,b,prof,calque,ifc,w:wx||[1,0,0],grp:ratioGrp||null,nom:nom||prof,dim:dimProfil(prof)});};
   const pPot=g.ppot, pTr=g.ptrav, pInt=CALC&&CALC.profils.poteau_interieur&&CALC.profils.poteau_interieur!=="—"?CALC.profils.poteau_interieur:pPot;
   // fondations (semelles + fûts) : boîtes béton
-  const fond=(x,y,a)=>{const zs=-P.D+P.eprop; M.push({box:[x-a/2,y-a/2,zs,x+a/2,y+a/2,zs+(+P.hs1)],calque:"fondations",ifc:"IfcFooting",nom:"Semelle "+Math.round(a*100)+"×"+Math.round(a*100)});
-    M.push({box:[x-P.f1/2,y-P.f1/2,zs+(+P.hs1),x+P.f1/2,y+P.f1/2,0],calque:"fondations",ifc:"IfcFooting",nom:"Fût "+Math.round(P.f1*100)+"×"+Math.round(P.f1*100)});};
+  const fond=(x,y,a,hs=+P.hs1,fb=+P.f1)=>{const zs=-P.D+P.eprop; M.push({box:[x-a/2,y-a/2,zs,x+a/2,y+a/2,zs+hs],calque:"fondations",ifc:"IfcFooting",nom:"Semelle "+Math.round(a*100)+"×"+Math.round(a*100)});
+    M.push({box:[x-fb/2,y-fb/2,zs+hs,x+fb/2,y+fb/2,0],calque:"fondations",ifc:"IfcFooting",nom:"Fût "+Math.round(fb*100)+"×"+Math.round(fb*100)});};
   for(let i=0;i<=nt;i++){const x=er*i;
     for(let k=0;k<=nn;k++){const rive=k===0||k===nn; barre([x,k*B,0],[x,k*B,Hm],rive?pPot:pInt,"ossature","IfcColumn",[1,0,0],rive?"poteau_rive":"poteau_interieur",rive?"Poteau de rive":"Poteau de noue"); fond(x,k*B,+P.a1);}
     for(let k=0;k<nn;k++){const o=k*B;
@@ -1530,7 +1735,7 @@ function modele3D(g){
     }
   }
   // poteaux de pignon
-  for(const x of [0,L]) for(let k=0;k<nn;k++) for(let j=1;j<g.nip;j++){const y=k*B+j*g.eppr; barre([x,y,0],[x,y,top(y)],g.ppp,"ossature","IfcColumn",[0,1,0],null,"Poteau de pignon"); fond(x,y,+P.a2);}
+  for(const x of [0,L]) for(let k=0;k<nn;k++) for(let j=1;j<g.nip;j++){const y=k*B+j*g.eppr; barre([x,y,0],[x,y,top(y)],g.ppp,"ossature","IfcColumn",[0,1,0],null,"Poteau de pignon"); fond(x,y,+P.a2,+P.hs2,+P.f2p);}
   // pannes, sablières
   const hp=dimProfil(g.ppanne).h;
   for(let k=0;k<nn;k++) for(let j=0;j<g.np;j++){const y=j*(B/2)/Math.max(1,g.np-1);
@@ -1859,10 +2064,12 @@ function legende(k,g){
   switch(k){
     case 0: return `Poteaux de portique ■ ${g.ppot} sur semelles ${P.a1*100} × ${P.a1*100} ; poteaux de pignon ● ${g.ppp} sur semelles ${P.a2*100} × ${P.a2*100} ; semelles filantes en pointillés.`;
     case 4: return `Translucides : ${P.pct} % – skydomes : ${P.nsky} – descentes EP : ${g.ndesc} – poutre au vent : ${g.nbcv} travées – liernes : ${g.nl} ligne(s) par travée.`;
-    case 5: return `Aciers : semelles isolées ${P.hasem} maille ${P.msem*100} cm ; fûts ${P.nbf} ${P.hafut} + cadres ${P.hacad} e = ${P.ecad*100} cm ; semelle filante ${P.nfil} ${P.hafil} + ${P.harep} e = ${P.erep*100} cm ; dallage ${P.ferr} ${P.hix} (X) / ${P.hiy} (Y)${g.kdbl?` + nappe sup. ${P.hsx} / ${P.hsy} + chaises`:""}, maille ${g.maille*100} cm.`;
+    case 5: return `Aciers : semelles isolées ${g.SEM&&g.SEM.types.length?g.SEM.types.map(t=>t.id+" "+txtNappe(t.inf)).join(", "):P.hasem+" maille "+P.msem*100+" cm"} ; fûts ${P.nbf} ${P.hafut} + cadres ${P.hacad} e = ${P.ecad*100} cm ; semelle filante ${P.nfil} ${P.hafil} + ${P.harep} e = ${P.erep*100} cm ; dallage ${P.ferr} ${P.hix} (X) / ${P.hiy} (Y)${g.kdbl?` + nappe sup. ${P.hsx} / ${P.hsy} + chaises`:""}, maille ${g.maille*100} cm.`;
     case 7: return `Perspectives isométriques sans échelle. Ossature : poteaux ${g.ppot}, ${g.treil?"fermes treillis":"traverses "+g.ptrav}, pannes ${g.ppanne}, ${g.kbard?"lisses "+g.plisse+", ":""}contreventements en orange.`;
     case 8: return `Vue éclatée : pannes et poutre au vent soulevées, portique de rive et lisses du long-pan avant écartés pour la lisibilité. Nomenclature indicative.`;
     case 10: return CALC?`Calcul par éléments finis 2D (méthode des déplacements) – profilés retenus : poteaux de rive ${CALC.profils.poteau_rive}, traverses ${CALC.profils.traverse}${CALC.profils.poteau_interieur!=="—"?", poteaux intérieurs "+CALC.profils.poteau_interieur:""}. Jarrets non vérifiés (hauteur ${P.jh} h).`:"Calcul indisponible.";
+    case 13: return `Ferraillage des semelles isolées ${P.fsem==="Imposé"?"imposé (paramètres)":"calculé"} – FeE${P.fe}, béton C${P.ab_fck}, enrobage ${fmt(+P.csem*100,0)} cm – repères ① à ⑥ : voir la nomenclature. Efforts issus du calcul du portique.`;
+    case 14: return `Méthode des bielles (BAEL 91 mod. 99), aciers minimaux et poinçonnement (EC2), sol latéritique σ adm ${fmt(+P.qadm)} MPa à confirmer par étude géotechnique. Vérification croisée : feuille FERRAILLAGE_SEMELLES du classeur.`;
     case 12: return `Assemblages selon l'EN 1993-1-8 à partir des efforts du calcul de portique ; tiges d'ancrage : BAEL A.6.1. Dispositions constructives (pinces, soudures, raidisseurs) à reporter sur les plans d'exécution.`;
     case 11: return `Vérifications EN 1993-1-1 ; combinaisons EN 1990 ; vent EC1 simplifié (vb ${P.vb} m/s à confirmer). Assemblages, bracons et fondations à justifier séparément.`;
     case 9: return `Détails types sans échelle – épaisseurs et boulonnerie à confirmer par la note de calcul des assemblages (EC3-1-8).`;
@@ -1873,12 +2080,12 @@ function legende(k,g){
 const TITRES=["VUE EN PLAN – IMPLANTATION","COUPE TRANSVERSALE – PORTIQUE TYPE","ÉLÉVATION LONG-PAN","ÉLÉVATION PIGNON",
   "VUE EN PLAN TOITURE – CALEPINAGE","COUPE DE FONDATION ET DALLAGE (DÉTAIL)","ÉLÉVATION MUR AGGLOS – PANNEAU TYPE",
   "VUE D'ENSEMBLE – PERSPECTIVES ET PLAN DE CHARPENTE","ASSEMBLAGE ÉCLATÉ ET NOMENCLATURE","DÉTAILS D'ASSEMBLAGE",
-  "NOTE DE CALCUL – MODÈLE ET SOLLICITATIONS","NOTE DE CALCUL – VÉRIFICATIONS EC3, ELS ET RÉACTIONS","NOTE DE CALCUL – ASSEMBLAGES EC3-1-8"];
+  "NOTE DE CALCUL – MODÈLE ET SOLLICITATIONS","NOTE DE CALCUL – VÉRIFICATIONS EC3, ELS ET RÉACTIONS","NOTE DE CALCUL – ASSEMBLAGES EC3-1-8","FERRAILLAGE DES SEMELLES ISOLÉES – PLANS ET NOMENCLATURE","NOTE DE CALCUL – FONDATIONS (BAEL 91 / EC2)"];
 let DATE=new Date().toLocaleDateString("fr-FR");
 function dessiner(){
   const g=calc(); lancerCalcul(g);
   VUE3D.modele=modele3D(g); if(document.getElementById("cv3d")&&document.getElementById("cv3d")._init) rendu3D();
-  const vues=[P1,P2,P3,P4,P5,P6,P7,pageEnsemble,pageEclate,pageDetails,pageCalcFigures,pageCalcTableaux,pageAssemblages].map(f=>f(g)), NP=vues.length;
+  const vues=[P1,P2,P3,P4,P5,P6,P7,pageEnsemble,pageEclate,pageDetails,pageCalcFigures,pageCalcTableaux,pageAssemblages,pageFerrSemelles,pageNoteSemelles].map(f=>f(g)), NP=vues.length;
   const gabTxt=`Gabarit ${P.gab}${g.nn>1?" – "+g.nn+" nefs":""} : portée ${f2(g.B)} m × longueur ${f2(g.L)} m – H sablière ${f2(g.H)} m – pente ${f1(P.p)} % – ${g.systeme} – façade : ${P.fac}`;
   document.getElementById("planches").innerHTML=vues.map((v,k)=>`
   <section class="page">
@@ -1890,7 +2097,7 @@ function dessiner(){
       <tr><td colspan="3" class="leg">${LEG}</td><td colspan="2" class="bpa">BON POUR ACCORD</td></tr>
       <tr><td colspan="3" rowspan="2" style="font-size:9px">${esc(legende(k,g))}</td><td>Date :</td><td></td></tr>
       <tr><td style="height:9mm">Signature :</td><td></td></tr>
-      <tr><td colspan="5" class="leg">${k>=10?"Note de calcul de prédimensionnement – à viser avant exécution":k>=7?"Perspectives et détails sans échelle":"Échelle automatique (même échelle en X et en Y)"} – cotes en mètres – EC3 / EC1 / BAEL 91 mod. 99 / EC2 – esquisse de prédimensionnement à confirmer par note de calcul.</td></tr>
+      <tr><td colspan="5" class="leg">${k===13?"Échelle indiquée sur la planche":k>=10?"Note de calcul de prédimensionnement – à viser avant exécution":k>=7?"Perspectives et détails sans échelle":"Échelle automatique (même échelle en X et en Y)"} – cotes en mètres – EC3 / EC1 / BAEL 91 mod. 99 / EC2 – esquisse de prédimensionnement à confirmer par note de calcul.</td></tr>
     </table>
   </section>`).join("");
 }
