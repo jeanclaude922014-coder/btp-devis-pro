@@ -14,6 +14,7 @@ import sys
 from conception.projet import Projet
 from conception.ec3 import dimensionner
 from conception.note_word import generer_note
+from conception.dxf_plans import exporter_dxf
 
 
 def main():
@@ -21,6 +22,7 @@ def main():
     ap.add_argument("fiche", nargs="?", help="fiche projet JSON")
     ap.add_argument("--code", help="CODE PLANS copié depuis le classeur Excel")
     ap.add_argument("-o", "--sortie", default=None, help="note Word à produire (.docx)")
+    ap.add_argument("--dxf", default=None, help="plans DXF à produire (AutoCAD R2010)")
     a = ap.parse_args()
     if a.code:
         p = Projet.from_code(a.code)
@@ -38,6 +40,9 @@ def main():
     sortie = a.sortie or "Note_de_calcul_portique.docx"
     generer_note(p, v, sortie)
     print("Note de calcul :", sortie)
+    if a.dxf:
+        _, vues = exporter_dxf(p, v["profils"], a.dxf)
+        print("Plans DXF :", a.dxf, "–", ", ".join(f"{t} (1:{d})" for t, d in vues))
     return 0 if all(float(r) <= 1 for r in v["ratio_groupes"].values()) else 1
 
 
