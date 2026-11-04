@@ -95,5 +95,44 @@ for (const [id, model, ids] of [
   }
 }
 
+// 6. Version 21 (Expert CI) : têtes différenciées, coupe de sol, situations hydrauliques, choc, optimisation.
+{
+  const base = specFromPreset("r200x200");
+  const r0 = runStudy(base);
+  if (!r0.ok) { failed++; console.log("ÉCHEC  r200x200 : calcul impossible"); }
+  else {
+    // Réglage « position par position » identique aux valeurs générales : même ouvrage, même acier.
+    const same = specFromPreset("r200x200");
+    same.values.annexes = JSON.stringify({ wings: { amont_g: { angle: Number(same.values.aileAngle), long: Number(same.values.aileLong) } } });
+    const r1 = runStudy(same);
+    if (!r1.ok || !r1.study.heads.uniform || Math.abs(r1.study.quantities.steelMass - r0.study.quantities.steelMass) > 1e-6) { failed++; console.log("ÉCHEC  annexes identiques aux valeurs générales : résultat différent"); }
+    else console.log("OK   annexes identiques aux valeurs générales : têtes uniformes, même acier");
+    // Aile aval rive droite supprimée, aile amont rive gauche à 45° : têtes vérifiées séparément.
+    const diff = specFromPreset("r200x200");
+    diff.values.annexes = JSON.stringify({ heads: { aval: { radierLong: 4 } }, wings: { amont_g: { angle: 45, long: 4.5 }, aval_d: { actif: false } } });
+    const r2 = runStudy(diff);
+    const ids = r2.ok ? r2.study.checks.map((c) => c.id) : [];
+    const ok2 = r2.ok && !r2.study.heads.uniform && ids.includes("T-MA-GLIS-AM") && ids.includes("T-MA-GLIS-AV") && ids.includes("T-MA-F-AMG")
+      && r2.study.heads.perHead[1].wings.length === 1 && r2.study.quantities.bars.some((b) => b.designation.endsWith("— amont, rive gauche"));
+    if (!ok2) { failed++; console.log("ÉCHEC  têtes différenciées"); }
+    else console.log(`OK   têtes différenciées : ${ids.filter((x) => /-(AM|AV)/.test(x)).length} vérifications propres aux têtes amont et aval, une seule aile à l'aval`);
+    // Choc sur guide-roue présent par défaut.
+    if (!ids.includes("ANX-CHOC-F-AM")) { failed++; console.log("ÉCHEC  choc sur guide-roue"); } else console.log("OK   choc sur guide-roue vérifié tête par tête");
+    // Coupe de sol : une couche élastique unique = formule élastique Δσ·h/E.
+    const geo = specFromPreset("r200x200");
+    geo.values.couchesSol = JSON.stringify([{ nom: "Argile", ep: 3, gamma: 18, methode: "oedometrique", Cc: 0.3, Cr: 0.05, e0: 1, sigP: null }]);
+    geo.values.situationsHydro = JSON.stringify([{ nom: "Vidange", nappe: 2.5, eauInt: 0, type: "transitoire", actif: true }]);
+    const r3 = runStudy(geo);
+    if (!r3.ok) { failed++; console.log("ÉCHEC  coupe de sol : calcul impossible"); }
+    else {
+      const L0 = r3.study.geo.layers[0];
+      check("coupe de sol : tassement œdométrique NC h·Cc/(1+e0)·log((σ0+Δσ)/σ0) (cm)", L0.s, (3 * 0.3) / 2 * Math.log10((L0.s0 + L0.ds) / L0.s0) * 100, 1e-9);
+      const fl = r3.study.checks.find((c) => c.id === "G-SIT-FLOT-1");
+      if (!fl || fl.value === undefined) { failed++; console.log("ÉCHEC  situation hydraulique : flottaison absente"); }
+      else console.log(`OK   situation hydraulique « Vidange » : flottaison FS = ${fl.value.toFixed(2)}`);
+    }
+  }
+}
+
 if (failed) { console.log(`\n${failed} contrôle(s) en échec`); process.exit(1); }
 console.log("\nTous les contrôles sont satisfaits.");

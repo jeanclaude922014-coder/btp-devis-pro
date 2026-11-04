@@ -43,7 +43,8 @@ const LABELS: Record<string, string> = {
 const groupKey = (g: string) => (g.startsWith("dalle") ? "es" : g.startsWith("radier") ? "er" : g === "pint" ? "eInt" : "eExt");
 
 function candidates(spec: DalotSpec, c: Check): Candidate[] {
-  const id = c.id;
+  // Têtes différenciées : « T-MA-GLIS-AV », « T-MA-F-AMG »… se corrigent par les mêmes leviers.
+  const id = c.id.replace(/-(AM|AV)[GD]?$/, "");
   const out: Candidate[] = [];
   const fc = Number(spec.values.fc28);
   const fcUp = (): Candidate[] => [30, 35].filter((x) => x > fc).slice(0, 1).map((x) => ({
@@ -88,6 +89,10 @@ function candidates(spec: DalotSpec, c: Check): Candidate[] {
     out.push({ kind: "num", key: "aileSemelle", label: "Largeur de la semelle des murs en aile", step: 0.1, max: 6, unit: "m" });
   } else if (id.startsWith("T-MA-")) {
     out.push({ kind: "num", key: "aileEp", label: "Épaisseur des murs en aile", step: 0.05, max: 0.6, unit: "m" });
+  } else if (id === "T-RT-L") {
+    out.push({ kind: "num", key: "radierTeteLong", label: "Longueur des radiers de tête", step: 0.1, max: 12, unit: "m" });
+  } else if (id.startsWith("ANX-CHOC")) {
+    out.push({ kind: "num", key: "guideRoueL", label: "Largeur du guide-roue", step: 0.05, max: 0.6, unit: "m" });
   } else if (id.startsWith("T-MT-")) {
     out.push({ kind: "num", key: "murTeteEp", label: "Épaisseur du mur de tête", step: 0.05, max: 0.5, unit: "m" });
   } else if (id === "H-CHARGE" || id === "H-REV") {

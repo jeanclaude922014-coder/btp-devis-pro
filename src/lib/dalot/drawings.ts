@@ -8,7 +8,7 @@ import type { GroupId } from "./design";
 import type { Study } from "./engine";
 
 export type Pt = [number, number];
-export type Layer = "CADRE" | "COFFRAGE" | "AXES" | "COTATION" | "ACIERS" | "REPARTITION" | "TEXTE" | "TERRAIN" | "HACHURES";
+export type Layer = "CADRE" | "COFFRAGE" | "AXES" | "COTATION" | "ACIERS" | "REPARTITION" | "TEXTE" | "TERRAIN" | "HACHURES" | "DRAPEAU_ORANGE" | "DRAPEAU_VERT";
 
 export type Prim =
   | { t: "line"; a: Pt; b: Pt; layer: Layer }
@@ -34,6 +34,9 @@ export const LAYER_COLORS: Record<Layer, { aci: number; css: string }> = {
   TEXTE: { aci: 7, css: "#0f172a" },
   TERRAIN: { aci: 32, css: "#78350f" },
   HACHURES: { aci: 8, css: "#475569" },
+  // Drapeau de la République de Côte d'Ivoire (cartouche) : orange, blanc, vert.
+  DRAPEAU_ORANGE: { aci: 30, css: "#f77f00" },
+  DRAPEAU_VERT: { aci: 94, css: "#009e60" },
 };
 
 export const fmt = (x: number, d = 2) => x.toFixed(d).replace(".", ",");

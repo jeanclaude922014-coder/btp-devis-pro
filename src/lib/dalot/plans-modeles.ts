@@ -156,6 +156,14 @@ const AREA: Record<Model, Region> = {
 
 // ── Cartouches ─────────────────────────────────────────────
 
+/** Drapeau orange – blanc – vert (bandes verticales) du cartouche République de Côte d'Ivoire. */
+function flag(pg: Page, x: number, y: number, w: number, h: number) {
+  const b = w / 3;
+  pg.rect(x, y, b, h, "DRAPEAU_ORANGE", true);
+  pg.rect(x + 2 * b, y, b, h, "DRAPEAU_VERT", true);
+  pg.rect(x, y, w, h, "CADRE");
+}
+
 function cartoucheCafe(pg: Page, ctx: Ctx, title: string, idx: number, total: number) {
   const id = ctx.study.input.ident;
   // Cadre double du dessin, puis bandeau du cartouche.
@@ -170,8 +178,10 @@ function cartoucheCafe(pg: Page, ctx: Ctx, title: string, idx: number, total: nu
   for (let i = 1; i < xs.length - 1; i++) pg.line(xs[i], y0, xs[i], y0 + h);
   // 1. République / ministère
   const c1 = (xs[0] + xs[1]) / 2;
-  pg.text(c1, y0 + 24, 2.5, "RÉPUBLIQUE DE CÔTE D'IVOIRE", "center", true);
-  pg.text(c1, y0 + 20.5, 1.5, "Union – Discipline – Travail", "center");
+  const ct = ctx.study.input.cartouche;
+  pg.text(c1 + (ct.drapeau ? 4 : 0), y0 + 24, 2.5, up(ct.etat || "RÉPUBLIQUE DE CÔTE D'IVOIRE"), "center", true);
+  if (ct.devise) pg.text(c1 + (ct.drapeau ? 4 : 0), y0 + 20.5, 1.5, ct.devise, "center");
+  if (ct.drapeau) flag(pg, xs[0] + 2, y0 + 20, 7.5, 5);
   wrap(up(id.ministere || "Ministère de tutelle"), 44, 3).forEach((l, i) => pg.text(c1, y0 + 13 - i * 3, 1.9, l, "center", true));
   // 2. Maître d'ouvrage délégué
   const c2 = (xs[1] + xs[2]) / 2;
@@ -194,12 +204,15 @@ function cartoucheCafe(pg: Page, ctx: Ctx, title: string, idx: number, total: nu
   pg.line(c4 - 13, y0 + 24.8, c4 + 13, y0 + 24.8, "TEXTE");
   wrap(id.entreprise || "—", 24, 2).forEach((l, i) => pg.text(c4, y0 + 17 - i * 4, 2.8, l, "center", true));
   pg.text(c4, y0 + 3.5, 1.7, `Conception : ${id.auteur}`, "center");
+  const visas = [ct.editePar && `Édité : ${ct.editePar}`, ct.verifiePar && `Vérifié : ${ct.verifiePar}`, ct.approuvePar && `Approuvé : ${ct.approuvePar}`].filter(Boolean) as string[];
+  visas.forEach((v, i) => pg.text(c4, y0 + 11.4 - i * 2.2, 1.5, v, "center"));
   // 5. Indice, date
   const x5 = xs[4];
   pg.rect(x5 + 2, y0 + 17, 50, 11);
   pg.line(x5 + 38, y0 + 17, x5 + 38, y0 + 28);
   pg.text(x5 + 20, y0 + 19.5, 5.5, "INDICE", "center");
   pg.text(x5 + 45, y0 + 19.5, 5.5, id.indice || "A", "center");
+  pg.text(x5 + 27, y0 + 14.9, 1.7, `Phase : ${up(ct.phase || "EXÉCUTION")}`, "center", true);
   pg.text(x5 + 27, y0 + 10.5, 3.6, "Date :", "center");
   pg.text(x5 + 27, y0 + 4, 2.8, ctx.date, "center");
   // 6. Format, n° de planche
@@ -222,8 +235,10 @@ function cartouchePaia(pg: Page, ctx: Ctx, title: string, idx: number, scaleTxt:
   for (let i = 0; i < cols.length; i++) pg.rect(xs[i], y0, cols[i] - 1.2, h);
   // 1. République
   const c1 = xs[0] + (cols[0] - 1.2) / 2;
-  pg.text(c1, y0 + 20.5, 2.4, "RÉPUBLIQUE DE CÔTE D'IVOIRE", "center", true);
-  pg.text(c1, y0 + 17.2, 2, "------------------", "center");
+  const ct = ctx.study.input.cartouche;
+  pg.text(c1 + (ct.drapeau ? 4 : 0), y0 + 20.5, 2.4, up(ct.etat || "RÉPUBLIQUE DE CÔTE D'IVOIRE"), "center", true);
+  pg.text(c1 + (ct.drapeau ? 4 : 0), y0 + 17.2, ct.devise ? 1.6 : 2, ct.devise || "------------------", "center");
+  if (ct.drapeau) flag(pg, xs[0] + 1.5, y0 + 17, 7.5, 5);
   wrap(up(id.ministere || "Ministère"), 40, 2).forEach((l, i) => pg.text(c1, y0 + 13.5 - i * 2.8, 2.1, l, "center", true));
   pg.text(c1, y0 + 7.4, 2, "------------------", "center");
   pg.text(c1, y0 + 3.5, 2.1, up(id.maitreOuvrage || "—"), "center", true);
@@ -255,6 +270,8 @@ function cartouchePaia(pg: Page, ctx: Ctx, title: string, idx: number, scaleTxt:
   pg.rect(x5 + 1, y0 + 0.8, cols[4] - 3.2, 8);
   pg.text(x5 + (cols[4] - 1.2) / 2, y0 + 5.6, 1.8, "DATE", "center", true);
   pg.text(x5 + (cols[4] - 1.2) / 2, y0 + 1.9, 1.8, ctx.date, "center");
+  pg.text(x5 + (cols[4] - 1.2) / 2, y0 + 22.5, 1.6, `Phase : ${up(ct.phase || "EXÉCUTION")}`, "center", true);
+  if (ct.verifiePar) pg.text(x5 + (cols[4] - 1.2) / 2, y0 + 11.5, 1.4, `Vérifié : ${ct.verifiePar}`, "center");
   pg.text(x5 + (cols[4] - 1.2) / 2, y0 + 18, 1.6, `Conception :`, "center");
   pg.text(x5 + (cols[4] - 1.2) / 2, y0 + 15, 1.6, id.auteur, "center");
   // 6. Échelle et n°
@@ -746,7 +763,8 @@ function notesBox(pg: Page, ctx: Ctx, r: Region) {
     "Remblai latéritique compacté à 95 % OPM par couches de 20 cm.",
     "Cure humide 7 jours minimum ; badigeon bitumineux sur parements enterrés.",
   ];
-  const size = r.w < 120 ? 1.8 : 2.1;
+  if (!ctx.study.heads.uniform) lines.push("Têtes différenciées : tête amont représentée ; ailes et têtes position par position dans la note.");
+  const size = (r.w < 120 ? 1.8 : 2.1) * (lines.length > 6 ? 0.9 : 1);
   lines.forEach((l, i) => pg.text(r.x + 3, r.y + r.h - 10 - i * (size * 1.75), size, `– ${l}`, "left"));
 }
 
@@ -1377,8 +1395,11 @@ function gardeCafe(pg: Page, ctx: Ctx, scaleTxt: string) {
   const x0 = 12, w = 200, cx = x0 + w / 2;
   pg.rect(x0, 10, w, 277);
   let y = 280;
-  pg.text(cx, y, 2.6, "RÉPUBLIQUE DE CÔTE D'IVOIRE", "center", true); y -= 3.5;
-  pg.text(cx, y, 1.7, "Union – Discipline – Travail", "center"); y -= 9;
+  const ct = ctx.study.input.cartouche;
+  if (ct.drapeau) { flag(pg, cx - 6, y - 5, 12, 8); y -= 9; }
+  pg.text(cx, y, 2.6, up(ct.etat || "RÉPUBLIQUE DE CÔTE D'IVOIRE"), "center", true); y -= 3.5;
+  if (ct.devise) pg.text(cx, y, 1.7, ct.devise, "center");
+  y -= 9;
   wrap(up(id.ministere || "Ministère de tutelle"), 52, 3).forEach((l) => { pg.text(cx, y, 2.8, l, "center"); y -= 4; });
   y -= 5;
   pg.text(cx, y, 2.8, "MAÎTRE D'OUVRAGE", "center"); y -= 4;

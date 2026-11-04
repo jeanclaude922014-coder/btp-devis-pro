@@ -65,6 +65,57 @@ export function runStudy(spec: DalotSpec): RunOutcome {
   }
 }
 
+export type RunStep = { label: string; ms: number };
+
+/**
+ * Même calcul que `runStudy`, étape par étape, en rendant la main entre deux étapes : la barre du
+ * haut affiche l'avancement (« Calcul en cours ») avec la durée de chaque étape.
+ */
+export async function runStudyAsync(spec: DalotSpec, onStep?: (steps: RunStep[], current: string | null) => void): Promise<RunOutcome> {
+  const steps: RunStep[] = [];
+  const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
+  const pause = () => new Promise<void>((r) => setTimeout(r, 0));
+  const t0 = now();
+  const step = async <T,>(label: string, fn: () => T): Promise<T> => {
+    onStep?.(steps, label);
+    await pause();
+    const a = now();
+    const out = fn();
+    steps.push({ label, ms: now() - a });
+    onStep?.(steps, null);
+    return out;
+  };
+  const missing = await step("Validation des données", () => missingFields(spec.values));
+  if (missing.length > 0) return { ok: false, missing: missing.map((f) => f.label) };
+  try {
+    const input = toInput(spec);
+    if (input.openings.some((o) => !(o > 0))) return { ok: false, missing: [], error: "Ouverture de cellule invalide." };
+    const analysis = await step("Actions permanentes, poussées et hydraulique ; convois : diffusion et balayage des positions ; combinaisons d'actions", () => runAnalysis(input));
+    const design = await step("Dimensionnement des armatures et vérification des sections", () => designSections(input, analysis));
+    const geo = await step("Contact unilatéral du sol, portance, tassement et stabilité", () => geotechChecks(input, analysis));
+    const heads = await step("Ouvrages annexes : murs en aile, têtes, bêches, guide-roues", () => designHeads(input, design.mat));
+    const quantities = await step("Métré et nomenclature des aciers", () => computeQuantities(input, design.mat, design.groups, heads));
+    const hydro = await step("Étude hydraulique", () => hydroStudy(input));
+    const checks = await step("Contrôles du modèle et synthèse des vérifications", () => [...hydro.checks, ...design.checks, ...geo.checks, ...heads.checks, ...modelControls(input, analysis)]);
+    if (input.convoys.length === 0) {
+      checks.push({
+        id: "C-TRAFIC", domain: "Dimensionnement des sections", element: "Ouvrage", label: "Charges d'exploitation routières",
+        status: "non_verifie", ref: "Fascicule 61 titre II", detail: "Aucun convoi sélectionné : l'ouvrage n'est justifié que sous charges permanentes.",
+      });
+    }
+    return {
+      ok: true,
+      study: {
+        input, values: spec.values, analysis, design, geo: geo.result, heads, hydro: hydro.result, quantities, checks,
+        status: globalStatus(checks), fingerprint: fingerprint(spec),
+        defaultsInPlace: spec.defaulted, durationMs: now() - t0,
+      },
+    };
+  } catch (e) {
+    return { ok: false, missing: [], error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 export type OptimizeProposal = { key: string; label: string; from: number; to: number }[];
 
 /**
