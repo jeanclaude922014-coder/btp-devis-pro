@@ -44,6 +44,7 @@ Deux possibilités :
 | GROS_ŒUVRE | Terrassements, semelles isolées et filantes, maçonnerie de fondation, dallage, variante agglos, récapitulatif des matériaux |
 | DQE_DEVIS | 5 lots, TOTAL HT, TVA = HT × 0,18, TOTAL TTC |
 | RÉCAP_GABARITS | Comparatif des 7 gabarits et contrôle de cohérence avec le DQE |
+| (paramètre « Nombre de nefs ») | 1 à 4 nefs identiques : poteaux de noue, chéneaux centraux, quantités et esquisses adaptées |
 | RAPPORT_VÉRIFICATION | Rapport de vérification automatique du gabarit actif (EC3 / EC1 / BAEL), imprimable en PDF |
 | PLANS | 7 planches A4 paysage avec cartouche (imprimables en PDF) |
 | COORD_PLANS (masquée) | Coordonnées des esquisses, calculées par formules |
@@ -120,6 +121,72 @@ Le rapport vérifie automatiquement le gabarit actif et se met à jour à chaque
 4. **Synthèse et conclusion** automatiques, avec cadres « Établi par », « Vérifié par » et « Visa ».
 
 > Il s'agit de vérifications simplifiées de prédimensionnement (EC3 / EC1 / EC0, BAEL 91 mod. 99). La vitesse de vent de 25 m/s et la contrainte admissible de 0,20 MPa sont des valeurs par défaut à confirmer (données météo locales, étude géotechnique). Elles ne remplacent pas la note de calcul d'exécution.
+
+## Module de conception : du croquis à la note de calcul
+
+Chaîne de travail sur le principe « l'outil automatise, l'ingénieur vérifie et valide ». Chaque étape produit un livrable contrôlable, et l'étape suivante ne démarre qu'après visa.
+
+| Étape | Outil | Livrable | Point de contrôle |
+|---|---|---|---|
+| 1. Lecture du croquis | Claude (lecture de la photo) | fiche projet JSON avec la confiance de chaque valeur lue | – |
+| 2. Contre-lecture | `valider_fiche.py` | rapport `.md` et `.docx` : contrôles, points d'arrêt, profilés du croquis comparés au calcul | **visa des points ☐** |
+| 3. Calcul et note | `calculer_portique.py` | note de calcul Word (en-tête Moulo Jean Claude) | relecture de la note |
+| 4. Plans CAO | `calculer_portique.py --dxf` | 5 planches DXF A3 (AutoCAD R2010) | contrôle des plans |
+| 5. Métré et devis | `fiche_vers_classeur.py` | classeur Excel pré-rempli (gabarit PERSONNALISÉ) | relecture du DQE |
+| 6. Plans de présentation | CODE PLANS → `Generateur_Plans.html` | 10 planches PDF | Bon pour accord |
+
+### La fiche projet (`conception/projet.py`)
+
+Source unique, en JSON. Elle contient :
+
+- une ou plusieurs nefs, de portées et pentes indépendantes, avec éventuellement un poteau de faîtage ;
+- la hauteur, la longueur, l'entraxe, les jarrets et les appuis ;
+- les charges G, Q et le vent EC1 ;
+- l'acier, les critères de flèche et les maintiens latéraux (bracons) ;
+- les profilés, imposés ou « auto ».
+
+Elle se crée depuis un croquis, depuis le CODE PLANS du classeur (`--code`), ou à la main (voir `exemples/`).
+
+### Calcul du portique (`conception/portique.py`, `conception/ec3.py`)
+
+- **Méthode** : éléments finis 2D, méthode des déplacements. Le calcul est validé sur la formule de Kleinlogel (écart inférieur à 0,1 %).
+- **Modèle** : jarrets modélisés par un tronçon à inertie majorée ; pieds de poteaux articulés ou encastrés ; multi-nefs avec poteaux de noue.
+- **Cas de charges** : G (poids propre, couverture, pannes), Q (toiture, catégorie H) et 4 cas de vent EC1 (gauche ou droite, surpression ou dépression intérieure).
+- **Combinaisons EC0** : ELU 1,35G + 1,5Q, 1,35G + 1,5W et 1,0G + 1,5W ; ELS G + Q et G + W.
+- **Vérifications EC3** :
+  - résistance de section M + N (6.2.9.1) et cisaillement ;
+  - flambement y et z, déversement (méthode générale, Mcr) ;
+  - interaction 6.61 / 6.62 (annexe B) ;
+  - flèche des traverses L/200 et déplacement en tête H/150.
+- **Choix automatique** : les profilés les plus légers satisfaisant toutes les vérifications (IPE pour les traverses, IPE ou HEA pour les poteaux).
+
+### Commandes
+
+```bash
+cd outils/charpente-metallique
+python3 valider_fiche.py exemples/croquis_2nefs.json                    # contre-lecture + visa
+python3 calculer_portique.py exemples/croquis_2nefs.json \
+        -o Note_croquis.docx --dxf Plans_croquis.dxf                    # note Word + plans DXF
+python3 calculer_portique.py --code "PLAN1;gab=20 × 40;B=20.0000;..."   # depuis le CODE PLANS d'Excel
+python3 fiche_vers_classeur.py exemples/croquis_2nefs.json -o Classeur_croquis.xlsx
+```
+
+Le module nécessite Python 3, openpyxl, numpy, python-docx, matplotlib et ezdxf.
+
+### Exemple réel : le croquis à 2 nefs
+
+La fiche `exemples/croquis_2nefs.json` est issue de la lecture d'un croquis iPad :
+
+- 2 nefs de 15,9 et 15,2 m ;
+- hauteur 6,25 m à l'égout et 8,8 m au faîtage ;
+- 15 travées de 5 m ;
+- jarrets de 1,5 m × 660 mm.
+
+La contre-lecture retrouve les hauteurs au faîtage à 0 cm près et soumet 6 points au visa, dont 2 cotes non identifiées. Les profilés du croquis (IPE 400, IPE 450, IPE 300) sont vérifiés avec des taux de 0,07 à 0,43. Le calcul propose des sections plus légères (IPE 400, HEA 160, IPE 220), sous vent ivoirien et sans neige.
+
+Livrables d'exemple dans `exemples/` : notes de calcul Word, plans DXF, rapports de contre-lecture.
+
+> Limites : vent EC1 simplifié (coefficients de pression moyens) ; assemblages, bracons et fondations à justifier séparément (rapport de vérification du classeur pour les fondations) ; pas de liaison directe avec AutoCAD, Robot ou IDEA StatiCa. Le DXF s'ouvre dans AutoCAD, et un export vers Robot pourra être étudié.
 
 ## Régénérer le classeur
 

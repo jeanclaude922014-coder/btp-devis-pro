@@ -1931,7 +1931,11 @@ def main(out, gabarit="20 × 40", recalc=True, plans_seuls=False, params=None, p
     wb.properties.creator = ""
     wb.properties.lastModifiedBy = ""
     wb.properties.title = "Quantitatif charpente métallique"
-    for name, val in PARAM_TEST.items():   # surcharge de paramètres (tests)
+    perso = {"perso_portee": "H", "perso_longueur": "I", "perso_hauteur": "J", "perso_pente": "K"}
+    for name, val in PARAM_TEST.items():   # surcharge de paramètres (fiche projet, tests)
+        if name in perso:
+            wb[PAR][f"{perso[name]}{5 + len(GABARITS)}"].value = val
+            continue
         sh, co = M.params[name].replace("$", "").split("!")
         wb[sh.strip("'")][co].value = val
     if plans_seuls:

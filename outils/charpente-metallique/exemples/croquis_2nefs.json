@@ -9,18 +9,18 @@
   "nefs": [
     {
       "portee": 15.9,
-      "pente": 32.0,
+      "pente": 32.1,
       "poteau_faitage": false
     },
     {
       "portee": 15.2,
-      "pente": 33.5,
+      "pente": 33.6,
       "poteau_faitage": false
     }
   ],
   "appuis": "articulés",
-  "jarret_ratio": 0.1,
-  "jarret_hauteur": 2.0,
+  "jarret_ratio": 0.095,
+  "jarret_hauteur": 2.2,
   "entraxe_pannes": 1.35,
   "entraxe_lisses": 1.8,
   "poteau_rive": "auto",
@@ -49,6 +49,75 @@
   "maintien_poteau": 2.0,
   "maintien_traverse": 2.0,
   "extra": {
-    "source": "Lecture du croquis : 2 nefs 15,9 + 15,2 m, H rive 6,25 m, faîtage 8,8 m, 15 travées de 5 m, jarrets 660×300, traverses IPE 300, poteaux IPE 400 / IPE 450 au centre (profilés du croquis non imposés : choix automatique)"
+    "lecture": {
+      "source": "Croquis à main levée sur iPad : coupe transversale + vue en plan",
+      "lu_par": "Claude (lecture) – à viser par Moulo Jean Claude",
+      "hauteur_faitage_lue": [
+        8.8,
+        8.8
+      ],
+      "profils_croquis": {
+        "poteau_rive": "IPE 400",
+        "poteau_interieur": "IPE 450",
+        "traverse": "IPE 300"
+      },
+      "valeurs": [
+        {
+          "element": "Portée nef 1",
+          "valeur": "15,9 m",
+          "confiance": "sûre"
+        },
+        {
+          "element": "Portée nef 2",
+          "valeur": "15,2 m",
+          "confiance": "sûre"
+        },
+        {
+          "element": "Hauteur à l'égout (rive)",
+          "valeur": "6,25 m",
+          "confiance": "sûre"
+        },
+        {
+          "element": "Hauteur au faîtage",
+          "valeur": "8,8 m (cote verticale à gauche)",
+          "confiance": "sûre"
+        },
+        {
+          "element": "Pentes déduites",
+          "valeur": "(8,8 − 6,25) / 7,95 = 32,1 % et (8,8 − 6,25) / 7,60 = 33,6 %",
+          "confiance": "déduite"
+        },
+        {
+          "element": "Longueur",
+          "valeur": "15 travées de 5 m = 75 m (vue en plan)",
+          "confiance": "sûre"
+        },
+        {
+          "element": "Jarret",
+          "valeur": "longueur 1,5 m, hauteur 660 mm pour une traverse de 300 (rapport 2,2)",
+          "confiance": "probable"
+        },
+        {
+          "element": "Profilés du croquis",
+          "valeur": "traverses IPE 300, poteaux de rive IPE 400, poteau central IPE 450",
+          "confiance": "probable"
+        },
+        {
+          "element": "Cote « 10,2 » dans la nef 1",
+          "valeur": "non identifiée : ne correspond ni au rampant (8,35 m) ni à une hauteur",
+          "confiance": "à confirmer"
+        },
+        {
+          "element": "Cote « 0,5 » en tête de poteau de rive",
+          "valeur": "hauteur ou longueur locale de jarret ?",
+          "confiance": "à confirmer"
+        },
+        {
+          "element": "Note manuscrite en haut",
+          "valeur": "« haunch to be constructed using 5 prismatic members, same web and flange thickness of the rafter » : jarret reconstitué soudé, épaisseurs de la traverse",
+          "confiance": "probable"
+        }
+      ]
+    }
   }
 }
