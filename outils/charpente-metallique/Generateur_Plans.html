@@ -43,6 +43,7 @@ table.cart td{border:1px solid #000;padding:2px 4px;vertical-align:middle}
 .note .cols{display:flex;gap:6px}.note .cols>div{flex:1}
 .note .concl{font-weight:bold;font-size:9px;padding:3px 5px;margin-bottom:3px}.note .concl.ok{background:#C6EFCE;color:#006100}.note .concl.nc{background:#FFC7CE;color:#9C0006}
 .note .pt{font-style:italic;margin:1px 0}
+.note .asg{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px}.note .asb h4{margin-top:2px}.note .ref{font-style:italic;color:#555;font-size:0.9em}
 @page{size:A4 landscape;margin:8mm}
 @media print{
   body{background:#fff}
@@ -119,6 +120,13 @@ const FORM = [
   ["vb","Vent : vb (m/s)",25],["ce","Vent : ce(z)",1.7],["fy","Acier fy (MPa)",["235","275","355"],"s"],
   ["flt","Flèche traverse L / …",200],["dep","Déplacement tête H / …",150],
   ["mpot","Bracons poteaux (× entraxe lisses)",2],["mtra","Bracons traverses (× entraxe pannes)",2]]],
+ ["Assemblages EC3-1-8",[
+  ["ab_cl","Boulons jarret / faîtage : classe",["10.9","8.8"],"s"],["ab_d","Boulons jarret / faîtage : diamètre",["20","24","16","27"],"s"],
+  ["ab_nr","Rangées de boulons tendues",["3","2","4"],"s"],["ab_tp","Épaisseur des platines d'about (mm)",20],
+  ["ab_tpp","Épaisseur de la platine de pied (mm)",20],["ab_nt","Nombre de tiges d'ancrage",["4","2","6"],"s"],
+  ["ab_clt","Classe des tiges d'ancrage",["4.6","5.6","8.8"],"s"],["ab_fck","Béton des fûts : fck (MPa)",["25","20","30"],"s"],
+  ["ab_dc","Boulons de contreventement : diamètre",["16","20","12"],"s"],["ab_nc","Boulons par attache de contreventement",["2","3","4"],"s"],
+  ["ab_tg","Épaisseur des goussets (mm)",10]]],
  ["Mur agglos",[
   ["bch","Chaînage largeur (m)",0.15],["hch","Chaînage hauteur (m)",0.2],["brd","Raidisseur côté (m)",0.15],["nrd","Raidisseurs / panneau",3],
   ["hachl","Aciers longitudinaux",HA,"s",2],["hachc","Cadres",HA,"s",0],["echc","Espacement cadres (m)",0.2]]]
@@ -1171,7 +1179,13 @@ async function noteDocxOctets(){
     [600,850,2200,700,800,1100,600,600,600,650,1100]);
   b+=wH("6. États limites de service")+wTable(["Vérification","Combinaison","Valeur","Limite","Taux","Statut"],
     v.els.map(e=>[e.verif,e.combinaison,fmt(e.valeur,1)+" mm",fmt(e.limite,1)+" mm",fmt(e.ratio),e.ratio<=1?"OK":"NON CONFORME"]),[2900,2300,1100,1100,800,1400]);
-  b+=wH("7. Conclusion")+wP((okG?"Le portique est justifié avec les profilés retenus. ":"Certaines vérifications ne sont pas satisfaites. ")+"Assemblages, bracons et fondations à justifier séparément. Note de prédimensionnement à viser avant exécution.",{sz:10});
+  const AS=assemblagesEC3(g);
+  if(AS){ b+=wH("7. Assemblages (EN 1993-1-8)");
+    AS.blocs.forEach(bl=>{b+=wH(bl.titre,2)+wP(bl.ref,{i:true,sz:8});
+      b+=wTable(["Donnée","Valeur"],bl.donnees,[2200,7400]);
+      b+=wTable(["Vérification","Ed","Rd","Taux","Statut"],bl.verifs.map(v=>[v[0],fmt(v[1]),fmt(v[2])+(v[3]==="–"?"":" "+v[3]),fmt(v[1]/v[2]),statutV(v)]),[4600,1200,1500,900,1400]);
+      b+=wP(bl.note,{i:true,sz:8});}); }
+  b+=wH("8. Conclusion")+wP((okG?"Le portique est justifié avec les profilés retenus. ":"Certaines vérifications ne sont pas satisfaites. ")+(AS?(AS.ok?"Les assemblages vérifiés (jarret, faîtage, pied de poteau, contreventement) sont satisfaisants. ":"Certains assemblages ne sont pas satisfaisants (§ 7). "):"")+"Bracons et fondations à justifier séparément. Note de prédimensionnement à viser avant exécution.",{sz:10});
   b+=wTable(["Établi par","Vérifié par","Visa"],[[aut+"\n\n\n","",""]],[3200,3200,3200]);
   const NS='xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"';
   const doc=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${NS}><w:body>${b}<w:sectPr><w:headerReference w:type="default" r:id="rIdH"/><w:footerReference w:type="default" r:id="rIdF"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1300" w:right="1134" w:bottom="1000" w:left="1134" w:header="567" w:footer="450" w:gutter="0"/></w:sectPr></w:body></w:document>`;
@@ -1197,7 +1211,7 @@ async function telechargerNote(){
 const DPI_EXPORT=200, PW=297, PH=210;   // A4 paysage en mm
 function vuesCourantes(){
   const g=calc(); lancerCalcul(g);
-  const vues=[P1,P2,P3,P4,P5,P6,P7,pageEnsemble,pageEclate,pageDetails,pageCalcFigures,pageCalcTableaux].map(f=>f(g));
+  const vues=[P1,P2,P3,P4,P5,P6,P7,pageEnsemble,pageEclate,pageDetails,pageCalcFigures,pageCalcTableaux,pageAssemblages].map(f=>f(g));
   return {g,vues};
 }
 function texteGabarit(g){return `Gabarit ${P.gab}${g.nn>1?" – "+g.nn+" nefs":""} : portée ${f2(g.B)} m × longueur ${f2(g.L)} m – H sablière ${f2(g.H)} m – pente ${f1(P.p)} % – ${g.systeme} – façade : ${P.fac}`;}
@@ -1266,7 +1280,7 @@ function noteSVG(g){
   return o;
 }
 function pageCompleteSVG(v,k,NP,g){
-  const m=8, corps=v.html!==undefined?`<svg x="${m+4}" y="16" width="${VW}" height="${VH}" viewBox="0 0 ${VW} ${VH}">${noteSVG(g)}</svg>`
+  const m=8, corps=v.html!==undefined?`<svg x="${m+4}" y="16" width="${VW}" height="${VH}" viewBox="0 0 ${VW} ${VH}">${v.svgNote?v.svgNote(g):noteSVG(g)}</svg>`
     :v.svg().replace("<svg ",`<svg x="${m+4}" y="16" width="${VW}" height="${VH}" `);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(PW/25.4*DPI_EXPORT)}" height="${Math.round(PH/25.4*DPI_EXPORT)}" viewBox="0 0 ${PW} ${PH}">
   <rect width="${PW}" height="${PH}" fill="#fff"/>
@@ -1291,6 +1305,158 @@ async function exporterPlanche(k){
   catch(e){ etatExport(""); alert("Export de l'image impossible : "+(e&&e.message)); }
 }
 
+// ============================================================ ASSEMBLAGES EC3-1-8 (début)
+const AS_BOULON={12:84.3,16:157,20:245,22:303,24:353,27:459,30:561};      // section résistante (mm²)
+const FUB={"4.6":400,"5.6":500,"8.8":800,"10.9":1000}, FYB={"4.6":240,"5.6":300,"8.8":640,"10.9":900};
+const GM2=1.25;
+function ftRd(cl,d,k2=0.9){return k2*FUB[cl]*AS_BOULON[d]/GM2/1000;}                       // kN (tab. 3.4)
+function fvRd(cl,d){return (cl==="10.9"||cl==="5.6"?0.5:0.6)*FUB[cl]*AS_BOULON[d]/GM2/1000;}   // kN, plan de cisaillement fileté
+// tronçon en T (6.2.4) : renvoie {F, mode} pour une rangée de 2 boulons ; longueurs en mm, efforts en kN
+function troncon(leff,t,fy,m,e,Ft2){
+  const Mpl=0.25*leff*t*t*fy, n=Math.min(e,1.25*m);
+  const F1=4*Mpl/m/1000, F2=(2*Mpl+n*Ft2*1000)/(m+n)/1000, F3=Ft2;
+  const F=Math.min(F1,F2,F3); return {F,mode:F===F1?"mode 1":(F===F2?"mode 2":"mode 3"),F1,F2,F3,leff};
+}
+// platine d'about boulonnée (jarret ou faîtage) – 6.2.7.2
+function platineAbout(o){
+  // o : {hj (mm hauteur totale au nu), tr (section traverse), col (section poteau ou null), tp, d, cl, nr, M, N, V, fy}
+  const fy=o.fy, tr=o.tr, d=o.d, Ft=ftRd(o.cl,d), Ft2=2*Ft, e=40, p=Math.max(70,3*d), aw=5;
+  const bp=Math.max(tr.b,o.col?o.col.b:0)+20, w=Math.min(bp-2*e,Math.max(90,tr.tw+2*(2.2*d)));
+  const mP=Math.max(20,(w-tr.tw)/2-0.8*aw*Math.SQRT2), leffP=Math.min(2*Math.PI*mP,4*mP+1.25*e);
+  const tP=troncon(leffP,o.tp,fy,mP,e,Ft2);
+  let tC=null, Fwt=Infinity, Fcwc=Infinity, Vwp=Infinity;
+  if(o.col){const c=o.col, r=c.h>=300?21:15, mC=Math.max(20,(w-c.tw)/2-0.8*r), leffC=Math.min(2*Math.PI*mC,4*mC+1.25*e);
+    tC=troncon(leffC,c.tf,fy,mC,e,Ft2); Fwt=leffC*c.tw*fy/1000;
+    const beffc=tr.tf+2*Math.SQRT2*aw+5*(c.tf+r)+2*o.tp; Fcwc=beffc*c.tw*fy/1000; Vwp=0.9*fy*c.Avz*100/Math.sqrt(3)/1000;}
+  const Mc=tr.Wply*fy/1000*(o.hj/tr.h), Fcfb=Mc*1000/(o.hj-tr.tf);       // semelle comprimée du jarret
+  const Fc=Math.min(Fcfb,Fcwc,Vwp);
+  const rangs=[]; let somme=0;
+  for(let r=0;r<o.nr;r++){const h=o.hj-tr.tf/2-50-r*p; if(h<=0.3*o.hj) break;
+    let F=Math.min(tP.F,tC?tC.F:Infinity,Fwt); F=Math.max(0,Math.min(F,Fc-somme)); somme+=F; rangs.push({h,F});}
+  const MjRd=rangs.reduce((s,q)=>s+q.F*q.h/1000,0), actives=rangs.filter(q=>q.F>0.5);
+  const z=actives.length?actives.reduce((s,q)=>s+q.F*q.h,0)/actives.reduce((s,q)=>s+q.F,0):o.hj*0.8, VwpEd=Math.abs(o.M)/(z/1000);
+  const nb=2*(actives.length+1), Fv=fvRd(o.cl,d), VRd=2*Fv+2*actives.length*Fv*(1-1/1.4);
+  const NjRd=o.N>=0?nb*Ft:tr.A*fy/10;
+  const inter=Math.abs(o.M)/MjRd+Math.abs(o.N)/NjRd;
+  return {Ft,Fv,bp,w,p,mP,tP,tC,Fwt,Fcwc,Vwp,Fcfb,Fc,rangs:actives,MjRd,VRd,NjRd,nb,inter,z,VwpEd,
+    af:Math.ceil(0.55*tr.tf),awb:Math.max(4,Math.ceil(0.55*tr.tw))};
+}
+// pied de poteau articulé – 6.2.5, 6.2.6.12, 6.2.2 ; ancrage BAEL A.6.1
+function piedPoteau(o){
+  // o : {col, tp, d, cl, n, lt (m), fck, fy, Nc, Nt, combos:[{V,H}]}
+  const c=o.col, fcd=o.fck/1.5, fjd=2/3*1.5*fcd, cc=o.tp*Math.sqrt(o.fy/(3*fjd));
+  const hw=c.h-2*c.tf-2*cc, Aeff=2*(c.b+2*cc)*(c.tf+2*cc)+(hw>0?hw*(c.tw+2*cc):0);
+  const NcRd=Aeff*fjd/1000;
+  const Ft=ftRd(o.cl,o.d,0.85), e=40, m=Math.max(25,60-0.8*5*Math.SQRT2), leff=Math.min(2*Math.PI*m,4*m+1.25*e);
+  const tT=troncon(leff,o.tp,o.fy,m,e,(o.n/2)*Ft);           // une rangée de tiges de chaque côté de l'âme
+  const NtRd=2*tT.F;
+  const ab=0.44-0.0003*FYB[o.cl], Fvb=ab*FUB[o.cl]*AS_BOULON[o.d]/GM2/1000;
+  let rV=0, cV=null; o.combos.forEach(q=>{const R=0.2*Math.max(0,q.V)+o.n*Fvb, r=Math.abs(q.H)/R; if(r>rV){rV=r;cV=q;}});
+  const tsu=0.6*1*(0.6+0.06*o.fck), Frod=o.Nt>0?o.Nt/o.n:0, lreq=Math.max(20*o.d/1000,Frod>0?0.6*Frod*1000/(Math.PI*o.d*tsu)/1000:0);
+  const Ftu=o.Nt/o.n, Fvu=cV?Math.abs(cV.H)/o.n:0, inter=Fvu/(Fvb*o.n/o.n)+Ftu/(1.4*Ft);
+  return {fjd,c:cc,Aeff,NcRd,Ft,tT,NtRd,Fvb,rV,cV,tsu,lreq,inter};
+}
+// attache de cornière sur gousset – 3.6.1 (tab. 3.4), 3.10.3, 4.5.3.3
+function attacheCornière(o){
+  // o : {N, A (cm²), t (mm), tg (mm), d, cl, n, fu, fy}
+  const d0=o.d+2, e1=Math.max(40,1.5*d0), p1=Math.max(60,2.5*d0), e2=Math.max(30,1.2*d0);
+  const Fv=fvRd(o.cl,o.d), ab=Math.min(e1/(3*d0),p1/(3*d0)-0.25,FUB[o.cl]/o.fu,1), k1=Math.min(2.8*e2/d0-1.7,2.5);
+  const Fb=k1*ab*o.fu*o.d*Math.min(o.t,o.tg)/GM2/1000;
+  const b2=o.n<=2?(p1<=2.5*d0?0.4:(p1>=5*d0?0.7:0.4+0.3*(p1-2.5*d0)/(2.5*d0))):(p1<=2.5*d0?0.5:(p1>=5*d0?0.7:0.5+0.2*(p1-2.5*d0)/(2.5*d0)));
+  const Anet=o.A*100-o.t*d0, NuRd=b2*Anet*o.fu/GM2/1000;
+  const a=5, Lw=2*150, Fw=o.fu/(Math.sqrt(3)*0.8*GM2)*a*Lw/1000;
+  return {d0,e1,p1,Fv,Fb,ab,k1,b2,Anet,NuRd,Fw,a,Lw,FRd:o.n*Math.min(Fv,Fb)};
+}
+// efforts aux nœuds à partir du calcul du portique
+function effortsAssemblages(R){
+  const m=R.modele; let jar={M:0}, fai={M:0};
+  for(const [cn,r] of Object.entries(R.elu)) for(const [nom,b] of Object.entries(m.barres)){
+    if(b.groupe!=="traverse") continue;
+    const e0=r.eff[b.elements[0]], eL=r.eff[b.elements[b.elements.length-1]];
+    if(Math.abs(e0.Mi)>Math.abs(jar.M)) jar={M:e0.Mi,N:e0.Ni,V:e0.Vi,comb:cn,barre:nom};
+    if(Math.abs(eL.Mj)>Math.abs(fai.M)) fai={M:eL.Mj,N:eL.Nj,V:eL.Vj,comb:cn,barre:nom};}
+  const rive=m.appuis.filter(a=>{const x=m.X[a.nd][0]; return Math.abs(x-Math.min(...m.appuis.map(q=>m.X[q.nd][0])))<1e-6||Math.abs(x-Math.max(...m.appuis.map(q=>m.X[q.nd][0])))<1e-6;});
+  let Nc=0,Nt=0,cNc="",cNt=""; const combos=[];
+  for(const [cn,r] of [...Object.entries(R.elu)]) rive.forEach(a=>{const q=r.reac[a.nd]; if(q[1]>Nc){Nc=q[1];cNc=cn;} if(-q[1]>Nt){Nt=-q[1];cNt=cn;} combos.push({V:q[1],H:q[0],comb:cn});});
+  return {jar,fai,pied:{Nc,Nt,cNc,cNt,combos}};
+}
+function assemblagesEC3(g){
+  if(!CALC) return null;
+  const R=CALC.R, pr=CALC_PR, ef=effortsAssemblages(R), fy=pr.fy, tr=SEC[CALC.profils.traverse], col=SEC[CALC.profils.poteau_rive];
+  const dB=parseInt(P.ab_d), cl=P.ab_cl, nr=parseInt(P.ab_nr), tp=+P.ab_tp;
+  const blocs=[];
+  // 1. jarret
+  const hj=pr.jarret_hauteur*tr.h, J=platineAbout({hj,tr,col,tp,d:dB,cl,nr,M:ef.jar.M,N:ef.jar.N,V:ef.jar.V,fy});
+  blocs.push({titre:"1. Assemblage poteau-traverse (jarret, platine d'about boulonnée)",ref:"EC3-1-8 § 6.2.7.2, 6.2.4, 6.2.6, 3.6",
+    donnees:[["Profilés",`poteau ${col.nom}, traverse ${tr.nom}, hauteur au nu ${fmt(hj,0)} mm`],["Boulons",`${J.nb} HR M${dB} classe ${cl} – ${J.rangs.length} rangée(s) tendue(s), pas ${J.p} mm`],
+      ["Platine",`${fmt(J.bp,0)} × ${fmt(hj+100,0)} × ${tp} mm, S${fy} – entraxe des boulons ${fmt(J.w,0)} mm`],
+      ["Efforts",`M = ${fmt(ef.jar.M,1)} kN·m, N = ${fmt(ef.jar.N,1)} kN, V = ${fmt(ef.jar.V,1)} kN (${ef.jar.comb})`],
+      ["Rangées",J.rangs.map((q,i)=>`r${i+1} : h = ${fmt(q.h,0)} mm, F = ${fmt(q.F,1)} kN`).join(" ; ")],
+      ["Composantes",`Ft,Rd = ${fmt(J.Ft,1)} kN/boulon ; platine ${J.tP.mode} ${fmt(J.tP.F,1)} kN ; semelle poteau ${J.tC.mode} ${fmt(J.tC.F,1)} kN ; âme tendue ${fmt(J.Fwt,1)} kN ; compression ${fmt(J.Fc,1)} kN ; panneau d'âme ${fmt(J.Vwp,1)} kN`]],
+    verifs:[["Moment : M_Ed ≤ Mj,Rd = Σ Fr·hr",Math.abs(ef.jar.M),J.MjRd,"kN·m"],["Interaction M/Mj,Rd + N/Nj,Rd ≤ 1 (6.2.7.1)",J.inter,1,"–"],
+      ["Cisaillement des boulons (rangée comprimée + 0,29 Fv tendus)",Math.abs(ef.jar.V),J.VRd,"kN"],["Panneau d'âme du poteau : Vwp,Ed = M / z ≤ Vwp,Rd (z = "+fmt(J.z,0)+" mm)",J.VwpEd,J.Vwp,"kN"]],
+    note:`Soudures : semelles a ≥ ${J.af} mm, âme a ≥ ${J.awb} mm (cordons d'angle double). Raidisseurs du poteau au droit des semelles du jarret recommandés.`});
+  // 2. faîtage
+  const hf=1.5*tr.h, F=platineAbout({hj:hf,tr,col:null,tp,d:dB,cl,nr:Math.min(2,nr),M:ef.fai.M,N:ef.fai.N,V:ef.fai.V,fy});
+  blocs.push({titre:"2. Assemblage de faîtage (platines d'about)",ref:"EC3-1-8 § 6.2.7.2, 6.2.4",
+    donnees:[["Profilés",`traverse ${tr.nom}, jarret de faîtage : hauteur ${fmt(hf,0)} mm (1,5 h)`],["Boulons",`${F.nb} HR M${dB} classe ${cl}`],
+      ["Efforts",`M = ${fmt(ef.fai.M,1)} kN·m, N = ${fmt(ef.fai.N,1)} kN, V = ${fmt(ef.fai.V,1)} kN (${ef.fai.comb})`],
+      ["Rangées",F.rangs.map((q,i)=>`r${i+1} : h = ${fmt(q.h,0)} mm, F = ${fmt(q.F,1)} kN`).join(" ; ")],
+      ["Composantes",`platine ${F.tP.mode} ${fmt(F.tP.F,1)} kN ; compression ${fmt(F.Fc,1)} kN`]],
+    verifs:[["Moment : M_Ed ≤ Mj,Rd",Math.abs(ef.fai.M),F.MjRd,"kN·m"],["Interaction M/Mj,Rd + N/Nj,Rd ≤ 1",F.inter,1,"–"],["Cisaillement des boulons",Math.abs(ef.fai.V),F.VRd,"kN"]],
+    note:"Le moment de faîtage change de signe sous le vent : boulons répartis symétriquement (2 rangées en haut, 2 en bas)."});
+  // 3. pied de poteau
+  const dT=parseInt(String(P.dtige).replace(/\D/g,""))||24, nT=parseInt(P.ab_nt), tpp=+P.ab_tpp;
+  const B_=piedPoteau({col,tp:tpp,d:dT,cl:P.ab_clt,n:nT,lt:+P.ltige,fck:+P.ab_fck,fy,Nc:ef.pied.Nc,Nt:ef.pied.Nt,combos:ef.pied.combos});
+  blocs.push({titre:"3. Pied de poteau articulé (platine et tiges d'ancrage)",ref:"EC3-1-8 § 6.2.5, 6.2.6.12, 6.2.2 – BAEL A.6.1",
+    donnees:[["Platine",`${tpp} mm sur poteau ${col.nom} ; béton C${P.ab_fck} : fjd = ${fmt(B_.fjd,1)} MPa, c = ${fmt(B_.c,0)} mm, Aeff = ${fmt(B_.Aeff/100,0)} cm²`],
+      ["Tiges",`${nT} tiges Ø${dT} classe ${P.ab_clt}, longueur ${fmt(+P.ltige,2)} m avec crochet – Ft,Rd = ${fmt(B_.Ft,1)} kN/tige`],
+      ["Efforts",`compression ${fmt(ef.pied.Nc,1)} kN (${ef.pied.cNc}) ; soulèvement ${fmt(ef.pied.Nt,1)} kN (${ef.pied.cNt||"–"})`],
+      ["Cisaillement",`combinaison la plus défavorable : H = ${fmt(B_.cV?Math.abs(B_.cV.H):0,1)} kN, V = ${fmt(B_.cV?B_.cV.V:0,1)} kN ; frottement 0,2·N + tiges ${fmt(B_.Fvb,1)} kN/tige`]],
+    verifs:[["Compression sur le béton : Nc ≤ Aeff·fjd",ef.pied.Nc,B_.NcRd,"kN"],["Soulèvement : Nt ≤ min(tiges, flexion de la platine)",ef.pied.Nt,Math.min(B_.NtRd,nT*B_.Ft),"kN"],
+      ["Cisaillement : H ≤ 0,2·N + n·Fvb,Rd",B_.rV,1,"–"],["Tiges : traction + cisaillement (tab. 3.4)",B_.inter,1,"–"],["Ancrage des tiges : longueur requise (≥ 20 Ø) ≤ longueur prévue",B_.lreq,+P.ltige,"m"]],
+    note:"Le soulèvement est repris par le poids de la semelle : voir le rapport de vérification du classeur (F2)."});
+  // 4. contreventement
+  const cvv=g.B<=20?"L 60x6":"L 70x7", tA=parseInt(cvv.split("x")[1]);
+  const qp=pr.vent.ce*0.5*1.25*pr.vent.vb**2/1000, wm=qp*1.1, Spig=g.W*g.Hm+g.nn*g.p*g.B*g.B/4;
+  const Ncv=1.5*wm*Spig/4/Math.max(1,g.nbcv)/(g.er/Math.hypot(g.er,g.Hm));
+  const C=attacheCornière({N:Ncv,A:(KG[cvv]||5.42)/0.785,t:tA,tg:+P.ab_tg,d:parseInt(P.ab_dc),cl:"8.8",n:parseInt(P.ab_nc),fu:360,fy});
+  blocs.push({titre:"4. Attache de contreventement (cornière boulonnée sur gousset)",ref:"EC3-1-8 § 3.6.1 (tab. 3.4), 3.10.3, 4.5.3.3",
+    donnees:[["Éléments",`diagonale ${cvv}, gousset ép. ${P.ab_tg} mm soudé au poteau (a = ${C.a} mm, L = ${C.Lw} mm)`],
+      ["Boulons",`${P.ab_nc} × M${P.ab_dc} classe 8.8, trous Ø${C.d0} – e1 = ${fmt(C.e1,0)} mm, p1 = ${fmt(C.p1,0)} mm`],
+      ["Effort",`N = ${fmt(Ncv,1)} kN (vent sur pignon 1,5 W, réparti sur ${g.nbcv} travées contreventées)`],
+      ["Résistances",`Fv,Rd = ${fmt(C.Fv,1)} kN, Fb,Rd = ${fmt(C.Fb,1)} kN (αb = ${fmt(C.ab,2)}), β2 = ${fmt(C.b2,2)}, Anet = ${fmt(C.Anet/100,2)} cm²`]],
+    verifs:[["Boulons : N ≤ n·min(Fv,Rd ; Fb,Rd)",Ncv,C.FRd,"kN"],["Section nette de la cornière : N ≤ β2·Anet·fu/γM2",Ncv,C.NuRd,"kN"],["Soudure du gousset : N ≤ Fw,Rd",Ncv,C.Fw,"kN"]],
+    note:"Cornière attachée par une seule aile : excentricité prise en compte par le coefficient β2."});
+  return {blocs, ok:blocs.every(b=>b.verifs.every(v=>v[1]<=v[2]+1e-9))};
+}
+// ============================================================ ASSEMBLAGES EC3-1-8 (fin)
+
+// ---------------------------------------------------------- planche 13 : assemblages EC3-1-8
+function statutV(v){return v[1]<=v[2]+1e-9?"OK":"NON CONFORME";}
+function pageAssemblages(g){
+  const A=assemblagesEC3(g);
+  if(!A) return {svg:()=>`<svg viewBox="0 0 ${VW} ${VH}"><text x="10" y="20" font-size="5">Calcul indisponible.</text></svg>`};
+  const bloc=b=>`<div class="asb"><h4>${esc(b.titre)}</h4><div class="ref">${esc(b.ref)}</div>
+    <table class="t">${b.donnees.map(d=>`<tr><td style="width:22%">${esc(d[0])}</td><td>${esc(d[1])}</td></tr>`).join("")}</table>
+    <table class="t"><tr><th>Vérification</th><th>Ed</th><th>Rd</th><th>Taux</th><th></th></tr>
+    ${b.verifs.map(v=>`<tr><td>${esc(v[0])}</td><td>${fmt(v[1],2)}</td><td>${fmt(v[2],2)} ${v[3]==="–"?"":v[3]}</td><td><b>${fmt(v[1]/v[2])}</b></td><td class="${statutV(v)==="OK"?"ok":"nc"}">${statutV(v)}</td></tr>`).join("")}</table>
+    <div class="pt">${esc(b.note)}</div></div>`;
+  return {html:`<div class="note"><div class="concl ${A.ok?"ok":"nc"}">${A.ok?"CONCLUSION : les quatre assemblages vérifiés selon l'EN 1993-1-8 sont satisfaisants.":"CONCLUSION : au moins un assemblage n'est pas satisfaisant – voir les lignes NON CONFORME."}</div>
+    <div class="asg">${A.blocs.map(bloc).join("")}</div></div>`, svgNote:assemblagesSVG};
+}
+function assemblagesSVG(g){
+  const A=assemblagesEC3(g); if(!A) return sTx(10,20,"Calcul indisponible.",{fs:5});
+  let o=sRc(0,0.5,VW,5,A.ok?"#C6EFCE":"#FFC7CE","none")+sTx(2,4,A.ok?"CONCLUSION : les quatre assemblages vérifiés selon l'EN 1993-1-8 sont satisfaisants.":"CONCLUSION : au moins un assemblage n'est pas satisfaisant.",{fs:2.7,b:true,c:A.ok?"#006100":"#9C0006"});
+  const wc=(VW-4)/2; let ys=[8,8];
+  A.blocs.forEach((b,k)=>{const col=k%2, x=col*(wc+4); let y=ys[col];
+    o+=sTx(x,y+2.4,b.titre,{fs:2.45,b:true,c:"#1F4E79"})+sTx(x,y+4.9,b.ref,{fs:1.7,i:true,c:"#555"}); y+=6;
+    let t=svgTab(x,y,[24,wc-24],null,b.donnees,1.6,2.35); o+=t.svg; y+=t.h+0.8;
+    t=svgTab(x,y,[wc-55,13,18,10,14],["Vérification","Ed","Rd","Taux",""],b.verifs.map(v=>[v[0],fmt(v[1]),fmt(v[2])+(v[3]==="–"?"":" "+v[3]),fmt(v[1]/v[2]),statutV(v)]),1.6,2.35);
+    o+=t.svg; y+=t.h+0.8; couper(b.note,120).forEach((l,i)=>{o+=sTx(x,y+2+i*2.2,l,{fs:1.6,i:true});}); y+=2.4*couper(b.note,120).length+2.5; ys[col]=y;});
+  return o;
+}
+
 // ============================================================ planches + cartouches
 const LEG="Couleurs : charpente en bleu · contreventements en orange · béton en gris · aciers en rouge · maçonnerie en marron clair · cotes et baies en noir · translucides hachurés en bleu clair · remblai en latérite";
 function legende(k,g){
@@ -1301,6 +1467,7 @@ function legende(k,g){
     case 7: return `Perspectives isométriques sans échelle. Ossature : poteaux ${g.ppot}, ${g.treil?"fermes treillis":"traverses "+g.ptrav}, pannes ${g.ppanne}, ${g.kbard?"lisses "+g.plisse+", ":""}contreventements en orange.`;
     case 8: return `Vue éclatée : pannes et poutre au vent soulevées, portique de rive et lisses du long-pan avant écartés pour la lisibilité. Nomenclature indicative.`;
     case 10: return CALC?`Calcul par éléments finis 2D (méthode des déplacements) – profilés retenus : poteaux de rive ${CALC.profils.poteau_rive}, traverses ${CALC.profils.traverse}${CALC.profils.poteau_interieur!=="—"?", poteaux intérieurs "+CALC.profils.poteau_interieur:""}. Jarrets non vérifiés (hauteur ${P.jh} h).`:"Calcul indisponible.";
+    case 12: return `Assemblages selon l'EN 1993-1-8 à partir des efforts du calcul de portique ; tiges d'ancrage : BAEL A.6.1. Dispositions constructives (pinces, soudures, raidisseurs) à reporter sur les plans d'exécution.`;
     case 11: return `Vérifications EN 1993-1-1 ; combinaisons EN 1990 ; vent EC1 simplifié (vb ${P.vb} m/s à confirmer). Assemblages, bracons et fondations à justifier séparément.`;
     case 9: return `Détails types sans échelle – épaisseurs et boulonnerie à confirmer par la note de calcul des assemblages (EC3-1-8).`;
     case 6: return `Sections : chaînages ${P.bch*100} × ${P.hch*100} cm et raidisseurs ${P.brd*100} × ${P.brd*100} cm – 4 ${P.hachl} + cadres ${P.hachc} e = ${P.echc*100} cm ; linteaux idem avec appuis de 20 cm.`;
@@ -1310,11 +1477,11 @@ function legende(k,g){
 const TITRES=["VUE EN PLAN – IMPLANTATION","COUPE TRANSVERSALE – PORTIQUE TYPE","ÉLÉVATION LONG-PAN","ÉLÉVATION PIGNON",
   "VUE EN PLAN TOITURE – CALEPINAGE","COUPE DE FONDATION ET DALLAGE (DÉTAIL)","ÉLÉVATION MUR AGGLOS – PANNEAU TYPE",
   "VUE D'ENSEMBLE – PERSPECTIVES ET PLAN DE CHARPENTE","ASSEMBLAGE ÉCLATÉ ET NOMENCLATURE","DÉTAILS D'ASSEMBLAGE",
-  "NOTE DE CALCUL – MODÈLE ET SOLLICITATIONS","NOTE DE CALCUL – VÉRIFICATIONS EC3, ELS ET RÉACTIONS"];
+  "NOTE DE CALCUL – MODÈLE ET SOLLICITATIONS","NOTE DE CALCUL – VÉRIFICATIONS EC3, ELS ET RÉACTIONS","NOTE DE CALCUL – ASSEMBLAGES EC3-1-8"];
 let DATE=new Date().toLocaleDateString("fr-FR");
 function dessiner(){
   const g=calc(); lancerCalcul(g);
-  const vues=[P1,P2,P3,P4,P5,P6,P7,pageEnsemble,pageEclate,pageDetails,pageCalcFigures,pageCalcTableaux].map(f=>f(g)), NP=vues.length;
+  const vues=[P1,P2,P3,P4,P5,P6,P7,pageEnsemble,pageEclate,pageDetails,pageCalcFigures,pageCalcTableaux,pageAssemblages].map(f=>f(g)), NP=vues.length;
   const gabTxt=`Gabarit ${P.gab}${g.nn>1?" – "+g.nn+" nefs":""} : portée ${f2(g.B)} m × longueur ${f2(g.L)} m – H sablière ${f2(g.H)} m – pente ${f1(P.p)} % – ${g.systeme} – façade : ${P.fac}`;
   document.getElementById("planches").innerHTML=vues.map((v,k)=>`
   <section class="page">

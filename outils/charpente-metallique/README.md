@@ -32,6 +32,13 @@ Deux possibilités :
    - **Calcul intégré au HTML** : le portique est calculé directement dans le navigateur, hors connexion et sans installation (éléments finis 2D, combinaisons EC0, vérifications EC3, choix automatique des profilés).
      - Les résultats sont identiques au module Python, contrôlé sur 4 bâtiments, écart nul.
      - Les planches 11 et 12 présentent la note de calcul : modèle, moments ELU, déformée, vérifications des barres, ELS, réactions d'appui pour les fondations et poids des portiques.
+     - **Assemblages EN 1993-1-8** (planche 13, note Word § 7, export d'images), calculés à partir des efforts du portique :
+       1. **Jarret poteau-traverse** (platine d'about boulonnée HR) : résistance de chaque rangée par tronçons en T de la platine et de la semelle du poteau (modes 1 à 3), âme tendue, compression, cisaillement du panneau d'âme Vwp,Ed = M / z ; moment résistant Mj,Rd = Σ Fr·hr ; interaction M + N ; cisaillement des boulons ; épaisseurs de soudure.
+       2. **Faîtage** (platines d'about) : même méthode.
+       3. **Pied de poteau articulé** : compression de la platine sur le béton (fjd, aire efficace), soulèvement (tiges et flexion de la platine), cisaillement (frottement 0,2·N + tiges), traction + cisaillement des tiges, ancrage BAEL (≥ 20 Ø).
+       4. **Attache de contreventement** : cisaillement des boulons, pression diamétrale, section nette de la cornière (β2), soudure du gousset.
+
+       Les boulons, platines, tiges, béton et goussets se règlent dans la section « Assemblages EC3-1-8 ».
      - Le bouton **« Exporter les images (ZIP) »** fait dessiner toutes les planches (plans, perspectives, détails, note de calcul) et les enregistre en images PNG A4 paysage à 200 dpi (2339 × 1654 px), cartouche compris, réunies dans un fichier ZIP. Le bouton **« ⤓ Image PNG »** de chaque planche exporte celle-ci seule. Les images se partagent par WhatsApp ou par courriel, et s'insèrent dans un rapport Word ou une présentation.
      - Le bouton **« Note de calcul Word »** télécharge un vrai fichier .docx avec en-tête (champ « Établi par »), pied de page numéroté, diagrammes et tableaux.
      - Les plans reprennent automatiquement les profilés calculés, sauf profilé imposé dans le panneau.
