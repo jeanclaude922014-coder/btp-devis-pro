@@ -31,3 +31,7 @@ Voir `PLAN_DE_RECHERCHE.md` (R-01 à R-10).
 
 ### Hors périmètre respecté
 Aucun fichier de l'application `btp-devis-pro` (src/, prisma/, outils/, scripts/) n'a été modifié.
+
+## Session 1 (suite) — 2026-11-08 — Standard à la racine du projet
+- Sur demande de Moulo Jean Claude, `STANDARD_DEVELOPPEMENT_LOGICIELS_GC.md` (STD-GC-001 v2.0) a été copié à la racine du projet `btp-devis-pro`, conformément au § 9 du standard.
+- La copie est identique à l'original. **La version de référence reste `REFERENTIEL_GC/STANDARD_DEVELOPPEMENT_LOGICIELS_GC.md`** : toute évolution du standard doit y être faite, puis recopiée à la racine.
