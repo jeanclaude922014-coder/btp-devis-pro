@@ -35,3 +35,9 @@ Aucun fichier de l'application `btp-devis-pro` (src/, prisma/, outils/, scripts/
 ## Session 1 (suite) — 2026-11-08 — Standard à la racine du projet
 - Sur demande de Moulo Jean Claude, `STANDARD_DEVELOPPEMENT_LOGICIELS_GC.md` (STD-GC-001 v2.0) a été copié à la racine du projet `btp-devis-pro`, conformément au § 9 du standard.
 - La copie est identique à l'original. **La version de référence reste `REFERENTIEL_GC/STANDARD_DEVELOPPEMENT_LOGICIELS_GC.md`** : toute évolution du standard doit y être faite, puis recopiée à la racine.
+
+## Session 1 (suite) — 2026-11-08 — Audit de btp-devis-pro
+- Audit réalisé sans modifier le code : `project_management/AUDIT_INITIAL_2026-11-08.md`.
+- Constat principal : application d'économie de la construction, sans module de calcul de structures.
+- Documents § 9 créés : `PROJECT_SCOPE.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, `project_management/` (checklist, limites, décisions), `docs/validation/` (4 fiches), `docs/tutorial/`.
+- Nouvelles demandes : D-13 (prix de référence CI), D-14 (DQE réels).

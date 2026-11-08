@@ -34,5 +34,15 @@ Pour chaque document fourni, merci d'indiquer si possible le **titre exact, l'é
 | D-11 | Cours de RDM | Votre cours de RDM (formulaire des poutres, méthode des trois moments, Caquot) | `01_RDM_ET_ANALYSE_STRUCTURALE/Poutres/` | OUVERTE |
 | D-12 | Charpente métallique | Le texte CM66 ou un cours d'EC3 avec exemples (déversement, assemblages) | `03_CHARPENTE_METALLIQUE/` | OUVERTE |
 
+## Demandes issues de l'audit de btp-devis-pro (2026-11-08)
+
+| N° | Priorité | Sujet | Ressource recherchée | Utilité | Projet / module | Dépôt recommandé | Statut |
+|---|---|---|---|---|---|---|---|
+| D-13 | **P0** | Prix unitaires de référence (Côte d'Ivoire) | Bordereaux de prix unitaires (BPU) et DQE de marchés attribués récents (AGEROUTE, BNETD, maîtres d'ouvrage privés), barèmes de main-d'œuvre, mercuriale des matériaux (ciment, acier HA, granulats) avec leur date | Sourcer et dater les prix du catalogue par défaut (audit A-03) | btp-devis-pro, bibliothèque de prix | `10_MODELES_ET_NOTES_DE_CALCUL/Notes_Internes/` (créer un sous-dossier `Prix_Reference_CI/` après accord) | OUVERTE |
+| D-14 | P1 | DQE réels de test | 3 à 5 DQE réels (Excel et PDF texte) avec leur total HT signé, et une situation de travaux (attachements + décompte) | Vérifier l'import DQE et le suivi HT/TVA/TTC (fiches de validation) | btp-devis-pro, import et suivi DQE | `10_MODELES_ET_NOTES_DE_CALCUL/Cas_Reproduits/` | OUVERTE |
+
+> Les DQE et prix fournis peuvent être confidentiels : indiquez s'ils doivent rester hors du dépôt Git.
+
 ## Historique
 - 2026-11-08 : création des demandes D-01 à D-12 (session d'initialisation).
+- 2026-11-08 : ajout de D-13 et D-14 (audit de btp-devis-pro).
