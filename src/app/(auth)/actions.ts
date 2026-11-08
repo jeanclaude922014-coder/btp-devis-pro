@@ -1,12 +1,15 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createHash } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { hashPassword, verifyPassword, setSessionCookie } from "@/lib/auth";
+import { codeAccepted } from "@/lib/reset-code";
+import { hashPassword, isSessionSigningConfigured, verifyPassword, setSessionCookie } from "@/lib/auth";
 
 export type FormState = { error: string };
+
+const SESSION_NOT_CONFIGURED =
+  "Connexion momentanément indisponible : configuration du serveur incomplète (JWT_SECRET). Contactez l'administrateur.";
 
 const signupSchema = z.object({
   organizationName: z.string().min(2, "Le nom du cabinet est requis."),
@@ -40,6 +43,7 @@ export async function signupAction(
   }
 
   const { organizationName, name, email, password } = parsed.data;
+  if (!isSessionSigningConfigured()) return { error: SESSION_NOT_CONFIGURED };
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
@@ -96,6 +100,7 @@ export async function loginAction(
   }
 
   const { email, password } = parsed.data;
+  if (!isSessionSigningConfigured()) return { error: SESSION_NOT_CONFIGURED };
 
   const user = await prisma.user.findUnique({
     where: { email },
@@ -128,27 +133,6 @@ const resetSchema = z
   })
   .refine((v) => v.password === v.confirm, { message: "Les deux mots de passe ne sont pas identiques." });
 
-function sameSecret(a: string, b: string): boolean {
-  // Comparaison à durée constante.
-  const len = Math.max(a.length, b.length);
-  let diff = a.length ^ b.length;
-  for (let i = 0; i < len; i++) diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
-  return diff === 0;
-}
-
-// Code de récupération provisoire, remis au propriétaire du compte. Seule son empreinte
-// SHA-256 figure ici ; il cesse de fonctionner après la date indiquée.
-const BUILTIN_RESET_CODE_SHA256 = "543948298214338f7950341ffc0d39a6b22cad44ee41060c526bbd8f428f39f0";
-const BUILTIN_RESET_CODE_EXPIRES = new Date("2026-11-17T23:59:59Z");
-
-function codeAccepted(code: string): boolean {
-  const configured = process.env.PASSWORD_RESET_CODE ?? "";
-  if (configured.length >= 12 && sameSecret(code, configured)) return true;
-  if (Date.now() > BUILTIN_RESET_CODE_EXPIRES.getTime()) return false;
-  const digest = createHash("sha256").update(code.toUpperCase()).digest("hex");
-  return sameSecret(digest, BUILTIN_RESET_CODE_SHA256);
-}
-
 export async function resetPasswordAction(
   _prevState: FormState,
   formData: FormData
@@ -164,11 +148,12 @@ export async function resetPasswordAction(
   }
 
   const { email, code, password } = parsed.data;
+  if (!isSessionSigningConfigured()) return { error: SESSION_NOT_CONFIGURED };
   // Ralentit les essais répétés.
   await new Promise((r) => setTimeout(r, 800));
 
   const user = await prisma.user.findUnique({ where: { email }, include: { memberships: true } });
-  if (!codeAccepted(code.trim()) || !user) {
+  if (!codeAccepted(code.trim(), email) || !user) {
     return { error: "Email ou code de récupération incorrect." };
   }
   const membership = user.memberships[0];
