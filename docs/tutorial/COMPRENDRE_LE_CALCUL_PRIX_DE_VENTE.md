@@ -24,7 +24,7 @@ Le prix de vente d'un article se construit en trois étages, à partir du coût 
 - DS = h × t + M + E
 - PR = DS × (1 + FG / 100)
 - PV = PR × (1 + B / 100)
-- Total de l'article = PV × Q
+- Total de l'article = PV × Q, arrondi au franc (0,5 F arrondi vers le haut)
 - Total du lot = somme des totaux de ses articles ; total du devis = somme des lots
 
 Le bénéfice s'applique **sur le prix de revient** (frais généraux inclus), et non sur le déboursé sec.
@@ -40,12 +40,12 @@ Données : h = 2 h, t = 1 500 F/h, M = 10 000 F, E = 500 F, FG = 15 %, B = 10 %,
 | Prix de revient | 13 500 + 2 025 | 15 525 F |
 | Bénéfice | 15 525 × 0,10 | 1 552,5 F |
 | Prix de vente unitaire | 15 525 + 1 552,5 | 17 077,5 F |
-| Total pour 12,5 unités | 17 077,5 × 12,5 | 213 468,75 F |
+| Total pour 12,5 unités | 17 077,5 × 12,5 = 213 468,75, arrondi au franc | 213 469 F |
 
 Ces résultats sont identiques à ceux du logiciel (voir `docs/validation/FICHE_VALIDATION_PRIX_DE_REVIENT.md`).
 
 ## Limites
 - Montants **hors taxes**. Le devis n'applique pas de TVA.
 - Les frais généraux et le bénéfice sont les mêmes pour toutes les lignes d'un devis.
-- L'arrondi au franc n'intervient qu'à l'affichage. Le total affiché peut différer de quelques francs de la somme des lignes affichées.
+- Chaque total d'article est arrondi au franc avant d'être additionné : le total du devis est donc toujours exactement la somme des lignes imprimées.
 - La justesse du prix dépend entièrement des valeurs h, t, M et E de votre bibliothèque de prix. Les valeurs fournies par défaut sont **indicatives et non sourcées**.

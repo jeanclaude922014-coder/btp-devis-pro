@@ -13,7 +13,10 @@ Décisions **constatées** dans le code (reconstituées lors de l'audit) et déc
 | TD-05 | Import DQE par heuristiques (regex, contrôle Qté × P.U.) plutôt que par modèle d'IA | Fonctionne hors ligne, déterministe, gratuit | En vigueur |
 | TD-06 | Générateur de plan par règles et pavage « slice-and-dice » | Déterministe, pas de dépendance externe | En vigueur |
 | TD-07 | Migrations au build non bloquantes et création des tables au démarrage | Base parfois injoignable depuis le build | En vigueur, filet de sécurité |
-| TD-08 | Code de récupération provisoire intégré (empreinte SHA-256), expirant le 17/11/2026 | Récupérer un compte sans service d'e-mail | **À revoir** (audit A-02) |
+| TD-08 | Code de récupération provisoire intégré (empreinte SHA-256), expirant le 17/11/2026, **limité au compte du propriétaire** depuis le 2026-11-08 | Récupérer un compte sans service d'e-mail | En vigueur (A-02 corrigé) |
+| TD-09 | En production, l'absence de `JWT_SECRET` bloque toutes les sessions (échec fermé) au lieu d'utiliser un secret public | Sécurité (A-01) | En vigueur depuis le 2026-11-08 |
+| TD-10 | Arrondi de chaque total de ligne au franc (demi-franc vers le haut) avant sommation | Cohérence du document contractuel (A-07) | En vigueur depuis le 2026-11-08 |
+| TD-11 | Tests avec le lanceur intégré de Node (`node:test`) exécuté par `tsx` (déjà présent dans les dépendances), commande `npm test` | Aucune nouvelle dépendance | En vigueur depuis le 2026-11-08 |
 
 ## Dépendances et licences
 Licences des dépendances principales **non relues pendant l'audit** (pas de `node_modules` dans l'environnement d'audit). Action : générer un inventaire des licences (`npx license-checker` ou équivalent) avant toute diffusion commerciale.
@@ -21,8 +24,8 @@ Licences des dépendances principales **non relues pendant l'audit** (pas de `no
 ## Décisions proposées (en attente de votre validation)
 | N° | Proposition | Motif |
 |---|---|---|
-| TDP-01 | Refuser le démarrage en production si `JWT_SECRET` est absent | A-01 |
-| TDP-02 | Arrondir chaque total de ligne au franc avant de faire la somme | A-07, cohérence du document contractuel |
+| TDP-01 | ~~Refuser le démarrage en production si `JWT_SECRET` est absent~~ → appliquée sous la forme TD-09 | A-01 |
+| TDP-02 | ~~Arrondir chaque total de ligne~~ → appliquée (TD-10) | A-07 |
 | TDP-03 | Extraire les totaux du suivi DQE dans `src/lib/dqe/totals.ts` et les tester | A-05, standard § 5 |
-| TDP-04 | Adopter un outil de test (par exemple Vitest ou `node:test`) | A-04 |
+| TDP-04 | ~~Adopter un outil de test~~ → appliquée (TD-11) | A-04 |
 | TDP-05 | Futurs modules de calcul GC dans un dossier séparé `src/lib/gc/` qui cite `REFERENTIEL_GC/` | Séparer devis et dimensionnement |

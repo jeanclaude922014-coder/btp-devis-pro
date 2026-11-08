@@ -52,13 +52,24 @@ export function computeUnitPricing(
 
 export type QuoteLineLike = PriceInputs & { quantity: number };
 
+/**
+ * Arrondi d'un montant au franc (unité entière de la devise), demi-unité vers le haut.
+ * Les montants du devis sont affichés sans décimale (formatXof) : chaque total de ligne
+ * est arrondi AVANT sommation, pour que les sous-totaux et le total imprimés soient
+ * exactement la somme des lignes imprimées.
+ */
+export function roundToUnit(amount: number): number {
+  // Correction de l'erreur binaire (ex. 1.005 * 1000) avant l'arrondi.
+  return Math.round(amount + Math.sign(amount) * Number.EPSILON * Math.abs(amount));
+}
+
 export function computeLineTotal(
   line: QuoteLineLike,
   fgPct: number,
   benefitPct: number
 ): PricingBreakdown & { totalVente: number } {
   const breakdown = computeUnitPricing(line, fgPct, benefitPct);
-  return { ...breakdown, totalVente: breakdown.prixVente * line.quantity };
+  return { ...breakdown, totalVente: roundToUnit(breakdown.prixVente * line.quantity) };
 }
 
 export type QuoteLike = {

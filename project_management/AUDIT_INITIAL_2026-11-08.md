@@ -124,4 +124,13 @@ Le total imprimé peut donc différer de **quelques francs** de la somme des lig
 2. **Court terme (P1) :** tests unitaires A-04 → extraction des totaux A-05 → règle d'arrondi A-07 → mention HT/TVA A-08 et A-09 → jeu de DQE de référence A-06.
 3. **Moyen terme (P2) :** validation des saisies, CI, limitation des essais, clarification du générateur de plan.
 
-**Aucune de ces corrections n'a été appliquée.** Elles attendent votre décision.
+## 9. Suivi des corrections
+
+| Constat | Décision | Date | Correction | Preuve |
+|---|---|---|---|---|
+| A-01 | Validée par Moulo Jean Claude | 2026-11-08 | `src/lib/jwt.ts` : plus de secret de repli en production. Sans `JWT_SECRET`, aucune session n'est créée ni acceptée, et un message clair s'affiche à la connexion | `src/lib/jwt.test.ts`, build de production réussi, essai serveur : jeton forgé avec l'ancien secret → redirection vers /login |
+| A-02 | Validée : limiter au compte du propriétaire | 2026-11-08 | `src/lib/reset-code.ts` : code intégré accepté uniquement pour le compte du propriétaire (empreinte SHA-256 de l'e-mail), jusqu'au 17/11/2026 | `src/lib/reset-code.test.ts` |
+| A-04 | Validée | 2026-11-08 | Script `npm test` (`tsx --test`), 17 tests | Exécution : 17/17 réussis |
+| A-07 | Validée | 2026-11-08 | `computeLineTotal` arrondit chaque total de ligne au franc avant sommation (`roundToUnit`) | Test C2 : total = somme des lignes = 1 167 F |
+
+Les autres constats restent ouverts. Un point est hors périmètre des corrections : `npm run lint` signale 2 erreurs **préexistantes** dans `src/app/(app)/dashboard/page.tsx` (lien `<a>` au lieu de `<Link>`).

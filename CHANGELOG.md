@@ -3,6 +3,13 @@
 Historique reconstitué à partir de l'historique Git le 2026-11-08 (Moulo Jean Claude). Le logiciel n'a pas encore de numéros de version publiés : `package.json` indique 0.1.0.
 
 ## [Non publié]
+### Sécurité
+- 2026-11-08 — A-01 : en production, l'absence de `JWT_SECRET` bloque désormais les sessions au lieu d'utiliser un secret public (`src/lib/jwt.ts`). **Action requise : définir `JWT_SECRET` sur l'hébergement.**
+- 2026-11-08 — A-02 : le code de récupération intégré n'est plus accepté que pour le compte de son propriétaire (`src/lib/reset-code.ts`).
+### Corrigé
+- 2026-11-08 — A-07 : les totaux de ligne sont arrondis au franc avant sommation. Le total du devis est égal à la somme des lignes imprimées.
+### Ajouté
+- 2026-11-08 — A-04 : premiers tests automatisés (`npm test`, 17 tests).
 ### Documentation
 - 2026-11-08 — Audit initial selon STD-GC-001 et création de `PROJECT_SCOPE.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, `project_management/`, `docs/validation/`, `docs/tutorial/`. Aucune modification du code.
 - 2026-11-08 — Ajout du standard STD-GC-001 à la racine du projet.

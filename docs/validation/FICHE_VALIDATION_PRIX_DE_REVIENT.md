@@ -14,7 +14,7 @@ Domaine couvert : prix unitaire et total d'une ligne, sous-totaux de lots, total
   - DS = MO + matériaux + matériel
   - FG = DS × FG % / 100 ; PR = DS + FG
   - B = PR × B % / 100 ; PV = PR + B
-  - Total ligne = PV × quantité
+  - Total ligne = PV × quantité, **arrondi au franc** (demi-franc vers le haut) depuis le 2026-11-08
 - Frais généraux et bénéfice uniques pour tout le devis.
 - Pas de TVA dans ce module. Le total est implicitement hors taxes.
 - Cas non couverts : frais de chantier séparés, aléas, révision de prix, remises, arrondis normalisés.
@@ -30,8 +30,8 @@ Domaine couvert : prix unitaire et total d'une ligne, sous-totaux de lots, total
 | C1 : 2 h × 1 500 F/h, matériaux 10 000 F, matériel 500 F, FG 15 %, B 10 % | Déboursé sec | 13 500 | — | — | 13 500 | 0 | 0,01 F | Conforme |
 | C1 | Prix de revient | 15 525 | — | — | 15 525 | 0 | 0,01 F | Conforme |
 | C1 | Prix de vente unitaire | 17 077,5 | — | — | 17 077,5 | 0 | 0,01 F | Conforme |
-| C1, quantité 12,5 | Total de la ligne | 213 468,75 | — | — | 213 468,75 | 0 | 0,01 F | Conforme |
-| C2 : 3 lignes (0,33 h × 625 F/h + 101 F), FG 15 %, B 10 % | Total arrondi vs somme des lignes arrondies | 1 166 vs 1 167 | — | — | 1 166 / 1 167 | 1 F | — | **Écart d'arrondi constaté (A-07)** |
+| C1, quantité 12,5 | Total de la ligne (arrondi au franc) | 213 468,75 → 213 469 | — | — | 213 469 | 0 | 0 F | Conforme |
+| C2 : 3 lignes (0,33 h × 625 F/h + 101 F), FG 15 %, B 10 % | Total du devis = somme des lignes | 3 × 389 = 1 167 | — | — | 1 167 | 0 | 0 F | Conforme (A-07 corrigé le 2026-11-08 ; avant : 1 166 contre 1 167) |
 
 ## Contrôle manuel
 - Formules et étapes : voir le cas C1 dans `project_management/AUDIT_INITIAL_2026-11-08.md` § 4.1.
@@ -54,16 +54,17 @@ Domaine couvert : prix unitaire et total d'une ligne, sous-totaux de lots, total
 - [ ] Comparaison à un outil indépendant
 - [ ] Revue humaine compétente
 - [x] Domaine de validité clairement défini
+- [x] Tests automatisés (`src/lib/pricing.test.ts`, `npm test`)
 
 ## Réserves et actions
 | Réserve | Criticité | Impact | Action | Responsable | Échéance |
 |---|---|---|---|---|---|
-| Écart d'arrondi entre total et somme des lignes | P1 | Document contractuel contestable | Choisir une règle d'arrondi (TDP-02) | Moulo Jean Claude | À fixer |
-| Pas de test automatisé | P1 | Régression non détectée | Transformer C1 et C2 en tests | Développeur | À fixer |
+| ~~Écart d'arrondi~~ | P1 | — | Corrigé le 2026-11-08 | — | Fait |
+| ~~Pas de test automatisé~~ | P1 | — | C1 et C2 automatisés le 2026-11-08 | — | Fait |
 | Méthode non référencée | P2 | Explicabilité | Fournir une référence d'économie de la construction (D-13) | Équipe | À fixer |
 
 ## Conclusion
-Statut : `VÉRIFIÉ – CONTRÔLE MANUEL` (arithmétique) — `ACCEPTÉ AVEC RÉSERVE` (arrondis)
+Statut : `VÉRIFIÉ – CONTRÔLE MANUEL` (arithmétique et arrondis, tests automatisés)
 Domaine validé ou vérifié : calcul d'un prix unitaire et d'un total de ligne à frais généraux et bénéfice uniques
-Limites d'utilisation : pas de TVA, arrondi au franc uniquement à l'affichage
+Limites d'utilisation : pas de TVA ; totaux de ligne arrondis au franc, prix unitaires non arrondis
 Mention à afficher dans le logiciel : « Niveau de vérification : contrôle manuel de l'arithmétique effectué. Montants hors taxes. Les prix unitaires dépendent de votre bibliothèque de prix. »

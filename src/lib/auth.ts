@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { ensureAppSchema } from "@/lib/schema";
-import { signSession, verifySessionToken, type SessionPayload } from "@/lib/jwt";
+import { isSessionSigningConfigured, signSession, verifySessionToken, type SessionPayload } from "@/lib/jwt";
 
 const SESSION_COOKIE = "session";
 
@@ -22,7 +22,7 @@ export async function verifyPassword(
   return bcrypt.compare(password, hash);
 }
 
-export { signSession, verifySessionToken };
+export { isSessionSigningConfigured, signSession, verifySessionToken };
 
 /** Doit être appelé depuis une Server Action ou un Route Handler (pas un Server Component). */
 export async function setSessionCookie(payload: SessionPayload) {
