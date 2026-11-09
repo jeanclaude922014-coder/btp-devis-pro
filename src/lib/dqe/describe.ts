@@ -3,6 +3,7 @@
 
 import { categoryByKey, normalizeText } from "./categories";
 import type { DqeData, DqeItem, DqeLot } from "./types";
+import { lineAmount } from "./totals";
 
 export type LotDescription = {
   lotId: string;
@@ -25,7 +26,7 @@ const Q = (n: number) =>
 const M = (n: number) =>
   n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 1 : 2).replace(".", ",")} M F` : `${F(n)} F`;
 
-const amountOf = (i: DqeItem) => (+i.q || 0) * (+i.pu || 0);
+const amountOf = (i: DqeItem) => lineAmount(i);
 
 function sumWhere(items: DqeItem[], unit: RegExp, text?: RegExp): number {
   return items

@@ -20,6 +20,7 @@ import { requireSessionWithContext } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { describeAll } from "@/lib/dqe/describe";
 import type { DqeData } from "@/lib/dqe/types";
+import { sumHt, taxLabel, taxes } from "@/lib/dqe/totals";
 
 const F = (n: number) => Math.round(n).toLocaleString("fr-FR").replace(/[  ]/g, " ");
 const BLUE = "1E3A5F";
@@ -53,7 +54,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const data = dqe.data as unknown as DqeData;
   const desc = describeAll(data);
-  const ht = data.items.reduce((s, i) => s + i.q * i.pu, 0);
+  const ht = sumHt(data.items);
+  const tx = taxes(ht, data.tva);
   const author = user.name;
   const today = new Date().toLocaleDateString("fr-FR");
 
@@ -170,8 +172,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           labelLine("Date", today),
           labelLine("Composition", `${data.sites.length} ouvrage(s), ${data.lots.length} lots, ${data.items.length} articles`),
           labelLine("Montant total HT", `${F(ht)} F CFA`),
-          labelLine(`TVA ${Math.round(data.tva * 100)} %`, `${F(ht * data.tva)} F CFA`),
-          labelLine("Montant total TTC", `${F(ht * (1 + data.tva))} F CFA`),
+          labelLine(taxLabel(data.tva), `${F(tx.tva)} F CFA`),
+          labelLine("Montant total TTC", `${F(tx.ttc)} F CFA`),
           new Paragraph({ heading: HeadingLevel.HEADING_1, spacing: { before: 240, after: 120 }, children: [new TextRun({ text: "1. Récapitulatif par lot", color: BLUE })] }),
           new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: recapRows }),
           new Paragraph({ heading: HeadingLevel.HEADING_1, spacing: { before: 360, after: 120 }, children: [new TextRun({ text: "2. Description détaillée des lots", color: BLUE })] }),

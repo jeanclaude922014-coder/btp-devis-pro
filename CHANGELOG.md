@@ -3,6 +3,12 @@
 Historique reconstitué à partir de l'historique Git le 2026-11-08 (Moulo Jean Claude). Le logiciel n'a pas encore de numéros de version publiés : `package.json` indique 0.1.0.
 
 ## [Non publié]
+### Corrigé
+- 2026-11-09 — A-05 : calculs de TVA et de montants des DQE regroupés dans `src/lib/dqe/totals.ts` (écran de suivi, CSV, Word, description des lots) et alignés dans l'outil hors ligne. Les colonnes réalisé + reste = marché s'additionnent exactement en HT, TVA et TTC. Le total Word est identique à celui de l'écran. Les taux décimaux sont affichés exactement (« 9,5 % »).
+### Ajouté
+- 2026-11-09 — Taux de TVA modifiable dans le suivi DQE et l'outil hors ligne (0 = « TVA (exonéré) »).
+- 2026-11-09 — 10 tests sur les montants et la TVA des DQE (27 tests au total).
+
 ### Sécurité
 - 2026-11-08 — A-01 : en production, l'absence de `JWT_SECRET` bloque désormais les sessions au lieu d'utiliser un secret public (`src/lib/jwt.ts`). **Action requise : définir `JWT_SECRET` sur l'hébergement.**
 - 2026-11-08 — A-02 : le code de récupération intégré n'est plus accepté que pour le compte de son propriétaire (`src/lib/reset-code.ts`).

@@ -223,7 +223,27 @@ const P1=n=>n.toFixed(1).replace(".",",");
 const todayISO=()=>{const n=new Date();return n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0");};
 const fD=s=>{if(!s)return"";const[y,m,d]=s.split("-");return d+"/"+m+"/"+y.slice(2);};
 const clone=o=>JSON.parse(JSON.stringify(o));
-const mt=i=>Math.round((+i.q||0)*(+i.pu||0));
+/* DQE-TOTALS:BEGIN */
+/* Montants et TVA : mêmes règles que src/lib/dqe/totals.ts (vérifié par src/lib/dqe/totals.test.ts).
+   Articles arrondis au franc ; réalisé plafonné à la quantité du marché ; TVA arrondie une fois sur le total ;
+   TTC = HT + TVA ; TVA du reste = TVA du marché − TVA du réalisé. */
+var TX=(function(){
+  var R0=function(x){return Math.round(x+Math.sign(x)*Number.EPSILON*Math.abs(x));};
+  var pos=function(v){var n=Number(v);return isFinite(n)&&n>0?n:0;};
+  var rate=function(r){var n=Number(r);if(!isFinite(n)||n<0)return 0;return Math.min(n,1);};
+  var tax=function(ht,r){var t=R0(ht*rate(r));return{ht:ht,tva:t,ttc:ht+t};};
+  return{
+    mt:function(i){return R0(pos(i.q)*pos(i.pu));},
+    exA:function(i,e){return R0(Math.min(pos(e),pos(i.q))*pos(i.pu));},
+    attA:function(a,i){return i?R0(pos(a.q)*pos(i.pu)):0;},
+    rate:rate,
+    tax:tax,
+    split:function(ht,ex,r){var a=tax(ht,r),b=tax(ex,r),rh=ht-ex,rt=a.tva-b.tva;return{total:a,executed:b,remaining:{ht:rh,tva:rt,ttc:rh+rt}};},
+    label:function(r){r=rate(r);if(r===0)return"TVA (exonéré)";return"TVA "+(Math.round(r*10000)/100).toLocaleString("fr-FR",{maximumFractionDigits:2})+" %";}
+  };
+})();
+/* DQE-TOTALS:END */
+const mt=i=>TX.mt(i);
 const newId=()=>"d"+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const CAT=k=>DQE.categoryByKey(k);
 const STRAT={titres:"à partir des titres de lots du document",numerotation:"à partir de la numérotation des prix (pas de titres de lots dans le document)","mots-cles":"par reconnaissance des désignations (ni titres de lots ni numérotation dans le document)"};
@@ -395,7 +415,7 @@ function execQ(k,upto){return D().att.filter(a=>a.k===k&&(!upto||a.d<=upto)).red
 function lotOf(i){return D().lots.find(l=>l.id===i.lot);}
 function inSite(i){const l=lotOf(i);return !!l&&(!site||l.site===site);}
 function totals(){const up=D().suivi;let ht=0,ex=0,n=0,done=0;
-  D().items.forEach(i=>{if(!inSite(i))return;const e=execQ(i.k,up);ht+=mt(i);ex+=Math.min(e,Math.max(+i.q||0,0))*(+i.pu||0);n++;if(+i.q>0&&e>=+i.q)done++;});
+  D().items.forEach(i=>{if(!inSite(i))return;const e=execQ(i.k,up);ht+=mt(i);ex+=TX.exA(i,e);n++;if(+i.q>0&&e>=+i.q)done++;});
   const o=D().orig;const orig=o.items.filter(i=>{const l=o.lots.find(x=>x.id===i.lot);return l&&(!site||l.site===site);}).reduce((s,i)=>s+mt(i),0);
   return{ht,ex,n,done,diff:ht-orig};}
 const siteName=id=>(D().sites.find(s=>s.id===id)||{}).name||"";
@@ -404,7 +424,7 @@ const siteName=id=>(D().sites.find(s=>s.id===id)||{}).name||"";
 function render(){
   const app=$("#app"); if(!CUR){app.innerHTML="";return;}
   const d=D(); if(!d.suivi) d.suivi=todayISO();
-  const r=d.report, T=totals(), up=d.suivi, tva=d.tva;
+  const r=d.report, T=totals(), up=d.suivi, tva=TX.rate(d.tva), KT=TX.tax(T.ht,tva);
   const pct=T.ht?T.ex/T.ht*100:0;
   let h="";
   h+='<section class="report'+(CUR.example?" example":"")+'">'+
@@ -418,6 +438,7 @@ function render(){
     '<div class="tools">'+
       '<label class="field" for="site">Ouvrage<select id="site"><option value="">Tout le marché</option>'+d.sites.map(s=>'<option value="'+s.id+'"'+(site===s.id?" selected":"")+">"+esc(s.name)+"</option>").join("")+'</select></label>'+
       '<label class="field" for="suivi">Situation au<input type="date" id="suivi" value="'+up+'"></label>'+
+      '<label class="field" for="tvaRate">Taux de TVA (%)<input type="text" id="tvaRate" inputmode="decimal" style="width:5.5em;text-align:right" title="0 pour un marché exonéré de TVA" value="'+String(Math.round(tva*10000)/100).replace(".",",")+'"></label>'+
       '<label class="field grow" for="q">Rechercher<input type="search" id="q" placeholder="N° ou désignation" value="'+esc(query)+'"></label>'+
       '<button type="button" class="btn'+(onlyRun?" on":"")+'" id="onlyRun">Articles en cours seulement</button>'+
       '<button type="button" class="btn" id="html">Télécharger la page (.html)</button>'+
@@ -429,7 +450,7 @@ function render(){
 
   h+='<section class="kpis">'+
     '<div class="kpi main"><span class="l">Montant total HT</span><span class="v">'+F(T.ht)+'</span><span class="s">'+esc(site?siteName(site):"Tout le marché")+" · "+T.n+' articles</span></div>'+
-    '<div class="kpi"><span class="l">TVA '+Math.round(tva*100)+' %</span><span class="v">'+F(T.ht*tva)+'</span><span class="s">TTC '+F(T.ht*(1+tva))+'</span></div>'+
+    '<div class="kpi"><span class="l">'+TX.label(tva)+'</span><span class="v">'+F(KT.tva)+'</span><span class="s">TTC '+F(KT.ttc)+'</span></div>'+
     '<div class="kpi good"><span class="l">Réalisé HT au '+fD(up)+'</span><span class="v">'+F(T.ex)+'</span><div class="meter"><i style="width:'+Math.min(100,pct)+'%"></i></div><span class="s">'+P1(pct)+' % du montant</span></div>'+
     '<div class="kpi"><span class="l">Reste à réaliser HT</span><span class="v">'+F(T.ht-T.ex)+'</span><span class="s">'+T.done+"/"+T.n+' articles soldés</span></div>'+
     '<div class="kpi '+(T.diff>0?"bad":T.diff<0?"good":"")+'"><span class="l">Écart / DQE d\'origine</span><span class="v">'+(T.diff>0?"+":"")+F(T.diff)+'</span><span class="s">'+(T.diff?"après modifications":"aucune modification")+'</span></div>'+
@@ -467,7 +488,7 @@ function render(){
     '<label class="field o" for="aObs">Observation<input id="aObs" autocomplete="off"></label>'+
     '<button type="button" class="btn pri" id="aSave">Enregistrer la quantité</button></div>'+
     '<p class="muted small" style="margin:8px 0 0">Chaque saisie s\'ajoute au cumul de l\'article : % exécuté, montant réalisé, avancement par lot et situation se calculent seuls.</p></section>';
-  const rows=d.lots.filter(l=>!site||l.site===site).map(l=>{let ht=0,ex=0;d.items.filter(i=>i.lot===l.id).forEach(i=>{ht+=mt(i);ex+=Math.min(execQ(i.k,up),Math.max(+i.q||0,0))*(+i.pu||0);});return{l,ht,ex};});
+  const rows=d.lots.filter(l=>!site||l.site===site).map(l=>{let ht=0,ex=0;d.items.filter(i=>i.lot===l.id).forEach(i=>{ht+=mt(i);ex+=TX.exA(i,execQ(i.k,up));});return{l,ht,ex};});
   const mx=Math.max(1,...rows.map(x=>x.ht));
   const short=id=>siteName(id).replace(/^\d+\.\s*/,"").split(/\s+/).slice(0,2).join(" ");
   h+='<section class="panel"><h2>Avancement par lot</h2><p class="muted small" style="margin:2px 0 0">montant exécuté / montant DQE · longueur de barre = poids du lot</p><div class="lots">'+
@@ -475,11 +496,11 @@ function render(){
     "</div></section></div>";
 
   // Courbe + journal
-  const attTot=d.att.reduce((s,a)=>{const i=d.items.find(x=>x.k===a.k);return s+(i?a.q*i.pu:0);},0);
+  const attTot=d.att.reduce((s,a)=>s+TX.attA(a,d.items.find(x=>x.k===a.k)),0);
   h+='<div class="two"><section class="panel"><div class="sec-head"><h2>Montant réalisé cumulé</h2><span class="muted small">'+F(T.ht)+' F HT</span></div>'+curve(T.ht)+'</section>'+
     '<section class="panel"><div class="sec-head"><h2>Journal des attachements</h2><span class="muted small">'+d.att.length+" saisie"+(d.att.length>1?"s":"")+" · "+F(attTot)+' F HT</span></div><div class="jr"><table class="tbl"><thead><tr><th>Date</th><th>Article</th><th class="r">Quantité</th><th class="r">Montant</th><th>Observation</th><th></th></tr></thead><tbody>'+
     (d.att.length?[...d.att.keys()].reverse().map(ix=>{const a=d.att[ix];const i=d.items.find(x=>x.k===a.k);
-      return "<tr><td>"+fD(a.d)+"</td><td>"+(i?esc(i.n)+" – "+esc(i.d):"(article supprimé)")+'</td><td class="r">'+Q(+a.q)+" "+(i?esc(i.u):"")+'</td><td class="r">'+(i?F(a.q*i.pu):"")+"</td><td>"+esc(a.o||"")+'</td><td class="r"><button type="button" class="x'+(armed==="att"+ix?" warn":"")+'" data-adel="'+ix+'" aria-label="Supprimer cette saisie">'+(armed==="att"+ix?"Suppr. ?":"✕")+"</button></td></tr>";}).join("")
+      return "<tr><td>"+fD(a.d)+"</td><td>"+(i?esc(i.n)+" – "+esc(i.d):"(article supprimé)")+'</td><td class="r">'+Q(+a.q)+" "+(i?esc(i.u):"")+'</td><td class="r">'+(i?F(TX.attA(a,i)):"")+"</td><td>"+esc(a.o||"")+'</td><td class="r"><button type="button" class="x'+(armed==="att"+ix?" warn":"")+'" data-adel="'+ix+'" aria-label="Supprimer cette saisie">'+(armed==="att"+ix?"Suppr. ?":"✕")+"</button></td></tr>";}).join("")
     :'<tr><td colspan="6" class="muted">Aucune quantité saisie. Choisissez un article, indiquez la quantité exécutée du jour et cliquez « Enregistrer la quantité ».</td></tr>')+
     "</tbody></table></div></section></div>";
 
@@ -490,7 +511,7 @@ function render(){
   d.sites.forEach(s=>{if(site&&site!==s.id)return;let sHT=0,sEX=0;
     if(d.sites.length>1)t+='<tr class="site"><td colspan="11">'+esc(s.name)+"</td></tr>";
     d.lots.filter(l=>l.site===s.id).forEach(l=>{const its=d.items.filter(i=>i.lot===l.id);let lHT=0,lEX=0,rowsH="",lastSec;
-      its.forEach(i=>{const e=execQ(i.k,up),m=mt(i),ex=Math.min(e,Math.max(+i.q||0,0))*(+i.pu||0);lHT+=m;lEX+=ex;
+      its.forEach(i=>{const e=execQ(i.k,up),m=mt(i),ex=TX.exA(i,e);lHT+=m;lEX+=ex;
         if(qs&&!(i.d.toLowerCase().includes(qs)||String(i.n).toLowerCase().includes(qs)))return;
         if(onlyRun&&!(e>0&&e<+i.q))return;
         const p=+i.q>0?e/+i.q*100:0,o=OBY[i.k];
@@ -506,9 +527,10 @@ function render(){
       if(!collapsed[l.id])t+=rowsH;});
     gHT+=sHT;gEX+=sEX;
     if(d.sites.length>1)t+='<tr class="tot"><td colspan="5">Total '+esc(s.name)+' (HT)</td><td class="r">'+F(sHT)+"</td><td></td><td>"+(sHT?Math.round(sEX/sHT*100)+" %":"")+'</td><td class="r">'+F(sEX)+'</td><td class="r">'+F(sHT-sEX)+"</td><td></td></tr>";});
+  const GT=TX.split(gHT,gEX,tva);
   t+='<tr class="grand"><td colspan="5">MONTANT TOTAL HT</td><td class="r">'+F(gHT)+"</td><td></td><td>"+(gHT?Math.round(gEX/gHT*100)+" %":"")+'</td><td class="r">'+F(gEX)+'</td><td class="r">'+F(gHT-gEX)+"</td><td></td></tr>"+
-    '<tr class="sub"><td colspan="5">TVA '+Math.round(tva*100)+' %</td><td class="r">'+F(gHT*tva)+'</td><td></td><td></td><td class="r">'+F(gEX*tva)+'</td><td class="r">'+F((gHT-gEX)*tva)+"</td><td></td></tr>"+
-    '<tr class="grand"><td colspan="5">MONTANT TOTAL TTC</td><td class="r">'+F(gHT*(1+tva))+'</td><td></td><td></td><td class="r">'+F(gEX*(1+tva))+'</td><td class="r">'+F((gHT-gEX)*(1+tva))+"</td><td></td></tr></tbody>";
+    '<tr class="sub"><td colspan="5">'+TX.label(tva)+'</td><td class="r">'+F(GT.total.tva)+'</td><td></td><td></td><td class="r">'+F(GT.executed.tva)+'</td><td class="r">'+F(GT.remaining.tva)+"</td><td></td></tr>"+
+    '<tr class="grand"><td colspan="5">MONTANT TOTAL TTC</td><td class="r">'+F(GT.total.ttc)+'</td><td></td><td></td><td class="r">'+F(GT.executed.ttc)+'</td><td class="r">'+F(GT.remaining.ttc)+"</td><td></td></tr></tbody>";
   h+='<section class="panel"><h2>Devis quantitatif et estimatif</h2><p class="muted small" style="margin:4px 0 0">Désignation, unité, quantité et prix unitaire modifiables · cliquez sur un lot pour le replier. Case orange = valeur différente du DQE d\'origine. « + » ajoute un article au lot, « ✕ » le supprime (deux clics).</p>'+
     '<div class="dqe-wrap"><table class="tbl dqe">'+t+"</table></div></section>";
 
@@ -526,7 +548,7 @@ function curve(tot){
   const W=640,H=240;
   if(!ev.length||!tot)return '<svg class="curve" viewBox="0 0 '+W+" "+H+'" role="img" aria-label="Courbe vide"><text x="320" y="110" text-anchor="middle">Aucune quantité saisie avant le '+fD(up)+'.</text><text x="320" y="132" text-anchor="middle">La courbe se dessine dès la première saisie d\'attachement.</text></svg>';
   const days=[...new Set(ev.map(a=>a.d))],cumK={},pts=[];
-  days.forEach(dd=>{ev.filter(a=>a.d===dd).forEach(a=>{cumK[a.k]=(cumK[a.k]||0)+(+a.q||0);});const c=Object.keys(cumK).reduce((x,k)=>x+Math.min(cumK[k],Math.max(+by[k].q||0,0))*(+by[k].pu||0),0);pts.push([dd,c]);});
+  days.forEach(dd=>{ev.filter(a=>a.d===dd).forEach(a=>{cumK[a.k]=(cumK[a.k]||0)+(+a.q||0);});const c=Object.keys(cumK).reduce((x,k)=>x+TX.exA(by[k],cumK[k]),0);pts.push([dd,c]);});
   const end=up>days[days.length-1]?up:days[days.length-1];const t0=new Date(days[0]),t1=new Date(end),span=Math.max(1,(t1-t0)/864e5);
   const Lm=62,R=16,Tp=16,B=34,xs=x=>Lm+((new Date(x)-t0)/864e5)/span*(W-Lm-R),ys=v=>H-B-v/tot*(H-B-Tp);
   let g="";[0,.25,.5,.75,1].forEach(f=>{const y=ys(tot*f);g+='<line x1="'+Lm+'" x2="'+(W-R)+'" y1="'+y+'" y2="'+y+'" style="stroke:var(--line)"/><text x="'+(Lm-6)+'" y="'+(y+3)+'" text-anchor="end">'+P1(tot*f/1e6)+" M</text>";});
@@ -551,6 +573,7 @@ document.addEventListener("change",e=>{const el=e.target;if(!CUR)return;const d=
   if(el.id==="dqeName"){if(el.value.trim()&&!CUR.example){CUR.name=el.value.trim();renderLib();persist();}return;}
   if(el.id==="site"){site=el.value;formK=null;render();return;}
   if(el.id==="suivi"){d.suivi=el.value||todayISO();aDate=d.suivi;changed();return;}
+  if(el.id==="tvaRate"){const v=parseFloat(String(el.value).replace(/\s/g,"").replace(",","."));if(isNaN(v)||v<0||v>100){lastMsg="<b>Taux de TVA invalide :</b> saisissez une valeur entre 0 et 100 (0 = exonéré).";render();return;}d.tva=TX.rate(v/100);changed("Taux de TVA modifié : "+TX.label(d.tva)+".");return;}
   if(el.id==="aItem"){formK=+el.value;info();return;}
   if(el.id==="aDate"){aDate=el.value;return;}
 });
@@ -599,18 +622,18 @@ async function offer(filename,data){
 }
 function exportCsv(){const d=D(),up=d.suivi,num=v=>String(Math.round(v*1000)/1000).replace(".",",");
   const R=[["Ouvrage","Lot","Corps d'état","N°","Désignation","U","Quantité","P.U.","Montant HT","Qté exécutée","% exécuté","Montant réalisé HT","Reste HT"]];let g=0,gx=0;
-  d.sites.forEach(s=>d.lots.filter(l=>l.site===s.id).forEach(l=>d.items.filter(i=>i.lot===l.id).forEach(i=>{const e=execQ(i.k,up),m=mt(i),x=Math.min(e,+i.q)*(+i.pu);g+=m;gx+=x;
-    R.push([s.name,l.name,CAT(l.category).label,i.n,i.d,i.u,num(+i.q),Math.round(+i.pu),m,num(e),+i.q?Math.round(e/+i.q*100):0,Math.round(x),Math.round(m-x)]);})));
-  R.push([]);R.push(["","","","","TOTAL HT","","","",g,"","",Math.round(gx),Math.round(g-gx)]);R.push(["","","","","TVA "+Math.round(d.tva*100)+" %","","","",Math.round(g*d.tva)]);R.push(["","","","","TOTAL TTC","","","",Math.round(g*(1+d.tva))]);
+  d.sites.forEach(s=>d.lots.filter(l=>l.site===s.id).forEach(l=>d.items.filter(i=>i.lot===l.id).forEach(i=>{const e=execQ(i.k,up),m=mt(i),x=TX.exA(i,e);g+=m;gx+=x;
+    R.push([s.name,l.name,CAT(l.category).label,i.n,i.d,i.u,num(+i.q),Math.round(+i.pu),m,num(e),+i.q?Math.round(e/+i.q*100):0,x,m-x]);})));
+  const CT=TX.split(g,gx,d.tva);R.push([]);R.push(["","","","","TOTAL HT","","","",CT.total.ht,"","",CT.executed.ht,CT.remaining.ht]);R.push(["","","","",TX.label(d.tva),"","","",CT.total.tva,"","",CT.executed.tva,CT.remaining.tva]);R.push(["","","","","TOTAL TTC","","","",CT.total.ttc,"","",CT.executed.ttc,CT.remaining.ttc]);
   R.push([]);R.push(["JOURNAL DES ATTACHEMENTS"]);R.push(["Date","N°","Désignation","U","Quantité","Montant HT","Observation"]);
-  d.att.forEach(a=>{const i=d.items.find(x=>x.k===a.k);R.push([fD(a.d),i?i.n:"",i?i.d:"",i?i.u:"",num(+a.q),i?Math.round(a.q*i.pu):"",a.o||""]);});
+  d.att.forEach(a=>{const i=d.items.find(x=>x.k===a.k);R.push([fD(a.d),i?i.n:"",i?i.d:"",i?i.u:"",num(+a.q),i?TX.attA(a,i):"",a.o||""]);});
   R.push([]);R.push(["Établi par : Moulo Jean Claude","","","","Situation au "+fD(up)]);
   const csv="﻿"+R.map(r=>r.map(v=>{v=String(v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}).join(";")).join("\r\n");
   offer("DQE_Suivi_"+safeName()+"_"+todayISO()+".csv",csv);}
 async function exportDocx(btn){
   btn.disabled=true;const old=btn.textContent;btn.textContent="Préparation du Word…";
   try{await needDocx();}catch(e){btn.disabled=false;btn.textContent=old;lastMsg="Le module Word n'a pas pu être chargé. Vérifiez la connexion.";paintStatus();return;}
-  const X=window.docx,d=D(),desc=DQE.describeAll(d),ht=d.items.reduce((s,i)=>s+i.q*i.pu,0),author="Moulo Jean Claude",today=new Date().toLocaleDateString("fr-FR"),BLUE="1D3557";
+  const X=window.docx,d=D(),desc=DQE.describeAll(d),ht=d.items.reduce((s,i)=>s+mt(i),0),WT=TX.tax(ht,d.tva),author="Moulo Jean Claude",today=new Date().toLocaleDateString("fr-FR"),BLUE="1D3557";
   const run=(text,o)=>new X.TextRun(Object.assign({text,size:20},o||{}));
   const line=(l,t)=>new X.Paragraph({spacing:{after:60},children:[run(l+" : ",{bold:true}),run(t)]});
   const cell=(t,o)=>{o=o||{};return new X.TableCell({width:o.w?{size:o.w,type:X.WidthType.PERCENTAGE}:undefined,shading:o.fill?{type:X.ShadingType.CLEAR,color:"auto",fill:o.fill}:undefined,margins:{top:40,bottom:40,left:80,right:80},children:[new X.Paragraph({alignment:o.right?X.AlignmentType.RIGHT:X.AlignmentType.LEFT,children:[new X.TextRun({text:t,bold:o.b,color:o.c,size:18})]})]});};
@@ -636,7 +659,7 @@ async function exportDocx(btn){
         new X.Paragraph({alignment:X.AlignmentType.CENTER,spacing:{after:240},children:[run(CUR.name,{size:26})]}),
         line("Fichier source",CUR.fileName),line("Établi par",author),line("Date",today),
         line("Composition",d.sites.length+" ouvrage(s), "+d.lots.length+" lots, "+d.items.length+" articles"),
-        line("Montant total HT",F(ht)+" F CFA"),line("TVA "+Math.round(d.tva*100)+" %",F(ht*d.tva)+" F CFA"),line("Montant total TTC",F(ht*(1+d.tva))+" F CFA"),
+        line("Montant total HT",F(ht)+" F CFA"),line(TX.label(d.tva),F(WT.tva)+" F CFA"),line("Montant total TTC",F(WT.ttc)+" F CFA"),
         new X.Paragraph({heading:X.HeadingLevel.HEADING_1,spacing:{before:240,after:120},children:[new X.TextRun({text:"1. Récapitulatif par lot",color:BLUE})]}),
         new X.Table({width:{size:100,type:X.WidthType.PERCENTAGE},rows}),
         new X.Paragraph({heading:X.HeadingLevel.HEADING_1,spacing:{before:360,after:120},children:[new X.TextRun({text:"2. Description détaillée des lots",color:BLUE})]}),
