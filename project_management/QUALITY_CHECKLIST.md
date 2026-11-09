@@ -13,9 +13,9 @@ Statuts conformes à STD-GC-001 § 2.2. Les références A-xx renvoient à `AUDI
 | Lecture correcte d'un DQE Excel réel | `dqe/parse.ts` | P1 | `NON ÉVALUÉ` | Jeu de DQE de référence demandé (D-14) |
 | Lecture correcte d'un DQE PDF réel | `dqe/extract.ts`, `parse.ts` | P1 | `NON ÉVALUÉ` | Idem |
 | Écart total déclaré / total recalculé signalé | import DQE | P1 | `VÉRIFIÉ – RÉFÉRENCES DOCUMENTAIRES` (lecture du code) | Avertissement si l'écart dépasse max(10 F ; 0,5 %) (`parse.ts`, l. 582). À confirmer par un test sur DQE réel |
-| Totaux HT / TVA / TTC du suivi | `dqe-workspace.tsx` | P1 | `NON ÉVALUÉ` | Calcul dans l'interface (A-05) |
-| Taux de TVA par défaut (18 %) | `dqe/parse.ts` | P1 | `À RECHERCHER` | Référence fiscale ivoirienne à citer (A-09) |
-| Plafonnement de l'exécuté à la quantité du marché | suivi DQE | P2 | `VÉRIFIÉ – RÉFÉRENCES DOCUMENTAIRES` (lecture du code) | `Math.min(e, q)`. Les dépassements de quantité ne sont pas valorisés : comportement à confirmer avec l'utilisateur |
+| Totaux HT / TVA / TTC du suivi | `src/lib/dqe/totals.ts` | P1 | `VÉRIFIÉ – CONTRÔLE MANUEL` | Corrigé le 2026-11-09 (A-05) : moteur unique, cas calculés à la main dans `totals.test.ts`, concordance testée avec l'outil hors ligne. Reste à comparer à un décompte réel (D-14) |
+| Taux de TVA par défaut (18 %) | `dqe/parse.ts` | P1 | `À RECHERCHER` | Taux modifiable depuis le 2026-11-09 (0 = exonéré). Référence fiscale ivoirienne à citer (A-09) |
+| Plafonnement de l'exécuté à la quantité du marché | suivi DQE | P2 | `VÉRIFIÉ – CONTRÔLE MANUEL` (test automatisé) | `executedAmount`. Les dépassements de quantité ne sont pas valorisés : comportement à confirmer avec l'utilisateur |
 | Surfaces du plan = surface demandée | `floor-plan/generate.ts` | P3 | `NON ÉVALUÉ` | Test simple à écrire |
 | Prix du catalogue par défaut | `prisma/seed.ts` | **P0** | `BLOQUANT POUR PUBLICATION PROFESSIONNELLE` | Aucune source (A-03). Les prix ne doivent pas être présentés comme référence sans calibrage |
 
@@ -31,7 +31,7 @@ Statuts conformes à STD-GC-001 § 2.2. Les références A-xx renvoient à `AUDI
 ## Qualité logicielle
 | Contrôle | Criticité | Statut |
 |---|---|---|
-| Tests unitaires du moteur de calcul | P1 | `EN COURS` : 17 tests (`npm test`) sur le prix, les sessions et le code de récupération. Import DQE et TVA non couverts (A-04) |
+| Tests unitaires du moteur de calcul | P1 | `EN COURS` : 27 tests (`npm test`) sur le prix, les sessions, le code de récupération, les montants et la TVA des DQE. Import DQE non couvert (A-04) |
 | CI : lint + build + tests | P2 | `À FAIRE` (A-12) |
 | Documentation STD-GC-001 § 9 | P2 | `EN COURS` (créée le 2026-11-08, à maintenir) |
 | Tutoriel intégré au logiciel (§ 10) | P2 | `À FAIRE` (plan dans `docs/tutorial/`) |

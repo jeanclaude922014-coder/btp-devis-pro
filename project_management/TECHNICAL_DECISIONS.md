@@ -16,6 +16,7 @@ Décisions **constatées** dans le code (reconstituées lors de l'audit) et déc
 | TD-08 | Code de récupération provisoire intégré (empreinte SHA-256), expirant le 17/11/2026, **limité au compte du propriétaire** depuis le 2026-11-08 | Récupérer un compte sans service d'e-mail | En vigueur (A-02 corrigé) |
 | TD-09 | En production, l'absence de `JWT_SECRET` bloque toutes les sessions (échec fermé) au lieu d'utiliser un secret public | Sécurité (A-01) | En vigueur depuis le 2026-11-08 |
 | TD-10 | Arrondi de chaque total de ligne au franc (demi-franc vers le haut) avant sommation | Cohérence du document contractuel (A-07) | En vigueur depuis le 2026-11-08 |
+| TD-12 | Montants DQE : articles arrondis au franc, TVA arrondie une fois sur le total, TTC = HT + TVA, TVA du reste = TVA du marché − TVA du réalisé. Moteur unique `src/lib/dqe/totals.ts`, copie JavaScript dans l'outil hors ligne testée contre lui | Colonnes qui s'additionnent exactement, mêmes chiffres partout (A-05) | En vigueur depuis le 2026-11-09 |
 | TD-11 | Tests avec le lanceur intégré de Node (`node:test`) exécuté par `tsx` (déjà présent dans les dépendances), commande `npm test` | Aucune nouvelle dépendance | En vigueur depuis le 2026-11-08 |
 
 ## Dépendances et licences
@@ -26,6 +27,6 @@ Licences des dépendances principales **non relues pendant l'audit** (pas de `no
 |---|---|---|
 | TDP-01 | ~~Refuser le démarrage en production si `JWT_SECRET` est absent~~ → appliquée sous la forme TD-09 | A-01 |
 | TDP-02 | ~~Arrondir chaque total de ligne~~ → appliquée (TD-10) | A-07 |
-| TDP-03 | Extraire les totaux du suivi DQE dans `src/lib/dqe/totals.ts` et les tester | A-05, standard § 5 |
+| TDP-03 | ~~Extraire les totaux du suivi DQE~~ → appliquée (TD-12) | A-05 |
 | TDP-04 | ~~Adopter un outil de test~~ → appliquée (TD-11) | A-04 |
 | TDP-05 | Futurs modules de calcul GC dans un dossier séparé `src/lib/gc/` qui cite `REFERENTIEL_GC/` | Séparer devis et dimensionnement |

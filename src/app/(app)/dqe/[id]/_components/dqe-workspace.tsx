@@ -3,6 +3,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { CATEGORIES, categoryByKey } from "@/lib/dqe/categories";
 import { describeAll } from "@/lib/dqe/describe";
+import {
+  attachmentAmount,
+  executedAmount,
+  executedQty,
+  lineAmount,
+  normalizeRate,
+  splitTaxes,
+  summarizeDqe,
+  taxLabel,
+  taxes,
+} from "@/lib/dqe/totals";
 import type { DqeData, DqeItem } from "@/lib/dqe/types";
 
 type SaveFn = (id: string, data: unknown) => Promise<{ ok: boolean; error?: string }>;
@@ -19,7 +30,7 @@ const fD = (s: string) => {
   const [y, m, d] = s.split("-");
   return `${d}/${m}/${y.slice(2)}`;
 };
-const mt = (i: DqeItem) => Math.round((+i.q || 0) * (+i.pu || 0));
+const mt = (i: DqeItem) => lineAmount(i);
 const pctTxt = (n: number) => `${n.toFixed(1).replace(".", ",")} %`;
 
 const STRATEGY_LABEL: Record<string, string> = {
@@ -85,44 +96,13 @@ export function DqeWorkspace({
   const lotById = useMemo(() => new Map(data.lots.map((l) => [l.id, l])), [data.lots]);
   const origByK = useMemo(() => new Map(data.orig.items.map((i) => [i.k, i])), [data.orig.items]);
 
-  const execQ = useCallback(
-    (k: number, upto?: string) =>
-      data.att.filter((a) => a.k === k && (!upto || a.d <= upto)).reduce((s, a) => s + (+a.q || 0), 0),
-    [data.att]
-  );
+  const execQ = useCallback((k: number, upto?: string) => executedQty(data.att, k, upto), [data.att]);
 
-  const inSite = useCallback(
-    (i: DqeItem) => {
-      const l = lotById.get(i.lot);
-      return !!l && (!site || l.site === site);
-    },
-    [lotById, site]
-  );
 
-  const totals = useMemo(() => {
-    let ht = 0;
-    let ex = 0;
-    let nArt = 0;
-    let nDone = 0;
-    data.items.forEach((i) => {
-      if (!inSite(i)) return;
-      const e = execQ(i.k, up);
-      ht += mt(i);
-      ex += Math.min(e, Math.max(+i.q || 0, 0)) * (+i.pu || 0);
-      nArt++;
-      if (+i.q > 0 && e >= +i.q) nDone++;
-    });
-    const origHt = data.orig.items
-      .filter((i) => {
-        const l = data.orig.lots.find((x) => x.id === i.lot);
-        return l && (!site || l.site === site);
-      })
-      .reduce((s, i) => s + mt(i), 0);
-    return { ht, ex, nArt, nDone, diff: ht - origHt };
-  }, [data, inSite, execQ, up, site]);
+  const totals = useMemo(() => summarizeDqe(data, { site, upto: up }), [data, site, up]);
 
   const descriptions = useMemo(() => describeAll(data), [data]);
-  const tva = data.tva;
+  const tva = normalizeRate(data.tva);
 
   // ── Mutations ─────────────────────────────────────────────
   const updateItem = (k: number, field: "d" | "u" | "q" | "pu" | "n", value: string) => {
@@ -237,24 +217,25 @@ export function DqeWorkspace({
             .forEach((i) => {
               const e = execQ(i.k, up);
               const m = mt(i);
-              const x = Math.min(e, +i.q) * +i.pu;
+              const x = executedAmount(i, e);
               g += m;
               gx += x;
-              R.push([s.name, l.name, categoryByKey(l.category).label, i.n, i.d, i.u, num(+i.q), Math.round(+i.pu), m, num(e), +i.q ? Math.round((e / +i.q) * 100) : 0, Math.round(x), Math.round(m - x)]);
+              R.push([s.name, l.name, categoryByKey(l.category).label, i.n, i.d, i.u, num(+i.q), Math.round(+i.pu), m, num(e), +i.q ? Math.round((e / +i.q) * 100) : 0, x, m - x]);
             })
         )
     );
     R.push([]);
-    R.push(["", "", "", "", "TOTAL HT", "", "", "", g, "", "", Math.round(gx), Math.round(g - gx)]);
-    R.push(["", "", "", "", `TVA ${Math.round(tva * 100)} %`, "", "", "", Math.round(g * tva)]);
-    R.push(["", "", "", "", "TOTAL TTC", "", "", "", Math.round(g * (1 + tva))]);
+    const tx = splitTaxes(g, gx, tva);
+    R.push(["", "", "", "", "TOTAL HT", "", "", "", tx.total.ht, "", "", tx.executed.ht, tx.remaining.ht]);
+    R.push(["", "", "", "", taxLabel(tva), "", "", "", tx.total.tva, "", "", tx.executed.tva, tx.remaining.tva]);
+    R.push(["", "", "", "", "TOTAL TTC", "", "", "", tx.total.ttc, "", "", tx.executed.ttc, tx.remaining.ttc]);
     R.push([]);
     R.push(["JOURNAL DES ATTACHEMENTS"]);
     R.push(["Date", "N°", "Désignation", "U", "Quantité", "Montant HT", "Observation"]);
     const byK = new Map(data.items.map((i) => [i.k, i]));
     data.att.forEach((a) => {
       const i = byK.get(a.k);
-      R.push([fD(a.d), i?.n ?? "", i?.d ?? "", i?.u ?? "", num(+a.q), i ? Math.round(a.q * i.pu) : "", a.o ?? ""]);
+      R.push([fD(a.d), i?.n ?? "", i?.d ?? "", i?.u ?? "", num(+a.q), i ? attachmentAmount(a, i) : "", a.o ?? ""]);
     });
     const csv =
       "﻿" +
@@ -328,6 +309,26 @@ export function DqeWorkspace({
             className="mt-1 block rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900"
           />
         </label>
+        <label className="text-xs text-slate-500">
+          Taux de TVA (%)
+          <input
+            key={`tva-${tva}`}
+            type="text"
+            inputMode="decimal"
+            defaultValue={String(Math.round(tva * 10000) / 100).replace(".", ",")}
+            onBlur={(e) => {
+              const v = parseFloat(e.target.value.replace(",", "."));
+              if (Number.isNaN(v) || v < 0 || v > 100) {
+                setMsg("Taux de TVA invalide : saisissez une valeur entre 0 et 100 (0 = exonéré).");
+                e.target.value = String(Math.round(tva * 10000) / 100).replace(".", ",");
+                return;
+              }
+              setData((d) => ({ ...d, tva: normalizeRate(v / 100) }));
+            }}
+            title="0 pour un marché exonéré de TVA"
+            className="mt-1 block w-20 rounded-md border border-slate-300 px-2 py-1.5 text-right text-sm text-slate-900"
+          />
+        </label>
         <label className="min-w-48 flex-1 text-xs text-slate-500">
           Rechercher
           <input
@@ -372,7 +373,7 @@ export function DqeWorkspace({
       {/* Indicateurs */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <Kpi label="Montant total HT" value={F(totals.ht)} sub={`${site ? siteName(site) : "Tout le marché"} · ${totals.nArt} articles`} main />
-        <Kpi label={`TVA ${Math.round(tva * 100)} %`} value={F(totals.ht * tva)} sub={`TTC ${F(totals.ht * (1 + tva))}`} />
+        <Kpi label={taxLabel(tva)} value={F(taxes(totals.ht, tva).tva)} sub={`TTC ${F(taxes(totals.ht, tva).ttc)}`} />
         <Kpi
           label={`Réalisé HT au ${fD(up)}`}
           value={F(totals.ex)}
@@ -586,10 +587,7 @@ export function DqeWorkspace({
             <span className="text-xs text-slate-500">
               {data.att.length} saisie{data.att.length > 1 ? "s" : ""} ·{" "}
               {F(
-                data.att.reduce((s, a) => {
-                  const i = data.items.find((x) => x.k === a.k);
-                  return s + (i ? a.q * i.pu : 0);
-                }, 0)
+                data.att.reduce((s, a) => s + attachmentAmount(a, data.items.find((x) => x.k === a.k)), 0)
               )}{" "}
               F HT
             </span>
@@ -625,7 +623,7 @@ export function DqeWorkspace({
                         <td className="text-right">
                           {Q(+a.q)} {i?.u}
                         </td>
-                        <td className="text-right">{i ? F(a.q * i.pu) : ""}</td>
+                        <td className="text-right">{i ? F(attachmentAmount(a, i)) : ""}</td>
                         <td>{a.o}</td>
                         <td className="text-right">
                           <button
@@ -700,7 +698,7 @@ export function DqeWorkspace({
                       its.forEach((i) => {
                         const e = execQ(i.k, up);
                         const m = mt(i);
-                        const ex = Math.min(e, Math.max(+i.q || 0, 0)) * (+i.pu || 0);
+                        const ex = executedAmount(i, e);
                         lHT += m;
                         lEX += ex;
                         if (qs && !(i.d.toLowerCase().includes(qs) || i.n.toLowerCase().includes(qs))) return;
@@ -829,6 +827,7 @@ export function DqeWorkspace({
                       </tr>
                     );
                 });
+                const gTx = splitTaxes(gHT, gEX, tva);
                 rows.push(
                   <tr key="g" className="border-t-2 border-slate-400 bg-slate-800 font-bold text-white">
                     <td colSpan={5} className="px-2 py-2">
@@ -843,24 +842,24 @@ export function DqeWorkspace({
                   </tr>,
                   <tr key="tva" className="bg-slate-100">
                     <td colSpan={5} className="px-2 py-1.5">
-                      TVA {Math.round(tva * 100)} %
+                      {taxLabel(tva)}
                     </td>
-                    <td className="text-right">{F(gHT * tva)}</td>
+                    <td className="text-right">{F(gTx.total.tva)}</td>
                     <td />
                     <td />
-                    <td className="text-right">{F(gEX * tva)}</td>
-                    <td className="text-right">{F((gHT - gEX) * tva)}</td>
+                    <td className="text-right">{F(gTx.executed.tva)}</td>
+                    <td className="text-right">{F(gTx.remaining.tva)}</td>
                     <td />
                   </tr>,
                   <tr key="ttc" className="bg-slate-800 font-bold text-white">
                     <td colSpan={5} className="px-2 py-2">
                       MONTANT TOTAL TTC
                     </td>
-                    <td className="text-right">{F(gHT * (1 + tva))}</td>
+                    <td className="text-right">{F(gTx.total.ttc)}</td>
                     <td />
                     <td />
-                    <td className="text-right">{F(gEX * (1 + tva))}</td>
-                    <td className="text-right">{F((gHT - gEX) * (1 + tva))}</td>
+                    <td className="text-right">{F(gTx.executed.ttc)}</td>
+                    <td className="text-right">{F(gTx.remaining.ttc)}</td>
                     <td />
                   </tr>
                 );
@@ -972,7 +971,7 @@ function LotBars({
         .filter((i) => i.lot === l.id)
         .forEach((i) => {
           ht += mt(i);
-          ex += Math.min(execQ(i.k, up), Math.max(+i.q || 0, 0)) * (+i.pu || 0);
+          ex += executedAmount(i, execQ(i.k, up));
         });
       return { l, ht, ex };
     });
@@ -1040,7 +1039,7 @@ function Curve({
     let cum = 0;
     cumK.forEach((q, k) => {
       const i = byK.get(k)!;
-      cum += Math.min(q, Math.max(+i.q || 0, 0)) * (+i.pu || 0);
+      cum += executedAmount(i, q);
     });
     pts.push([d, cum]);
   });
