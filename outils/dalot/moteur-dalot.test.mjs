@@ -100,3 +100,22 @@ test('Les deux règlements et les cas limites tournent sans erreur', () => {
   const p = M.parametresDefaut(); p.geo.es = 0;
   assert.equal(M.calculer(p).ok, false);
 });
+
+test('Règle de prédimensionnement de l\'assistant CYPE et cas de charge ajoutés', () => {
+  const e = M.predimensionner(2, 1.5);
+  proche(e.dalle, 0.18, 1e-12, 'Dalle pour L = 2 m');
+  proche(e.pied, 0.145, 1e-12, 'Piédroit pour G = 1,5 m');
+  assert.equal(M.predimensionner(6, 5).dalle, 0.5);
+  assert.equal(M.predimensionner(8, 2).dalle, null);
+  // la surcharge sur radier ne peut qu'augmenter (ou laisser égal) le moment enveloppe du radier
+  const p0 = M.parametresDefaut(); p0.charges.eau = false;
+  const p1 = M.parametresDefaut(); p1.charges.eau = false; p1.charges.fond = true; p1.charges.qFond = 50;
+  const m = (r, id) => r.ferraillage.find(f => f.id === id).Melu;
+  const r0 = M.calculer(p0), r1 = M.calculer(p1);
+  assert.ok(m(r1, 'rd_inf') >= m(r0, 'rd_inf') - 1e-9 && m(r1, 'rd_sup') >= m(r0, 'rd_sup') - 1e-9);
+  // enrobage extérieur plus grand : hauteur utile plus faible sur les nappes extérieures seulement
+  const p2 = M.parametresDefaut(); p2.mat.enrobageExt = 0.05;
+  const r2 = M.calculer(p2);
+  proche(r2.ferraillage.find(f => f.id === 'pd_ext').d, 0.25 - 0.05 - 0.007, 1e-12, 'd face extérieure');
+  proche(r2.ferraillage.find(f => f.id === 'pd_int').d, 0.25 - 0.04 - 0.007, 1e-12, 'd face intérieure');
+});

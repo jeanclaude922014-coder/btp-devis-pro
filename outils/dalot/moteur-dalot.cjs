@@ -39,7 +39,7 @@
       hydro: { Q: 12, K: 67, pente: 0.5, tauxMax: 0.8, vMin: 0.5, vMax: 4.0,
         C: 0.6, I: 100, A: 0.5 },
       norme: 'BAEL', // 'BAEL' | 'EC2'
-      mat: { fc: 25, fe: 500, enrobage: 0.04, env: 'humide', fissuration: 'prejudiciable',
+      mat: { fc: 25, fe: 500, enrobageExt: 0.04, enrobageInt: 0.04, dmax: 25, env: 'humide', fissuration: 'prejudiciable',
         wmax: 0.3, phiEst: 14 },
       geo: { n: 2, L: 2.0, H: 1.5, es: 0.25, er: 0.25, ep: 0.25, ec: 0.25, gousset: 0.15,
         longueur: 10, Hr: 0.6, ech: 0.05 },
@@ -48,7 +48,7 @@
       charges: { reglement: 'F61', classe: 1, largeurRoulable: 7, nFiles: 2,
         A: true, Bc: true, Bt: true, Br: true, Mc120: true,
         deltaAuto: true, deltaManuel: 1.2, alphaQ: 1, alphaq: 1,
-        eau: true, hEau: 1.5 },
+        eau: true, hEau: 1.5, surface: true, qSurface: 10, fond: false, qFond: 10 },
       coef: coefficientsDefaut('BAEL'),
       metre: { majorationAcier: 10 }
     };
@@ -246,7 +246,8 @@
 
   function casPermanents(mod) {
     const p = mod.p, g = p.geo, s = p.sol, geo = mod.geo;
-    const pp = casVide(mod), rem = casVide(mod), terre = casVide(mod), latG = casVide(mod), latD = casVide(mod), eau = casVide(mod);
+    const pp = casVide(mod), rem = casVide(mod), terre = casVide(mod), latG = casVide(mod), latD = casVide(mod), eau = casVide(mod), surf = casVide(mod), fond = casVide(mod);
+    const qS = p.charges.qSurface;
     const qRem = s.gammaR * g.Hr + s.gammaCh * g.ech;
     const K = coefPoussee(s);
     const ySurf = geo.Hc + g.es / 2 + g.Hr + g.ech;
@@ -254,8 +255,8 @@
     mod.membres.forEach(function (m) {
       m.elems.forEach(function (ie) {
         const c = milieuElem(mod, ie);
-        if (m.type === 'dalle') { pp.qy[ie] = -G_BETON * m.ep; rem.qy[ie] = -qRem; }
-        else if (m.type === 'radier') { pp.qy[ie] = -G_BETON * m.ep; eau.qy[ie] = -G_EAU * hEau; }
+        if (m.type === 'dalle') { pp.qy[ie] = -G_BETON * m.ep; rem.qy[ie] = -qRem; surf.qy[ie] = -qS; }
+        else if (m.type === 'radier') { pp.qy[ie] = -G_BETON * m.ep; eau.qy[ie] = -G_EAU * hEau; fond.qy[ie] = -p.charges.qFond; }
         else {
           pp.qy[ie] = -G_BETON * m.ep; // poids des voiles, charge axiale répartie
           if (m.type === 'pied') {
@@ -264,6 +265,7 @@
             const sens = m.idx === 0 ? 1 : -1; // poussée vers l'intérieur
             terre.qx[ie] = sens * K * sv;
             (m.idx === 0 ? latG : latD).qx[ie] = sens * K * s.qRemblai;
+            surf.qx[ie] = sens * K * qS; // surcharge uniforme d'extension infinie : dalle et deux piédroits
             if (c.y < yEau) eau.qx[ie] = -sens * G_EAU * (yEau - c.y); // eau intérieure, vers l'extérieur
           }
         }
@@ -271,7 +273,8 @@
     });
     // débords de demi-épaisseur des piédroits : remblai reporté aux nœuds d'angle
     rem.nodal[mod.T[0] * 3 + 1] -= qRem * g.ep / 2; rem.nodal[mod.T[geo.n] * 3 + 1] -= qRem * g.ep / 2;
-    return { pp: pp, rem: rem, terre: terre, latG: latG, latD: latD, eau: eau, K: K, qRem: qRem };
+    surf.nodal[mod.T[0] * 3 + 1] -= qS * g.ep / 2; surf.nodal[mod.T[geo.n] * 3 + 1] -= qS * g.ep / 2;
+    return { pp: pp, rem: rem, terre: terre, latG: latG, latD: latD, eau: eau, surf: surf, fond: fond, K: K, qRem: qRem };
   }
 
   /* Intensité linéique maximale (kN par mètre de longueur de dalot) d'une rangée de roues diffusées */
@@ -505,8 +508,8 @@
   }
   function texteBarres(b) { return b ? 'HA' + b.phi + ' e = ' + (b.esp * 100).toLocaleString('fr-FR') + ' cm' : '—'; }
 
-  function dimensionnerNappe(p, mat, h, Melu, Mels, Mfreq) {
-    const c = p.mat.enrobage, d = h - c - p.mat.phiEst / 2000;
+  function dimensionnerNappe(p, mat, h, c, Melu, Mels, Mfreq) {
+    const d = h - c - p.mat.phiEst / 2000;
     const elu = flexionELU(Melu, d, mat), els = sectionELS(Mels, d, mat), AsMin = sectionMin(d, h, mat);
     const alertes = [];
     if (!elu.ok) alertes.push('Moment réduit µ = ' + fr(elu.mu, 3) + ' > µ limite : augmenter l\'épaisseur.');
@@ -524,13 +527,13 @@
     const ratioRep = mat.norme === 'EC2' ? 0.2 : 1 / 3; // EC2 § 9.3.1.1 ; BAEL A.8.2.41 (charges concentrées)
     const rep = choisirBarres(Math.max(ratioRep * AsP, 3.9e-4)); // plancher usuel HA10 e = 20 cm
     const gouverne = AsReq === AsMin ? 'section minimale' : (els.ok && AsReq === els.As ? 'ELS' : 'ELU');
-    return { h: h, d: d, Melu: Melu, Mels: Mels, Mfreq: Mfreq, elu: elu, AsElu: elu.As, AsEls: els.As, AsMin: AsMin,
+    return { h: h, d: d, c: c, Melu: Melu, Mels: Mels, Mfreq: Mfreq, elu: elu, AsElu: elu.As, AsEls: els.As, AsMin: AsMin,
       AsReq: AsReq, gouverne: gouverne, barres: barres, AsP: AsP, sc: ct.sc, ss: ct.ss, wk: wk, rep: rep, alertes: alertes,
       ok: alertes.length === 0 };
   }
 
   function verifierTranchant(p, mat, h, Vu, AsTendu) {
-    const d = h - p.mat.enrobage - p.mat.phiEst / 2000;
+    const d = h - Math.max(p.mat.enrobageExt, p.mat.enrobageInt) - p.mat.phiEst / 2000;
     if (mat.norme === 'EC2') {
       const k = Math.min(2, 1 + Math.sqrt(0.2 / d)), rho = Math.min(0.02, AsTendu / d);
       const v = Math.max(0.18 / 1.5 * k * Math.pow(100 * rho * mat.fc, 1 / 3), 0.035 * Math.pow(k, 1.5) * Math.sqrt(mat.fc));
@@ -593,6 +596,15 @@
       fouille: (geo.B + 1) * (geo.Hext + 0.1) * Lg };
   }
 
+  /* Épaisseurs de départ : règle de l'assistant de StruBIM Box Culverts (manuel CYPE, § 3.2).
+     Dalle et radier : 0,02 L² + 0,10 pour L ≤ 5 m, 0,50 m entre 5 et 7 m.
+     Piédroits : 0,02 G² + 0,10 pour G ≤ 4,5 m, 0,50 m entre 4,5 et 7 m. Au-delà de 7 m : hors périmètre (null). */
+  function predimensionner(L, G) {
+    const dalle = L <= 5 ? 0.02 * L * L + 0.1 : (L < 7 ? 0.5 : null);
+    const pied = G <= 4.5 ? 0.02 * G * G + 0.1 : (G < 7 ? 0.5 : null);
+    return { dalle: dalle, radier: dalle, pied: pied };
+  }
+
   /* ------------------------------------------------------------------ */
   /* 10. Calcul complet                                                  */
   /* ------------------------------------------------------------------ */
@@ -615,7 +627,7 @@
     if (g.n < 1 || g.n > 6) e.push('Le nombre de cellules doit être compris entre 1 et 6.');
     if (g.Hr < 0 || g.ech < 0) e.push('Les hauteurs de remblai et de chaussée ne peuvent pas être négatives.');
     [g.es, g.er, g.ep].forEach(function (h) {
-      if (h - p.mat.enrobage - p.mat.phiEst / 2000 < 0.05) e.push('Épaisseur trop faible par rapport à l\'enrobage (hauteur utile < 5 cm).');
+      if (h - Math.max(p.mat.enrobageExt, p.mat.enrobageInt) - p.mat.phiEst / 2000 < 0.05) e.push('Épaisseur trop faible par rapport à l\'enrobage (hauteur utile < 5 cm).');
     });
     return e.filter(function (v, i) { return e.indexOf(v) === i; });
   }
@@ -626,7 +638,7 @@
     const mod = construireModele(p), geo = mod.geo, mat = mod.mat, c = p.coef;
     const perm = casPermanents(mod);
     const R = {};
-    ['pp', 'rem', 'terre', 'latG', 'latD', 'eau'].forEach(function (k) { R[k] = resultatCas(mod, perm[k]); });
+    ['pp', 'rem', 'terre', 'latG', 'latD', 'eau', 'surf', 'fond'].forEach(function (k) { R[k] = resultatCas(mod, perm[k]); });
     const Gv = somme(R.pp, R.rem), lat2 = somme(R.latG, R.latD);
     const conv = convoisRoutiers(p, geo);
     let nbCas = 0;
@@ -637,6 +649,8 @@
       });
       return opts;
     });
+    // surcharge uniforme en surface : incompatible avec les autres charges de chaussée (même groupe)
+    if (p.charges.surface && p.charges.qSurface > 0) groupesRoute[0].push({ type: 'civil', nom: 'Surcharge uniforme en surface', r: R.surf });
     function groupes(fG1, fG2, fRoute, fMc, fLat, fEau) {
       const gs = [
         { options: [{ f: fG1, r: Gv }, { f: fG2, r: Gv }] },
@@ -645,7 +659,11 @@
       groupesRoute.forEach(function (opts) {
         gs.push({ optionnel: true, options: opts.map(function (o) { return { f: o.type === 'militaire' ? fMc : fRoute, r: o.r }; }) });
       });
-      if (p.charges.eau) gs.push({ optionnel: true, options: [{ f: fEau, r: R.eau }] });
+      // eau intérieure et surcharge sur radier : incompatibles entre elles
+      const bas = [];
+      if (p.charges.eau) bas.push({ f: fEau, r: R.eau });
+      if (p.charges.fond && p.charges.qFond > 0) bas.push({ f: fRoute, r: R.fond });
+      if (bas.length) gs.push({ optionnel: true, options: bas });
       return gs;
     }
     const env = {
@@ -672,7 +690,7 @@
     }
     const epais = { dalle: p.geo.es, radier: p.geo.er, pied: p.geo.ep, cloison: p.geo.ec };
     const ferraillage = NAPPES.filter(function (nq) { return nq.membre !== 'cloison' || geo.n > 1; }).map(function (nq) {
-      const d = dimensionnerNappe(p, mat, epais[nq.membre], extremes(env.elu, nq.membre)[nq.face],
+      const d = dimensionnerNappe(p, mat, epais[nq.membre], nq.face === 'ext' ? p.mat.enrobageExt : p.mat.enrobageInt, extremes(env.elu, nq.membre)[nq.face],
         extremes(env.els, nq.membre)[nq.face], extremes(env.freq, nq.membre)[nq.face]);
       d.id = nq.id; d.membre = nq.membre; d.face = nq.face; d.nom = nq.nom;
       return d;
@@ -699,7 +717,7 @@
       conforme: alertes.length === 0 };
   }
 
-  return { VERSION: VERSION, parametresDefaut: parametresDefaut, coefficientsDefaut: coefficientsDefaut, calculer: calculer,
+  return { VERSION: VERSION, parametresDefaut: parametresDefaut, coefficientsDefaut: coefficientsDefaut, calculer: calculer, predimensionner: predimensionner,
     creerPortique: creerPortique, materiaux: materiaux, geometrie: geometrie, flexionELU: flexionELU, contraintesELS: contraintesELS,
     sectionELS: sectionELS, sectionMin: sectionMin, ouvertureFissure: ouvertureFissure, verifierTranchant: verifierTranchant,
     choisirBarres: choisirBarres, texteBarres: texteBarres, coefA: coefA, coefPoussee: coefPoussee, intensiteLigne: intensiteLigne,

@@ -18,8 +18,9 @@ Historique reconstitué à partir de l'historique Git le 2026-11-08 (Moulo Jean 
 ## Non publié — 2026-11-11
 ### Ajouté
 - Outil autonome `outils/Dalot_Pro_CI.html` (Dalot Pro CI 0.1.0) : hydraulique Manning-Strickler, portique sur appuis élastiques, charges Fascicule 61 titre II ou LM1, ferraillage BAEL 91 rév. 99 ou Eurocode 2, métré, note de calcul imprimable et export Word.
-- Moteur `outils/dalot/moteur-dalot.cjs` séparé de l'interface, 7 tests (`npm test`), assemblage par `npm run build:dalot`.
+- Moteur `outils/dalot/moteur-dalot.cjs` séparé de l'interface, 8 tests (`npm test`), assemblage par `npm run build:dalot`.
 - Fiche `docs/validation/FICHE_VALIDATION_DALOT.md`.
+- Alignement sur le manuel CYPE « StruBIM Box Culverts » (GC-0025) : enrobages extérieur et intérieur, taille du granulat, surcharge uniforme en surface, surcharge sur radier, épaisseurs de départ de l'assistant, table de correspondance dans le tutoriel.
 
 ## 0.1.0 — développements du 2026-07-07 au 2026-11-02
 ### Ajouté

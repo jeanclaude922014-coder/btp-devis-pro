@@ -21,6 +21,7 @@ Domaine couvert : dalot droit de 1 à 6 cellules identiques, coulé en place, ba
 | Règles BAEL 91 révisées 99 | DTU P 18-702 | 1999 | fr | non déposé dans `REFERENTIEL_GC/` | Texte réglementaire | Formules ELU / ELS, A.4.2.1, A.4.5.3, A.5.2.2 citées de mémoire d'usage : **à confronter au texte** |
 | Fascicule 61 titre II du CPC | Ministère de l'Équipement | 1971 | fr | non déposé | Texte réglementaire | A(l), Bc, Bt, Br, Mc120, δ, bc, bt, a1, a2 : **à confronter au texte** |
 | EN 1992-1-1, EN 1991-2, EN 1990 annexe A2 | CEN | 2004-2005 | fr/en | fiche GC-0001 | Norme | § 6.2.2, § 7.3.4, LM1, valeurs recommandées (pas d'annexe nationale ivoirienne) |
+| StruBIM Box Culverts - User's manual | CYPE Ingenieros | non indiquée | en | fiche GC-0025 | Documentation logicielle | Modèle, charges, champs de saisie, règle d'épaisseurs ; aucun exemple chiffré |
 | Résistance des matériaux, méthode des déplacements | cours classiques | — | fr | — | Analytique | Poutre bi-encastrée, cadre fermé symétrique |
 
 Aucun document du référentiel ne contient à ce jour d'exemple chiffré de dalot. Les textes BAEL et Fascicule 61 ne sont pas déposés : voir demandes ci-dessous.
@@ -33,6 +34,7 @@ Aucun document du référentiel ne contient à ce jour d'exemple chiffré de dal
 | Dalot par défaut, charges permanentes | Σ réactions du sol = poids total | égalité | écart < 0,01 % | 0,01 % | `VÉRIFIÉ – CONTRÔLE MANUEL` |
 | Flexion ELU BAEL, Mu = 100 kN.m, d = 0,25 m, fc28 = 25, Fe E500 | µ ; α ; As | 0,1129 ; 0,1501 ; 9,79 cm² | identique | 0,01 cm² | `VÉRIFIÉ – CONTRÔLE MANUEL` |
 | ELS section fissurée, M = 60 kN.m, As = 10 cm², d = 0,25 m, n = 15 | x ; σbc ; σs | 7,29 cm ; 7,29 MPa ; 265,8 MPa | identique | 0,2 MPa | `VÉRIFIÉ – CONTRÔLE MANUEL` |
+| Règle d'épaisseurs de l'assistant CYPE, L = 2 m, G = 1,5 m | dalle ; piédroit | 0,18 m ; 0,145 m (manuel § 3.2) | identique | exact | `VÉRIFIÉ – RÉFÉRENCES DOCUMENTAIRES` |
 | A(10 m) ; δ(L = 10, G = 1000, S = 500) ; K0(30°) ; Strickler | formules fermées | 18,66 kPa ; 1,20 ; 0,50 ; 5,97 m³/s | identique | arrondi | `VÉRIFIÉ – CONTRÔLE MANUEL` |
 
 ## Contrôle manuel
@@ -57,7 +59,7 @@ Sorties attendues : moments enveloppes ELU et ELS par paroi, effort tranchant, p
 ## Réserves et actions
 | Réserve | Criticité | Impact | Action | Responsable | Échéance |
 |---|---|---|---|---|---|
-| Vidéo et fichiers de référence CYPE annoncés par le demandeur non reçus : l'enchaînement des étapes suit la logique générale du module dalot de CYPE, sans alignement écran par écran | P1 | Écarts possibles de paramètres par rapport à la vidéo | Fournir la vidéo (ou des captures) et les fichiers | Moulo Jean Claude | à réception |
+| Vidéo de référence (YouTube `tSDFMF90D8w`) non lue : YouTube est refusé par le réseau de l'environnement. Étapes et champs alignés le 2026-11-11 sur le manuel officiel CYPE « StruBIM Box Culverts » (fiche GC-0025), pas sur la vidéo | P1 | Écarts possibles de valeurs par rapport à la vidéo | Fournir des captures d'écran de la vidéo ou les valeurs saisies | Moulo Jean Claude | à réception |
 | Formules BAEL, Fascicule 61 et EC non confrontées aux textes officiels | **P0** | Risque de coefficient erroné | Déposer les textes dans `REFERENTIEL_GC/06_NORMES_ET_REGLEMENTS/` et relire | Moulo Jean Claude | avant tout usage en exécution |
 | Pas de benchmark sur dalot complet | P1 | Modèle global non recoupé | Reproduire le dossier ci-dessus dans CYPE ou Robot | Équipe | — |
 | Répartition transversale des roues sous faible remblai | P1 | Sur-dimensionnement possible | Comparer à un calcul plaque | Équipe | — |
