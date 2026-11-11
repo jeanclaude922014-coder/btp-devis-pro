@@ -17,6 +17,8 @@ Décisions **constatées** dans le code (reconstituées lors de l'audit) et déc
 | TD-09 | En production, l'absence de `JWT_SECRET` bloque toutes les sessions (échec fermé) au lieu d'utiliser un secret public | Sécurité (A-01) | En vigueur depuis le 2026-11-08 |
 | TD-10 | Arrondi de chaque total de ligne au franc (demi-franc vers le haut) avant sommation | Cohérence du document contractuel (A-07) | En vigueur depuis le 2026-11-08 |
 | TD-11 | Tests avec le lanceur intégré de Node (`node:test`) exécuté par `tsx` (déjà présent dans les dépendances), commande `npm test` | Aucune nouvelle dépendance | En vigueur depuis le 2026-11-08 |
+| TD-12 | Dalot Pro CI : solveur de portique plan développé en interne (méthode des déplacements, Cholesky dense), sans dépendance | Outil en un seul fichier HTML utilisable hors connexion ; modèle petit (moins de 1 000 inconnues) ; bibliothèques EF du standard § 6 écartées car non embarquables dans un fichier autonome. Vérifié sur deux solutions analytiques | En vigueur depuis le 2026-11-11 |
+| TD-13 | Dalot Pro CI : moteur dans `outils/dalot/moteur-dalot.cjs`, interface dans `outils/dalot/interface.html`, assemblage par `scripts/build-dalot.mjs` | Séparation interface / moteur du standard § 5, moteur testable sous Node | En vigueur depuis le 2026-11-11 |
 
 ## Dépendances et licences
 Licences des dépendances principales **non relues pendant l'audit** (pas de `node_modules` dans l'environnement d'audit). Action : générer un inventaire des licences (`npx license-checker` ou équivalent) avant toute diffusion commerciale.

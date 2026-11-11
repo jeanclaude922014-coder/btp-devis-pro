@@ -1,5 +1,7 @@
 # Tutoriel et dossier pédagogique — btp-devis-pro
 
+> Outil Dalot Pro CI : le tutoriel et le dossier « Comprendre le calcul » sont intégrés à `outils/Dalot_Pro_CI.html` (rubrique Aide).
+
 **Auteur :** Moulo Jean Claude — **Date :** 2026-11-08
 Conforme à STD-GC-001 § 10. Ce dossier est le **plan** du tutoriel à intégrer dans le logiciel. Les sections marquées « à rédiger » le seront au fil des évolutions.
 

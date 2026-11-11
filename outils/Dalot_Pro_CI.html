@@ -1,0 +1,1454 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="author" content="Moulo Jean Claude">
+<title>Dalot Pro CI</title>
+<style>
+/* Mise en page : bandeau d'état, étapes de saisie à gauche (ordre du projet), travail au centre, coupe et verdict à droite.
+   Mêmes jetons que l'outil DQE du dépôt : encre « plan » bleu nuit + accent latérite. */
+:root{
+  --bg:#f6f4f1; --surface:#ffffff; --surface-2:#efebe6; --line:#ddd6cd; --line-2:#c9bfb2;
+  --ink:#1b2433; --ink-2:#4a5262; --muted:#7a7f89;
+  --accent:#b4532a; --accent-ink:#ffffff; --accent-soft:#f6e3d8;
+  --navy:#1d3557; --navy-soft:#e3e9f2;
+  --good:#2f7d4f; --good-soft:#e2f1e7; --bad:#b42318; --bad-soft:#fbe5e2; --warn:#8a5a00; --warn-soft:#fdf1d6;
+  --beton:#c9c5bd; --remblai:#e3b48f; --solnat:#c99a6f; --eau:#9fc4e8; --chaussee:#3b4049;
+  --f-display:"Barlow Condensed","Arial Narrow","Roboto Condensed",system-ui,sans-serif;
+  --f-body:"Public Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --r:8px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12161d; --surface:#1a2029; --surface-2:#222a35; --line:#2e3744; --line-2:#3d4857;
+  --ink:#e9e6e1; --ink-2:#b9bcc3; --muted:#8d929b;
+  --accent:#e0794a; --accent-ink:#1a0e08; --accent-soft:#3a2418;
+  --navy:#9fb8dc; --navy-soft:#1f2a3a;
+  --good:#5fbf86; --good-soft:#17301f; --bad:#f07b6b; --bad-soft:#3a1b18; --warn:#e7b85c; --warn-soft:#33270f;
+  --beton:#5d6470; --remblai:#7a4a2c; --solnat:#5a3a24; --eau:#2f5f8f; --chaussee:#0c0e12; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12161d; --surface:#1a2029; --surface-2:#222a35; --line:#2e3744; --line-2:#3d4857;
+  --ink:#e9e6e1; --ink-2:#b9bcc3; --muted:#8d929b;
+  --accent:#e0794a; --accent-ink:#1a0e08; --accent-soft:#3a2418;
+  --navy:#9fb8dc; --navy-soft:#1f2a3a;
+  --good:#5fbf86; --good-soft:#17301f; --bad:#f07b6b; --bad-soft:#3a1b18; --warn:#e7b85c; --warn-soft:#33270f;
+  --beton:#5d6470; --remblai:#7a4a2c; --solnat:#5a3a24; --eau:#2f5f8f; --chaussee:#0c0e12; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums}
+h1,h2,h3,h4{font-family:var(--f-display);letter-spacing:.01em;text-wrap:balance;margin:0;color:var(--ink)}
+h1{font-size:26px;font-weight:700;line-height:1.05}
+h2{font-size:22px;font-weight:600}
+h3{font-size:17px;font-weight:600}
+h4{font-size:15px;font-weight:600}
+p{margin:0}
+.entete{background:var(--navy);color:#fff;border-bottom:3px solid var(--accent)}
+:root[data-theme="dark"] .entete{background:#0e1320}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .entete{background:#0e1320}}
+.entete-in{max-width:1500px;margin:0 auto;padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
+.entete h1{color:#fff}
+.entete .sous{font-size:12px;color:#c9d3e3}
+.entete .marque{flex:1 1 260px;min-width:0}
+.actions{display:flex;flex-wrap:wrap;gap:6px}
+button,.btn{font:inherit;font-weight:600;font-size:13px;border-radius:6px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink);padding:7px 11px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.entete button{background:transparent;color:#fff;border-color:#5b6f90}
+.entete button.fort,button.fort{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.coque{max-width:1500px;margin:0 auto;padding-block:16px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;grid-template-columns:210px minmax(0,1fr) 330px;gap:18px;align-items:start}
+.coque>*{min-width:0}
+nav.etapes{display:flex;flex-direction:column;gap:2px;position:sticky;top:12px}
+nav.etapes .groupe{font-family:var(--f-display);font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:10px 0 4px 8px}
+nav.etapes button{display:flex;gap:9px;align-items:center;text-align:left;border:0;background:transparent;padding:7px 9px;font-weight:500;color:var(--ink-2);border-radius:6px}
+nav.etapes button .n{font-family:var(--f-mono);font-size:11px;color:var(--muted);width:18px;flex:none}
+nav.etapes button[aria-current="true"]{background:var(--surface);color:var(--ink);font-weight:700;box-shadow:inset 3px 0 0 var(--accent)}
+nav.etapes button:hover{background:var(--surface-2)}
+main{display:grid;gap:16px}
+.bloc{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:grid;gap:12px}
+.bloc>h3{padding-bottom:8px;border-bottom:1px solid var(--line)}
+.intro{color:var(--ink-2);max-width:72ch}
+.grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px 16px}
+.champ{display:grid;gap:3px;align-content:start}
+.champ label{font-size:12px;font-weight:600;color:var(--ink-2)}
+.champ .saisie{display:flex;align-items:stretch}
+.champ input[type=number],.champ input[type=text],.champ select{font:inherit;font-family:var(--f-mono);font-size:13px;width:100%;min-width:0;padding:7px 9px;border:1px solid var(--line-2);border-radius:6px;background:var(--bg);color:var(--ink)}
+.champ input[type=text],.champ select{font-family:var(--f-body)}
+.champ .unite{display:flex;align-items:center;padding:0 9px;font-size:12px;color:var(--muted);border:1px solid var(--line-2);border-left:0;border-radius:0 6px 6px 0;background:var(--surface-2);white-space:nowrap}
+.champ .saisie input:not(:last-child){border-radius:6px 0 0 6px}
+.champ .aide{font-size:11.5px;color:var(--muted);line-height:1.35}
+.champ.coche{grid-template-columns:auto 1fr;align-items:center;gap:8px}
+.champ.coche label{font-size:13px;color:var(--ink)}
+.champ.coche .aide{grid-column:2}
+.puces{display:flex;flex-wrap:wrap;gap:6px}
+.puces button{font-family:var(--f-mono);font-size:12px;font-weight:500;padding:5px 9px}
+.tableau{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:6px 9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;white-space:nowrap}
+td.num,th.num{text-align:right;font-family:var(--f-mono);white-space:nowrap}
+.etat{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.etat.ok{background:var(--good-soft);color:var(--good)}
+.etat.ko{background:var(--bad-soft);color:var(--bad)}
+.etat.av{background:var(--warn-soft);color:var(--warn)}
+.alerte{background:var(--bad-soft);color:var(--bad);border-radius:6px;padding:8px 11px;font-size:13px}
+.info{background:var(--navy-soft);color:var(--ink);border-radius:6px;padding:9px 12px;font-size:13px}
+.reserve{background:var(--warn-soft);color:var(--ink);border-radius:6px;padding:9px 12px;font-size:12.5px}
+.reserve a{color:inherit;font-weight:700}
+aside{display:grid;gap:12px;position:sticky;top:12px}
+.verdict{display:grid;gap:8px}
+.verdict ul{margin:0;padding-left:18px;font-size:12.5px;color:var(--ink-2);display:grid;gap:4px}
+.chiffres{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.chiffre{background:var(--surface-2);border-radius:6px;padding:8px 10px}
+.chiffre b{display:block;font-family:var(--f-mono);font-size:15px}
+.chiffre span{font-size:11px;color:var(--muted)}
+svg{display:block;width:100%;height:auto}
+svg text{font-family:var(--f-mono);fill:var(--ink)}
+svg .t-m{fill:var(--muted)}
+.s-beton{fill:var(--beton);stroke:var(--ink);stroke-width:1.2}
+.s-vide{fill:var(--bg);stroke:var(--ink);stroke-width:1.2}
+.s-remblai{fill:var(--remblai)} .s-sol{fill:var(--solnat)} .s-chaussee{fill:var(--chaussee)} .s-eau{fill:var(--eau)}
+.s-cote{stroke:var(--ink-2);stroke-width:.8;fill:none}
+.s-axe{stroke:var(--ink);stroke-width:1.6;fill:none}
+.s-max{fill:var(--accent);fill-opacity:.28;stroke:var(--accent);stroke-width:1.2}
+.s-min{fill:var(--navy);fill-opacity:.22;stroke:var(--navy);stroke-width:1.2}
+.s-acier{stroke:var(--accent);stroke-width:2.4;fill:none}
+.s-acier2{stroke:var(--navy);stroke-width:2.4;fill:none}
+.s-rep{fill:var(--bg);stroke:var(--ink);stroke-width:1}
+.legende{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--ink-2)}
+.legende i{display:inline-block;width:14px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle}
+.prose{display:grid;gap:10px;max-width:78ch}
+.prose ul,.prose ol{margin:0;padding-left:20px;display:grid;gap:4px}
+.prose code,.formule{font-family:var(--f-mono);font-size:12.5px;background:var(--surface-2);padding:1px 5px;border-radius:4px}
+.formule{display:block;padding:8px 10px;overflow-x:auto;white-space:pre}
+.note{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:24px;display:grid;gap:14px}
+.note h2{border-bottom:2px solid var(--accent);padding-bottom:4px;margin-top:8px}
+.cartouche{display:grid;grid-template-columns:1fr auto;gap:8px;border:1.5px solid var(--ink);padding:10px 12px}
+.cartouche .t{font-family:var(--f-display);font-size:20px;font-weight:700}
+.pied{font-size:11.5px;color:var(--muted)}
+@media (max-width:1150px){
+  .coque{grid-template-columns:minmax(0,1fr)}
+  nav.etapes{position:static;flex-direction:row;overflow-x:auto;gap:4px;padding-bottom:4px}
+  nav.etapes .groupe{display:none}
+  nav.etapes button{white-space:nowrap;border:1px solid var(--line);background:var(--surface)}
+  nav.etapes button[aria-current="true"]{box-shadow:inset 0 -3px 0 var(--accent)}
+  aside{position:static;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+}
+@media (prefers-reduced-motion:no-preference){button{transition:border-color .15s,background .15s}}
+@media print{
+  body{background:#fff;color:#000;font-size:11pt}
+  .entete,nav.etapes,aside,.ecran{display:none!important}
+  .coque{display:block;padding:0;max-width:none}
+  .note{border:0;padding:0}
+  .bloc{break-inside:avoid}
+  h2{break-after:avoid}
+  table{font-size:9.5pt}
+}
+</style>
+</head>
+<body>
+<header class="entete"><div class="entete-in">
+  <div class="marque">
+    <h1>Dalot Pro CI</h1>
+    <div class="sous">Dimensionnement des dalots cadres en béton armé — BAEL 91 rév. 99 / Eurocode 2 — contexte Côte d'Ivoire · <span id="nomProjet"></span></div>
+  </div>
+  <div class="actions">
+    <button id="bNouveau" title="Revenir à l'exemple de départ">Nouveau</button>
+    <button id="bOuvrir">Ouvrir</button>
+    <button id="bEnregistrer">Enregistrer</button>
+    <button id="bWord">Note Word</button>
+    <button id="bImprimer" class="fort">Imprimer / PDF</button>
+    <input type="file" id="fichier" accept=".json,application/json" hidden>
+  </div>
+</div></header>
+
+<div class="coque">
+  <nav class="etapes" id="nav" aria-label="Étapes du projet"></nav>
+  <main id="main"></main>
+  <aside id="aside"></aside>
+</div>
+
+<script>/*
+ * MOTEUR DE CALCUL — Dalot Pro CI
+ * Auteur : Moulo Jean Claude — Technicien génie civil BTP, Abidjan
+ * Dalot cadre fermé en béton armé, bande de 1 m, portique plan sur appuis élastiques (Winkler).
+ * Unités internes : kN, m, kPa. Résistances des matériaux saisies en MPa.
+ * Ce fichier ne contient aucune interface : il s'exécute dans Node (tests) et dans le navigateur.
+ * Statut STD-GC-001 : niveau 2 « contrôlé manuellement » sur les cas listés dans
+ * docs/validation/FICHE_VALIDATION_DALOT.md. Pas de comparaison à un logiciel tiers à ce jour.
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.DalotMoteur = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+  const VERSION = '0.1.0';
+  const G_BETON = 25; // kN/m3, béton armé
+  const G_EAU = 10; // kN/m3
+  const ES = 200000; // MPa
+  function fr(v, d) { return v.toFixed(d).replace('.', ','); } // nombre au format français
+
+  /* ------------------------------------------------------------------ */
+  /* 1. Paramètres par défaut (contexte ivoirien)                        */
+  /* ------------------------------------------------------------------ */
+  function coefficientsDefaut(norme) {
+    if (norme === 'EC2') {
+      // EN 1990 annexe A2 (ponts routiers), valeurs recommandées
+      return { Gsup: 1.35, Ginf: 1.0, eluRoute: 1.35, eluMc: 1.35, eluLat: 1.35, eluEau: 1.5,
+        elsRoute: 1.0, elsMc: 1.0, elsLat: 1.0, elsEau: 1.0, psi1: 0.75 };
+    }
+    // BAEL 91 rév. 99 + Fascicule 61 titre II : 1,5 x 1,07 = 1,605 arrondi 1,6 ; ELS 1,2
+    return { Gsup: 1.35, Ginf: 1.0, eluRoute: 1.6, eluMc: 1.35, eluLat: 1.6, eluEau: 1.35,
+      elsRoute: 1.2, elsMc: 1.0, elsLat: 1.2, elsEau: 1.0, psi1: 0.75 };
+  }
+
+  function parametresDefaut() {
+    return {
+      projet: { nom: 'Dalot 2 x 2,00 x 1,50', lieu: 'Abidjan', route: '', pk: '', maitre: 'AGEROUTE',
+        auteur: 'Moulo Jean Claude', date: '' },
+      hydro: { Q: 12, K: 67, pente: 0.5, tauxMax: 0.8, vMin: 0.5, vMax: 4.0,
+        C: 0.6, I: 100, A: 0.5 },
+      norme: 'BAEL', // 'BAEL' | 'EC2'
+      mat: { fc: 25, fe: 500, enrobage: 0.04, env: 'humide', fissuration: 'prejudiciable',
+        wmax: 0.3, phiEst: 14 },
+      geo: { n: 2, L: 2.0, H: 1.5, es: 0.25, er: 0.25, ep: 0.25, ec: 0.25, gousset: 0.15,
+        longueur: 10, Hr: 0.6, ech: 0.05 },
+      sol: { gammaR: 20, phi: 30, modeK: 'K0', Kmanuel: 0.5, gammaCh: 22, ks: 40000, sigmaAdm: 200,
+        qRemblai: 10, angleDiff: 30 },
+      charges: { reglement: 'F61', classe: 1, largeurRoulable: 7, nFiles: 2,
+        A: true, Bc: true, Bt: true, Br: true, Mc120: true,
+        deltaAuto: true, deltaManuel: 1.2, alphaQ: 1, alphaq: 1,
+        eau: true, hEau: 1.5 },
+      coef: coefficientsDefaut('BAEL'),
+      metre: { majorationAcier: 10 }
+    };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 2. Solveur de portique plan (méthode des déplacements)              */
+  /* ------------------------------------------------------------------ */
+  function creerPortique(noeuds, elements, appuis) {
+    const n = noeuds.length * 3;
+    const K = new Float64Array(n * n);
+    const el = elements.map(function (e) {
+      const a = noeuds[e.i], b = noeuds[e.j];
+      const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy), c = dx / L, s = dy / L;
+      const ea = e.EA / L, t = e.EI / (L * L * L);
+      const k = [
+        [ea, 0, 0, -ea, 0, 0],
+        [0, 12 * t, 6 * t * L, 0, -12 * t, 6 * t * L],
+        [0, 6 * t * L, 4 * t * L * L, 0, -6 * t * L, 2 * t * L * L],
+        [-ea, 0, 0, ea, 0, 0],
+        [0, -12 * t, -6 * t * L, 0, 12 * t, -6 * t * L],
+        [0, 6 * t * L, 2 * t * L * L, 0, -6 * t * L, 4 * t * L * L]];
+      const T = [
+        [c, s, 0, 0, 0, 0], [-s, c, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0],
+        [0, 0, 0, c, s, 0], [0, 0, 0, -s, c, 0], [0, 0, 0, 0, 0, 1]];
+      const ddl = [e.i * 3, e.i * 3 + 1, e.i * 3 + 2, e.j * 3, e.j * 3 + 1, e.j * 3 + 2];
+      // kg = Tt k T
+      const kT = k.map(function (row) {
+        return T[0].map(function (_, q) { let v = 0; for (let m = 0; m < 6; m++) v += row[m] * T[m][q]; return v; });
+      });
+      for (let p = 0; p < 6; p++) for (let q = 0; q < 6; q++) {
+        let v = 0; for (let m = 0; m < 6; m++) v += T[m][p] * kT[m][q];
+        K[ddl[p] * n + ddl[q]] += v;
+      }
+      return { L: L, c: c, s: s, k: k, T: T, ddl: ddl };
+    });
+    let kmax = 0; for (let i = 0; i < n; i++) kmax = Math.max(kmax, K[i * n + i]);
+    (appuis.ressorts || []).forEach(function (r) { K[r.ddl * n + r.ddl] += r.k; });
+    (appuis.fixes || []).forEach(function (d) { K[d * n + d] += kmax * 1e8; });
+    // Factorisation de Cholesky K = L Lt (en place, triangle inférieur)
+    for (let j = 0; j < n; j++) {
+      let d = K[j * n + j];
+      for (let k2 = 0; k2 < j; k2++) d -= K[j * n + k2] * K[j * n + k2];
+      if (!(d > 0)) throw new Error('Structure instable : vérifier les appuis (pivot ' + j + ').');
+      d = Math.sqrt(d); K[j * n + j] = d;
+      for (let i = j + 1; i < n; i++) {
+        let v = K[i * n + j];
+        const ri = i * n, rj = j * n;
+        for (let k2 = 0; k2 < j; k2++) v -= K[ri + k2] * K[rj + k2];
+        K[ri + j] = v / d;
+      }
+    }
+    function resoudre(F) {
+      const u = Float64Array.from(F);
+      for (let i = 0; i < n; i++) {
+        let v = u[i]; const ri = i * n;
+        for (let k2 = 0; k2 < i; k2++) v -= K[ri + k2] * u[k2];
+        u[i] = v / K[ri + i];
+      }
+      for (let i = n - 1; i >= 0; i--) {
+        let v = u[i];
+        for (let k2 = i + 1; k2 < n; k2++) v -= K[k2 * n + i] * u[k2];
+        u[i] = v / K[i * n + i];
+      }
+      return u;
+    }
+    /* cas = { qx:[], qy:[] charges réparties en repère GLOBAL par élément (kN/m), nodal:[...] } */
+    function calculerCas(cas) {
+      const F = new Float64Array(n);
+      if (cas.nodal) for (let i = 0; i < n; i++) F[i] = cas.nodal[i] || 0;
+      const feqs = [];
+      el.forEach(function (e, idx) {
+        const gx = cas.qx ? cas.qx[idx] || 0 : 0, gy = cas.qy ? cas.qy[idx] || 0 : 0;
+        const qx = gx * e.c + gy * e.s, qy = -gx * e.s + gy * e.c, L = e.L;
+        const f = [qx * L / 2, qy * L / 2, qy * L * L / 12, qx * L / 2, qy * L / 2, -qy * L * L / 12];
+        feqs.push(f);
+        if (gx || gy) for (let p = 0; p < 6; p++) {
+          let v = 0; for (let m = 0; m < 6; m++) v += e.T[m][p] * f[m];
+          F[e.ddl[p]] += v;
+        }
+      });
+      const u = resoudre(F);
+      const ne = el.length;
+      const M = new Float64Array(2 * ne), V = new Float64Array(2 * ne), N = new Float64Array(2 * ne);
+      el.forEach(function (e, idx) {
+        const ul = [0, 0, 0, 0, 0, 0];
+        for (let m = 0; m < 6; m++) { let v = 0; for (let p = 0; p < 6; p++) v += e.T[m][p] * u[e.ddl[p]]; ul[m] = v; }
+        const f = [0, 0, 0, 0, 0, 0];
+        for (let m = 0; m < 6; m++) { let v = 0; for (let p = 0; p < 6; p++) v += e.k[m][p] * ul[p]; f[m] = v - feqs[idx][m]; }
+        // Convention : M > 0 = fibre tendue du côté -y local ; N > 0 = traction
+        N[2 * idx] = -f[0]; N[2 * idx + 1] = f[3];
+        V[2 * idx] = f[1]; V[2 * idx + 1] = -f[4];
+        M[2 * idx] = -f[2]; M[2 * idx + 1] = f[5];
+      });
+      return { u: u, M: M, V: V, N: N };
+    }
+    return { n: n, elements: el, calculerCas: calculerCas };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 3. Matériaux                                                        */
+  /* ------------------------------------------------------------------ */
+  function materiaux(p) {
+    const fc = p.mat.fc, fe = p.mat.fe;
+    if (p.norme === 'EC2') {
+      const fctm = 0.3 * Math.pow(fc, 2 / 3);
+      return { norme: 'EC2', fc: fc, fe: fe, fcu: fc / 1.5, fsu: fe / 1.15, ft: fctm,
+        E: 22000 * Math.pow((fc + 8) / 10, 0.3), sigmaC: 0.6 * fc, sigmaS: 0.8 * fe, muLim: 0.372 };
+    }
+    const ft = 0.6 + 0.06 * fc;
+    let sig = fe;
+    if (p.mat.fissuration !== 'peu') {
+      sig = Math.min(2 / 3 * fe, Math.max(0.5 * fe, 110 * Math.sqrt(1.6 * ft)));
+      if (p.mat.fissuration === 'tres') sig *= 0.8;
+    }
+    return { norme: 'BAEL', fc: fc, fe: fe, fcu: 0.85 * fc / 1.5, fsu: fe / 1.15, ft: ft,
+      E: 11000 * Math.pow(fc, 1 / 3), sigmaC: 0.6 * fc, sigmaS: sig, muLim: fe >= 500 ? 0.372 : 0.392 };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 4. Géométrie et maillage                                            */
+  /* ------------------------------------------------------------------ */
+  function geometrie(p) {
+    const g = p.geo, n = Math.max(1, Math.round(g.n));
+    const xs = [0];
+    for (let k = 0; k < n; k++) {
+      const eg = k === 0 ? g.ep : g.ec, ed = k === n - 1 ? g.ep : g.ec;
+      xs.push(xs[k] + eg / 2 + g.L + ed / 2);
+    }
+    return { n: n, xs: xs, W: xs[n], Hc: g.H + g.es / 2 + g.er / 2,
+      B: n * g.L + 2 * g.ep + (n - 1) * g.ec, Hext: g.H + g.es + g.er };
+  }
+
+  function construireModele(p) {
+    const g = p.geo, geo = geometrie(p), mat = materiaux(p), E = mat.E * 1000;
+    const noeuds = [], elements = [], membres = [];
+    const T = [], Bn = [];
+    for (let k = 0; k <= geo.n; k++) { T.push(noeuds.push({ x: geo.xs[k], y: geo.Hc }) - 1); }
+    for (let k = 0; k <= geo.n; k++) { Bn.push(noeuds.push({ x: geo.xs[k], y: 0 }) - 1); }
+    function membre(type, idx, a, b, ep) {
+      const A = noeuds[a], Bb = noeuds[b], len = Math.hypot(Bb.x - A.x, Bb.y - A.y);
+      let ne = Math.min(32, Math.max(8, Math.ceil(len / 0.125))); if (ne % 2) ne++;
+      const m = { type: type, idx: idx, ep: ep, long: len, elems: [], noeuds: [a] };
+      let prev = a;
+      for (let q = 1; q <= ne; q++) {
+        const nd = q === ne ? b : noeuds.push({ x: A.x + (Bb.x - A.x) * q / ne, y: A.y + (Bb.y - A.y) * q / ne }) - 1;
+        m.elems.push(elements.push({ i: prev, j: nd, EA: E * ep, EI: E * ep * ep * ep / 12, ep: ep, membre: membres.length }) - 1);
+        m.noeuds.push(nd); prev = nd;
+      }
+      membres.push(m);
+    }
+    // Sens de parcours choisi pour que M > 0 tende toujours la face INTÉRIEURE du cadre
+    for (let k = 0; k < geo.n; k++) membre('dalle', k, T[k], T[k + 1], g.es);
+    membre('pied', 1, T[geo.n], Bn[geo.n], g.ep);
+    for (let k = geo.n - 1; k >= 0; k--) membre('radier', k, Bn[k + 1], Bn[k], g.er);
+    membre('pied', 0, Bn[0], T[0], g.ep);
+    for (let k = 1; k < geo.n; k++) membre('cloison', k, Bn[k], T[k], g.ec);
+
+    // Appuis élastiques verticaux sous le radier (Winkler), blocage horizontal au milieu du radier
+    const trib = {};
+    membres.filter(function (m) { return m.type === 'radier'; }).forEach(function (m) {
+      m.elems.forEach(function (ie) {
+        const e = elements[ie], l = Math.abs(noeuds[e.j].x - noeuds[e.i].x);
+        trib[e.i] = (trib[e.i] || 0) + l / 2; trib[e.j] = (trib[e.j] || 0) + l / 2;
+      });
+    });
+    trib[Bn[0]] += g.ep / 2; trib[Bn[geo.n]] += g.ep / 2;
+    const noeudsRadier = Object.keys(trib).map(Number).sort(function (a, b) { return noeuds[a].x - noeuds[b].x; });
+    const ressorts = noeudsRadier.map(function (nd) { return { ddl: nd * 3 + 1, k: p.sol.ks * trib[nd] }; });
+    let milieu = noeudsRadier[0];
+    noeudsRadier.forEach(function (nd) { if (Math.abs(noeuds[nd].x - geo.W / 2) < Math.abs(noeuds[milieu].x - geo.W / 2)) milieu = nd; });
+    const portique = creerPortique(noeuds, elements, { ressorts: ressorts, fixes: [milieu * 3] });
+    return { p: p, geo: geo, mat: mat, noeuds: noeuds, elements: elements, membres: membres, T: T, Bn: Bn,
+      noeudsRadier: noeudsRadier, trib: trib, portique: portique };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 5. Cas de charges                                                   */
+  /* ------------------------------------------------------------------ */
+  function coefPoussee(sol) {
+    const r = sol.phi * Math.PI / 180;
+    if (sol.modeK === 'Ka') return Math.pow(Math.tan(Math.PI / 4 - r / 2), 2);
+    if (sol.modeK === 'manuel') return sol.Kmanuel;
+    return 1 - Math.sin(r); // Jaky, poussée des terres au repos
+  }
+
+  function casVide(mod) {
+    const ne = mod.elements.length;
+    return { qx: new Float64Array(ne), qy: new Float64Array(ne), nodal: new Float64Array(mod.portique.n) };
+  }
+  function milieuElem(mod, ie) {
+    const e = mod.elements[ie], a = mod.noeuds[e.i], b = mod.noeuds[e.j];
+    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  }
+
+  function casPermanents(mod) {
+    const p = mod.p, g = p.geo, s = p.sol, geo = mod.geo;
+    const pp = casVide(mod), rem = casVide(mod), terre = casVide(mod), latG = casVide(mod), latD = casVide(mod), eau = casVide(mod);
+    const qRem = s.gammaR * g.Hr + s.gammaCh * g.ech;
+    const K = coefPoussee(s);
+    const ySurf = geo.Hc + g.es / 2 + g.Hr + g.ech;
+    const hEau = Math.min(Math.max(p.charges.hEau, 0), g.H), yEau = g.er / 2 + hEau;
+    mod.membres.forEach(function (m) {
+      m.elems.forEach(function (ie) {
+        const c = milieuElem(mod, ie);
+        if (m.type === 'dalle') { pp.qy[ie] = -G_BETON * m.ep; rem.qy[ie] = -qRem; }
+        else if (m.type === 'radier') { pp.qy[ie] = -G_BETON * m.ep; eau.qy[ie] = -G_EAU * hEau; }
+        else {
+          pp.qy[ie] = -G_BETON * m.ep; // poids des voiles, charge axiale répartie
+          if (m.type === 'pied') {
+            const z = ySurf - c.y;
+            const sv = z <= g.ech ? s.gammaCh * z : s.gammaCh * g.ech + s.gammaR * (z - g.ech);
+            const sens = m.idx === 0 ? 1 : -1; // poussée vers l'intérieur
+            terre.qx[ie] = sens * K * sv;
+            (m.idx === 0 ? latG : latD).qx[ie] = sens * K * s.qRemblai;
+            if (c.y < yEau) eau.qx[ie] = -sens * G_EAU * (yEau - c.y); // eau intérieure, vers l'extérieur
+          }
+        }
+      });
+    });
+    // débords de demi-épaisseur des piédroits : remblai reporté aux nœuds d'angle
+    rem.nodal[mod.T[0] * 3 + 1] -= qRem * g.ep / 2; rem.nodal[mod.T[geo.n] * 3 + 1] -= qRem * g.ep / 2;
+    return { pp: pp, rem: rem, terre: terre, latG: latG, latD: latD, eau: eau, K: K, qRem: qRem };
+  }
+
+  /* Intensité linéique maximale (kN par mètre de longueur de dalot) d'une rangée de roues diffusées */
+  function intensiteLigne(roues, bp) {
+    let best = 0;
+    for (let i = 0; i < roues.length; i++) {
+      let somme = 0;
+      for (let j = i; j < roues.length; j++) {
+        somme += roues[j].P;
+        best = Math.max(best, somme / (roues[j].y - roues[i].y + bp));
+      }
+    }
+    return best;
+  }
+
+  /* Diffusion d'une empreinte : 3/4 de l'épaisseur dans la chaussée (37°), angle saisi dans le remblai,
+     45° dans le béton jusqu'au feuillet moyen de la dalle. */
+  function diffusion(p, dim) {
+    const g = p.geo;
+    return dim + 2 * 0.75 * g.ech + 2 * Math.tan(p.sol.angleDiff * Math.PI / 180) * g.Hr + g.es;
+  }
+
+  function coefA(l) { return Math.max(2.3 + 360 / (l + 12), 4 - 0.002 * l); } // kN/m2, A(l) fascicule 61 titre II
+  const TAB_BC = { 1: [1.2, 1.1, 0.95, 0.8, 0.7], 2: [1.0, 1.0], 3: [1.0, 0.8] };
+  const TAB_A1 = { 1: [1, 1, 0.9, 0.75, 0.7], 2: [1, 0.9], 3: [0.9, 0.8] };
+  const V0 = { 1: 3.5, 2: 3.0, 3: 2.75 };
+  function val(tab, k) { return tab[Math.min(k, tab.length) - 1]; }
+
+  function majorationDynamique(L, G, S) { return 1 + 0.4 / (1 + 0.2 * L) + 0.6 / (1 + 4 * G / S); }
+
+  /* Retourne les « groupes » de charges routières : au plus une charge par groupe dans une combinaison. */
+  function convoisRoutiers(p, geo) {
+    const ch = p.charges, g = p.geo, cl = ch.classe;
+    const nF = Math.max(1, Math.round(ch.nFiles));
+    const Lr = ch.largeurRoulable;
+    const G = (G_BETON * g.es + p.sol.gammaR * g.Hr + p.sol.gammaCh * g.ech) * geo.W * Lr;
+    const details = [];
+    function fenetre(essieux, L) { // somme maximale des charges d'essieux dans une fenêtre de longueur L
+      let best = 0;
+      essieux.forEach(function (e0) {
+        let sum = 0; essieux.forEach(function (e) { if (e.x >= e0.x && e.x <= e0.x + L + 1e-9) sum += e.P; });
+        best = Math.max(best, sum);
+      });
+      return best;
+    }
+    function delta(S) { return ch.deltaAuto ? majorationDynamique(geo.W, G, S) : ch.deltaManuel; }
+
+    if (ch.reglement === 'LM1') {
+      const Qi = [300, 200, 100], roues = [];
+      for (let i = 0; i < Math.min(nF, 3); i++) {
+        roues.push({ y: 3 * i + 0.5, P: ch.alphaQ * Qi[i] / 2 }, { y: 3 * i + 2.5, P: ch.alphaQ * Qi[i] / 2 });
+      }
+      const lin = intensiteLigne(roues, diffusion(p, 0.4));
+      details.push({ nom: 'LM1 — tandem TS', lin: lin, a: diffusion(p, 0.4), b: diffusion(p, 0.4), delta: 1, coef: ch.alphaQ });
+      details.push({ nom: 'LM1 — charge répartie UDL', q: ch.alphaq * 9, delta: 1, coef: ch.alphaq });
+      return { details: details, groupes: [
+        [{ nom: 'LM1 TS', type: 'civil', a: diffusion(p, 0.4), essieux: [{ x: 0, lin: lin }, { x: 1.2, lin: lin }] }],
+        [{ nom: 'LM1 UDL', type: 'civil', uniforme: function () { return ch.alphaq * 9; } }]] };
+    }
+
+    const groupe = [];
+    if (ch.A) {
+      const a1 = val(TAB_A1[cl], nF), a2 = V0[cl] / (Lr / nF);
+      details.push({ nom: 'A(l)', q: coefA(geo.W) * a1 * a2, delta: 1, coef: a1 * a2, note: 'a1 = ' + a1 + ' ; a2 = ' + fr(a2, 3) });
+      groupe.push({ nom: 'A(l)', type: 'civil', uniforme: function (l) { return coefA(l) * a1 * a2; } });
+    }
+    if (ch.Bc) {
+      const camion = [{ x: 0, P: 60 }, { x: 4.5, P: 120 }, { x: 6, P: 120 }, { x: 10.5, P: 60 }, { x: 15, P: 120 }, { x: 16.5, P: 120 }];
+      const bp = diffusion(p, 0.25);
+      let best = 0, kBest = 1;
+      for (let k = 1; k <= nF; k++) {
+        const roues = []; for (let f = 0; f < k; f++) roues.push({ y: 2.5 * f, P: 1 }, { y: 2.5 * f + 2, P: 1 });
+        const v = val(TAB_BC[cl], k) * intensiteLigne(roues, bp);
+        if (v > best) { best = v; kBest = k; }
+      }
+      const S = fenetre(camion, geo.W) * nF * val(TAB_BC[cl], nF), d = delta(S);
+      details.push({ nom: 'Bc', lin: best * 60 * d, a: diffusion(p, 0.25), b: bp, delta: d, coef: val(TAB_BC[cl], kBest), S: S,
+        note: kBest + ' file(s) déterminante(s), roue arrière 60 kN' });
+      // charge par roue = moitié de l'essieu ; « best » est l'intensité pour une roue unitaire
+      groupe.push({ nom: 'Bc', type: 'civil', a: diffusion(p, 0.25),
+        essieux: camion.map(function (e) { return { x: e.x, lin: best * e.P / 2 * d }; }) });
+    }
+    if (ch.Bt && cl !== 3) {
+      const bt = cl === 1 ? 1.0 : 0.9, k = Math.min(nF, 2), roues = [];
+      for (let f = 0; f < k; f++) roues.push({ y: 3 * f, P: 80 }, { y: 3 * f + 2, P: 80 });
+      const bp = diffusion(p, 0.6);
+      const S = fenetre([{ x: 0, P: 160 }, { x: 1.35, P: 160 }], geo.W) * k * bt, d = delta(S);
+      const lin = bt * d * intensiteLigne(roues, bp);
+      details.push({ nom: 'Bt', lin: lin, a: diffusion(p, 0.25), b: bp, delta: d, coef: bt, S: S, note: 'roue 80 kN, 0,60 x 0,25 m' });
+      groupe.push({ nom: 'Bt', type: 'civil', a: diffusion(p, 0.25), essieux: [{ x: 0, lin: lin }, { x: 1.35, lin: lin }] });
+    }
+    if (ch.Br) {
+      const bp = diffusion(p, 0.6), d = delta(100), lin = d * 100 / bp;
+      details.push({ nom: 'Br', lin: lin, a: diffusion(p, 0.3), b: bp, delta: d, coef: 1, S: 100, note: 'roue isolée 100 kN, 0,60 x 0,30 m' });
+      groupe.push({ nom: 'Br', type: 'civil', a: diffusion(p, 0.3), essieux: [{ x: 0, lin: lin }] });
+    }
+    if (ch.Mc120) {
+      const bp = diffusion(p, 1.0), a = diffusion(p, 6.1);
+      const S = 1100 * Math.min(1, geo.W / 6.1), d = delta(S);
+      const lin = d * intensiteLigne([{ y: 0, P: 550 }, { y: 3.3, P: 550 }], bp);
+      details.push({ nom: 'Mc120', lin: lin, a: a, b: bp, delta: d, coef: 1, S: S, note: '2 chenilles de 550 kN, 6,10 x 1,00 m' });
+      groupe.push({ nom: 'Mc120', type: 'militaire', a: a, essieux: [{ x: 0, lin: lin }] });
+    }
+    return { details: details, groupes: [groupe] };
+  }
+
+  /* Génère les cas de charge de la dalle supérieure pour un convoi */
+  function casRoutiers(mod, convoi) {
+    const geo = mod.geo, W = geo.W, liste = [];
+    const dalles = mod.membres.filter(function (m) { return m.type === 'dalle'; });
+    function appliquer(patches) { // patches : [{x1,x2,q}] charge verticale kN/m
+      const cas = casVide(mod); let total = 0;
+      dalles.forEach(function (m) {
+        m.elems.forEach(function (ie) {
+          const e = mod.elements[ie], xa = mod.noeuds[e.i].x, xb = mod.noeuds[e.j].x;
+          patches.forEach(function (pt) {
+            const rec = Math.min(xb, pt.x2) - Math.max(xa, pt.x1);
+            if (rec > 0) { cas.qy[ie] -= pt.q * rec / (xb - xa); total += pt.q * rec; }
+          });
+        });
+      });
+      return total > 1e-9 ? cas : null;
+    }
+    if (convoi.uniforme) {
+      for (let i = 0; i < geo.n; i++) for (let j = i; j < geo.n; j++) {
+        const l = geo.xs[j + 1] - geo.xs[i];
+        const cas = appliquer([{ x1: geo.xs[i], x2: geo.xs[j + 1], q: convoi.uniforme(l) }]);
+        if (cas) liste.push({ nom: convoi.nom + ' travées ' + (i + 1) + '-' + (j + 1), type: convoi.type, cas: cas });
+      }
+      return liste;
+    }
+    const xmax = Math.max.apply(null, convoi.essieux.map(function (e) { return e.x; }));
+    const pas = Math.max(0.1, Math.min(0.25, W / 40));
+    [1, -1].forEach(function (sens) {
+      if (sens === -1 && convoi.essieux.length === 1) return;
+      for (let x0 = -xmax - convoi.a / 2; x0 <= W + convoi.a / 2 + 1e-9; x0 += pas) {
+        const patches = convoi.essieux.map(function (e) {
+          const xc = x0 + (sens === 1 ? e.x : xmax - e.x);
+          return { x1: xc - convoi.a / 2, x2: xc + convoi.a / 2, q: e.lin / convoi.a };
+        });
+        const cas = appliquer(patches);
+        if (cas) liste.push({ nom: convoi.nom + ' x0 = ' + fr(x0, 2) + ' m', type: convoi.type, cas: cas });
+      }
+    });
+    return liste;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 6. Enveloppes                                                       */
+  /* ------------------------------------------------------------------ */
+  function resultatCas(mod, cas) {
+    const r = mod.portique.calculerCas(cas);
+    r.sol = Float64Array.from(mod.noeudsRadier.map(function (nd) { return -r.u[nd * 3 + 1] * mod.p.sol.ks; }));
+    return r;
+  }
+  function somme(a, b) {
+    const o = {}; ['M', 'V', 'N', 'sol'].forEach(function (k) { o[k] = a[k].map(function (v, i) { return v + b[k][i]; }); });
+    return o;
+  }
+  /* groupes : [{ optionnel, options:[{f, r}] }] — produit cartésien, donc max de la somme = somme des max */
+  function enveloppe(groupes) {
+    const env = {};
+    ['M', 'V', 'N', 'sol'].forEach(function (k) {
+      const n = groupes[0].options[0].r[k].length;
+      const mx = new Float64Array(n), mn = new Float64Array(n);
+      groupes.forEach(function (gr) {
+        if (!gr.options.length) return;
+        for (let i = 0; i < n; i++) {
+          let a = gr.optionnel ? 0 : -Infinity, b = gr.optionnel ? 0 : Infinity;
+          for (let o = 0; o < gr.options.length; o++) {
+            const v = gr.options[o].f * gr.options[o].r[k][i];
+            if (v > a) a = v; if (v < b) b = v;
+          }
+          mx[i] += a; mn[i] += b;
+        }
+      });
+      env[k] = { max: mx, min: mn };
+    });
+    return env;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 7. Béton armé : section rectangulaire b = 1 m en flexion simple     */
+  /* ------------------------------------------------------------------ */
+  function flexionELU(Mu, d, mat) { // Mu kN.m/m, d m -> As m2/m
+    if (Mu <= 0) return { mu: 0, alpha: 0, z: d, As: 0, ok: true };
+    const mu = Mu / (d * d * mat.fcu * 1000);
+    if (mu > mat.muLim) return { mu: mu, alpha: NaN, z: NaN, As: NaN, ok: false };
+    const alpha = 1.25 * (1 - Math.sqrt(1 - 2 * mu)), z = d * (1 - 0.4 * alpha);
+    return { mu: mu, alpha: alpha, z: z, As: Mu / (z * mat.fsu * 1000), ok: true };
+  }
+  function contraintesELS(M, As, d, nEq) { // section fissurée, n = 15
+    const n = nEq || 15;
+    if (M <= 0 || As <= 0) return { x: 0, I: 0, sc: 0, ss: 0 };
+    const x = n * As * (-1 + Math.sqrt(1 + 2 * d / (n * As)));
+    const I = x * x * x / 3 + n * As * (d - x) * (d - x);
+    return { x: x, I: I, sc: M * x / I / 1000, ss: n * M * (d - x) / I / 1000 };
+  }
+  function sectionELS(M, d, mat) { // section d'acier minimale respectant les contraintes limites
+    if (M <= 0) return { As: 0, ok: true };
+    const ok = function (As) { const c = contraintesELS(M, As, d); return c.ss <= mat.sigmaS && c.sc <= mat.sigmaC; };
+    let lo = 1e-7, hi = 0.04 * d;
+    if (!ok(hi)) return { As: NaN, ok: false };
+    for (let i = 0; i < 60; i++) { const mid = (lo + hi) / 2; if (ok(mid)) hi = mid; else lo = mid; }
+    return { As: hi, ok: true };
+  }
+  function sectionMin(d, h, mat) {
+    if (mat.norme === 'EC2') return Math.max(0.26 * mat.ft / mat.fe * d, 0.0013 * d);
+    return 0.23 * d * mat.ft / mat.fe; // condition de non-fragilité BAEL A.4.2.1
+  }
+  /* Ouverture de fissure EN 1992-1-1 § 7.3.4, chargement de longue durée (kt = 0,4) */
+  function ouvertureFissure(M, As, d, h, c, phi, esp, mat) {
+    if (M <= 0 || As <= 0) return 0;
+    const ct = contraintesELS(M, As, d), ae = ES / mat.E;
+    const hcef = Math.min(2.5 * (h - d), (h - ct.x) / 3, h / 2), rho = As / hcef;
+    const dEps = Math.max(ct.ss - 0.4 * mat.ft / rho * (1 + ae * rho), 0.6 * ct.ss) / ES;
+    const sr = esp <= 5 * (c + phi / 2) ? 3.4 * c + 0.8 * 0.5 * 0.425 * phi / rho : 1.3 * (h - ct.x);
+    return sr * dEps * 1000; // mm
+  }
+  const DIAMS = [10, 12, 14, 16, 20, 25];
+  const ESPACEMENTS = [0.2, 0.15, 0.125, 0.1];
+  function catalogueBarres() {
+    const cat = [];
+    DIAMS.forEach(function (phi) { ESPACEMENTS.forEach(function (e) { cat.push({ phi: phi, esp: e, As: Math.PI * phi * phi / 4 * 1e-6 / e }); }); });
+    return cat.sort(function (a, b) { return a.As - b.As || b.esp - a.esp; });
+  }
+  function choisirBarres(AsReq, test) {
+    const cat = catalogueBarres();
+    for (let i = 0; i < cat.length; i++) if (cat[i].As >= AsReq - 1e-9 && (!test || test(cat[i]))) return cat[i];
+    return null;
+  }
+  function texteBarres(b) { return b ? 'HA' + b.phi + ' e = ' + (b.esp * 100).toLocaleString('fr-FR') + ' cm' : '—'; }
+
+  function dimensionnerNappe(p, mat, h, Melu, Mels, Mfreq) {
+    const c = p.mat.enrobage, d = h - c - p.mat.phiEst / 2000;
+    const elu = flexionELU(Melu, d, mat), els = sectionELS(Mels, d, mat), AsMin = sectionMin(d, h, mat);
+    const alertes = [];
+    if (!elu.ok) alertes.push('Moment réduit µ = ' + fr(elu.mu, 3) + ' > µ limite : augmenter l\'épaisseur.');
+    if (!els.ok) alertes.push('Contraintes limites de service impossibles à respecter : augmenter l\'épaisseur.');
+    const AsReq = Math.max(elu.ok ? elu.As : 0, els.ok ? els.As : 0, AsMin);
+    let barres = null;
+    if (elu.ok && els.ok) {
+      barres = choisirBarres(AsReq, mat.norme === 'EC2' ? function (b) {
+        return ouvertureFissure(Mfreq, b.As, d, h, c, b.phi / 1000, b.esp, mat) <= p.mat.wmax + 1e-9;
+      } : null);
+      if (!barres) alertes.push('Aucune disposition courante (HA10 à HA25, e ≥ 10 cm) ne convient : augmenter l\'épaisseur.');
+    }
+    const AsP = barres ? barres.As : 0, ct = contraintesELS(Mels, AsP, d);
+    const wk = mat.norme === 'EC2' && barres ? ouvertureFissure(Mfreq, AsP, d, h, c, barres.phi / 1000, barres.esp, mat) : null;
+    const ratioRep = mat.norme === 'EC2' ? 0.2 : 1 / 3; // EC2 § 9.3.1.1 ; BAEL A.8.2.41 (charges concentrées)
+    const rep = choisirBarres(Math.max(ratioRep * AsP, 3.9e-4)); // plancher usuel HA10 e = 20 cm
+    const gouverne = AsReq === AsMin ? 'section minimale' : (els.ok && AsReq === els.As ? 'ELS' : 'ELU');
+    return { h: h, d: d, Melu: Melu, Mels: Mels, Mfreq: Mfreq, elu: elu, AsElu: elu.As, AsEls: els.As, AsMin: AsMin,
+      AsReq: AsReq, gouverne: gouverne, barres: barres, AsP: AsP, sc: ct.sc, ss: ct.ss, wk: wk, rep: rep, alertes: alertes,
+      ok: alertes.length === 0 };
+  }
+
+  function verifierTranchant(p, mat, h, Vu, AsTendu) {
+    const d = h - p.mat.enrobage - p.mat.phiEst / 2000;
+    if (mat.norme === 'EC2') {
+      const k = Math.min(2, 1 + Math.sqrt(0.2 / d)), rho = Math.min(0.02, AsTendu / d);
+      const v = Math.max(0.18 / 1.5 * k * Math.pow(100 * rho * mat.fc, 1 / 3), 0.035 * Math.pow(k, 1.5) * Math.sqrt(mat.fc));
+      const VRd = v * d * 1000;
+      return { d: d, Vu: Vu, tau: Vu / d / 1000, limite: v, VRd: VRd, ok: Vu <= VRd, texte: 'VRd,c' };
+    }
+    const tau = Vu / d / 1000, lim = 0.07 * mat.fc / 1.5; // BAEL A.5.2.2, dalle sans armature d'effort tranchant
+    return { d: d, Vu: Vu, tau: tau, limite: lim, VRd: lim * d * 1000, ok: tau <= lim, texte: 'τu limite' };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 8. Hydraulique : écoulement à surface libre, Manning-Strickler      */
+  /* ------------------------------------------------------------------ */
+  function debitStrickler(K, L, y, pente) { // pente en m/m, par cellule
+    if (y <= 0) return 0;
+    const S = L * y, R = S / (L + 2 * y);
+    return K * S * Math.pow(R, 2 / 3) * Math.sqrt(pente);
+  }
+  function hydraulique(p) {
+    const h = p.hydro, g = p.geo, n = Math.max(1, Math.round(g.n)), I = h.pente / 100;
+    const qCell = h.Q / n;
+    const Qmax = n * debitStrickler(h.K, g.L, h.tauxMax * g.H, I);
+    const Qplein = n * debitStrickler(h.K, g.L, g.H, I);
+    let y = NaN;
+    if (qCell <= debitStrickler(h.K, g.L, g.H, I)) {
+      let lo = 0, hi = g.H;
+      for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (debitStrickler(h.K, g.L, m, I) < qCell) lo = m; else hi = m; }
+      y = hi;
+    }
+    const V = isNaN(y) ? NaN : qCell / (g.L * y);
+    const yc = Math.pow(Math.pow(qCell / g.L, 2) / 9.81, 1 / 3);
+    const alertes = [];
+    if (isNaN(y)) alertes.push('Le débit de projet dépasse la capacité à surface libre : l\'ouvrage se met en charge. Augmenter l\'ouverture, la hauteur ou le nombre de cellules.');
+    else {
+      if (y / g.H > h.tauxMax + 1e-9) alertes.push('Taux de remplissage ' + fr((100 * y / g.H), 0) + ' % supérieur au maximum fixé (' + fr((100 * h.tauxMax), 0) + ' %).');
+      if (V < h.vMin) alertes.push('Vitesse inférieure à ' + h.vMin + ' m/s : risque d\'ensablement et de dépôts.');
+      if (V > h.vMax) alertes.push('Vitesse supérieure à ' + h.vMax + ' m/s : prévoir une protection contre l\'affouillement (enrochements, parafouille).');
+    }
+    return { y: y, V: V, taux: y / g.H, Qmax: Qmax, Qplein: Qplein, yc: yc, froude: isNaN(y) ? NaN : V / Math.sqrt(9.81 * y),
+      revanche: g.H - y, Qrationnel: h.C * h.I * h.A / 3.6, ok: alertes.length === 0, alertes: alertes };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 9. Métré                                                            */
+  /* ------------------------------------------------------------------ */
+  function metre(p, geo, ferraillage) {
+    const g = p.geo, Lg = g.longueur;
+    const aire = geo.B * geo.Hext - geo.n * g.L * g.H + geo.n * 4 * g.gousset * g.gousset / 2;
+    const beton = aire * Lg;
+    const proprete = (geo.B + 0.2) * 0.1 * Lg;
+    const coffrage = (2 * geo.Hext + geo.n * (2 * g.H + g.L)) * Lg;
+    const dev = { dalle: geo.B, radier: geo.B, pied: 2 * geo.Hext, cloison: (geo.n - 1) * geo.Hext };
+    let acier = 0;
+    ferraillage.forEach(function (f) {
+      const l = dev[f.membre] * (f.face === 'both' ? 2 : 1);
+      acier += ((f.barres ? f.barres.As : 0) + (f.rep ? f.rep.As : 0)) * l * Lg * 7850;
+    });
+    acier *= 1 + p.metre.majorationAcier / 100;
+    return { aire: aire, beton: beton, proprete: proprete, coffrage: coffrage, acier: acier, ratio: acier / beton,
+      fouille: (geo.B + 1) * (geo.Hext + 0.1) * Lg };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 10. Calcul complet                                                  */
+  /* ------------------------------------------------------------------ */
+  const NAPPES = [
+    { id: 'ds_inf', membre: 'dalle', face: 'int', nom: 'Dalle supérieure — nappe inférieure (travées)' },
+    { id: 'ds_sup', membre: 'dalle', face: 'ext', nom: 'Dalle supérieure — nappe supérieure (angles et appuis)' },
+    { id: 'rd_sup', membre: 'radier', face: 'int', nom: 'Radier — nappe supérieure (travées)' },
+    { id: 'rd_inf', membre: 'radier', face: 'ext', nom: 'Radier — nappe inférieure (angles et appuis)' },
+    { id: 'pd_int', membre: 'pied', face: 'int', nom: 'Piédroits — face intérieure' },
+    { id: 'pd_ext', membre: 'pied', face: 'ext', nom: 'Piédroits — face extérieure (côté terre)' },
+    { id: 'cl', membre: 'cloison', face: 'both', nom: 'Cloisons intermédiaires — chaque face' }];
+
+  function controlerDonnees(p) {
+    const e = [], g = p.geo;
+    function pos(v, nom) { if (!(v > 0) || !isFinite(v)) e.push(nom + ' doit être strictement positif.'); }
+    pos(g.L, 'L\'ouverture'); pos(g.H, 'La hauteur libre'); pos(g.es, 'L\'épaisseur de la dalle');
+    pos(g.er, 'L\'épaisseur du radier'); pos(g.ep, 'L\'épaisseur des piédroits'); pos(g.longueur, 'La longueur de l\'ouvrage');
+    pos(p.mat.fc, 'La résistance du béton'); pos(p.mat.fe, 'La limite élastique de l\'acier'); pos(p.sol.ks, 'Le module de réaction du sol');
+    if (g.n > 1) pos(g.ec, 'L\'épaisseur des cloisons');
+    if (g.n < 1 || g.n > 6) e.push('Le nombre de cellules doit être compris entre 1 et 6.');
+    if (g.Hr < 0 || g.ech < 0) e.push('Les hauteurs de remblai et de chaussée ne peuvent pas être négatives.');
+    [g.es, g.er, g.ep].forEach(function (h) {
+      if (h - p.mat.enrobage - p.mat.phiEst / 2000 < 0.05) e.push('Épaisseur trop faible par rapport à l\'enrobage (hauteur utile < 5 cm).');
+    });
+    return e.filter(function (v, i) { return e.indexOf(v) === i; });
+  }
+
+  function calculer(p) {
+    const erreurs = controlerDonnees(p);
+    if (erreurs.length) return { ok: false, erreurs: erreurs };
+    const mod = construireModele(p), geo = mod.geo, mat = mod.mat, c = p.coef;
+    const perm = casPermanents(mod);
+    const R = {};
+    ['pp', 'rem', 'terre', 'latG', 'latD', 'eau'].forEach(function (k) { R[k] = resultatCas(mod, perm[k]); });
+    const Gv = somme(R.pp, R.rem), lat2 = somme(R.latG, R.latD);
+    const conv = convoisRoutiers(p, geo);
+    let nbCas = 0;
+    const groupesRoute = conv.groupes.map(function (gr) {
+      const opts = [];
+      gr.forEach(function (cv) {
+        casRoutiers(mod, cv).forEach(function (cr) { opts.push({ type: cr.type, nom: cr.nom, r: resultatCas(mod, cr.cas) }); nbCas++; });
+      });
+      return opts;
+    });
+    function groupes(fG1, fG2, fRoute, fMc, fLat, fEau) {
+      const gs = [
+        { options: [{ f: fG1, r: Gv }, { f: fG2, r: Gv }] },
+        { options: [{ f: fG1, r: R.terre }, { f: fG2, r: R.terre }] },
+        { optionnel: true, options: [{ f: fLat, r: R.latG }, { f: fLat, r: R.latD }, { f: fLat, r: lat2 }] }];
+      groupesRoute.forEach(function (opts) {
+        gs.push({ optionnel: true, options: opts.map(function (o) { return { f: o.type === 'militaire' ? fMc : fRoute, r: o.r }; }) });
+      });
+      if (p.charges.eau) gs.push({ optionnel: true, options: [{ f: fEau, r: R.eau }] });
+      return gs;
+    }
+    const env = {
+      elu: enveloppe(groupes(c.Gsup, c.Ginf, c.eluRoute, c.eluMc, c.eluLat, c.eluEau)),
+      els: enveloppe(groupes(1, 1, c.elsRoute, c.elsMc, c.elsLat, c.elsEau)),
+      freq: enveloppe(groupes(1, 1, c.psi1, c.psi1, c.psi1, c.psi1)),
+      perm: enveloppe(groupes(1, 1, 0, 0, 0, 0).slice(0, 2))
+    };
+    // extrêmes par type de membre
+    function extremes(e, type) {
+      let mInt = 0, mExt = 0, v = 0, nMin = 0, nMax = 0;
+      mod.membres.forEach(function (m) {
+        if (m.type !== type) return;
+        m.elems.forEach(function (ie) {
+          for (let q = 0; q < 2; q++) {
+            const i = 2 * ie + q;
+            mInt = Math.max(mInt, e.M.max[i]); mExt = Math.max(mExt, -e.M.min[i]);
+            v = Math.max(v, e.V.max[i], -e.V.min[i]);
+            nMin = Math.min(nMin, e.N.min[i]); nMax = Math.max(nMax, e.N.max[i]);
+          }
+        });
+      });
+      return { int: mInt, ext: mExt, both: Math.max(mInt, mExt), V: v, Nmin: nMin, Nmax: nMax };
+    }
+    const epais = { dalle: p.geo.es, radier: p.geo.er, pied: p.geo.ep, cloison: p.geo.ec };
+    const ferraillage = NAPPES.filter(function (nq) { return nq.membre !== 'cloison' || geo.n > 1; }).map(function (nq) {
+      const d = dimensionnerNappe(p, mat, epais[nq.membre], extremes(env.elu, nq.membre)[nq.face],
+        extremes(env.els, nq.membre)[nq.face], extremes(env.freq, nq.membre)[nq.face]);
+      d.id = nq.id; d.membre = nq.membre; d.face = nq.face; d.nom = nq.nom;
+      return d;
+    });
+    const tranchant = ['dalle', 'radier', 'pied', 'cloison'].filter(function (t) { return t !== 'cloison' || geo.n > 1; }).map(function (t) {
+      const x = extremes(env.elu, t);
+      const As = Math.min.apply(null, ferraillage.filter(function (f) { return f.membre === t; }).map(function (f) { return f.AsP; }));
+      const r = verifierTranchant(p, mat, epais[t], x.V, As);
+      r.membre = t; r.Nmin = x.Nmin; r.Nmax = x.Nmax;
+      return r;
+    });
+    const solMax = Math.max.apply(null, env.els.sol.max), solMin = Math.min.apply(null, env.els.sol.min);
+    const sol = { max: solMax, min: solMin, adm: p.sol.sigmaAdm, ok: solMax <= p.sol.sigmaAdm && solMin >= 0,
+      moyennePerm: Array.from(env.perm.sol.max).reduce(function (a, b) { return a + b; }, 0) / env.perm.sol.max.length };
+    const hyd = hydraulique(p);
+    const met = metre(p, geo, ferraillage);
+    const alertes = [];
+    ferraillage.forEach(function (f) { f.alertes.forEach(function (a) { alertes.push(f.nom + ' : ' + a); }); });
+    tranchant.forEach(function (t) { if (!t.ok) alertes.push('Effort tranchant (' + t.membre + ') : ' + fr(t.Vu, 1) + ' kN/m dépasse la résistance sans armature transversale (' + fr(t.VRd, 1) + ' kN/m). Augmenter l\'épaisseur ou prévoir des goussets et des armatures d\'effort tranchant.'); });
+    if (solMax > p.sol.sigmaAdm) alertes.push('Contrainte sur le sol ' + fr(solMax, 0) + ' kPa supérieure à la contrainte admissible ' + p.sol.sigmaAdm + ' kPa.');
+    if (solMin < 0) alertes.push('Décollement du radier détecté (pression négative) : le modèle élastique sans traction n\'est plus valable localement.');
+    return { ok: true, version: VERSION, geo: geo, mat: mat, mod: mod, K: perm.K, qRem: perm.qRem, convois: conv.details, nbCas: nbCas,
+      env: env, ferraillage: ferraillage, tranchant: tranchant, sol: sol, hydro: hyd, metre: met, alertes: alertes,
+      conforme: alertes.length === 0 };
+  }
+
+  return { VERSION: VERSION, parametresDefaut: parametresDefaut, coefficientsDefaut: coefficientsDefaut, calculer: calculer,
+    creerPortique: creerPortique, materiaux: materiaux, geometrie: geometrie, flexionELU: flexionELU, contraintesELS: contraintesELS,
+    sectionELS: sectionELS, sectionMin: sectionMin, ouvertureFissure: ouvertureFissure, verifierTranchant: verifierTranchant,
+    choisirBarres: choisirBarres, texteBarres: texteBarres, coefA: coefA, coefPoussee: coefPoussee, intensiteLigne: intensiteLigne,
+    majorationDynamique: majorationDynamique, debitStrickler: debitStrickler, hydraulique: hydraulique, diffusion: diffusion,
+    convoisRoutiers: convoisRoutiers };
+});
+</script>
+<script>
+(function(){
+'use strict';
+var M = DalotMoteur;
+var CLE = 'dalot-pro-ci-projet';
+
+/* ---------- état ---------- */
+function fusion(base, src){
+  Object.keys(base).forEach(function(k){
+    if (src == null || !(k in src)) return;
+    if (base[k] && typeof base[k] === 'object') fusion(base[k], src[k]);
+    else if (typeof src[k] === typeof base[k]) base[k] = src[k];
+  });
+  return base;
+}
+function nouveau(){ var p = M.parametresDefaut(); p.projet.date = new Date().toISOString().slice(0,10); p.sol.type = 'libre'; return p; }
+var P = nouveau();
+try { var s = localStorage.getItem(CLE); if (s) fusion(P, JSON.parse(s)); } catch(e){}
+var R = null, etape = 'projet', grandeur = 'M_elu';
+try { var h = (location.hash||'').slice(1); if (h) etape = h; } catch(e){}
+
+function lire(k){ return k.split('.').reduce(function(o,q){ return o[q]; }, P); }
+function ecrire(k,v){ var t = k.split('.'), o = P; for (var i=0;i<t.length-1;i++) o = o[t[i]]; o[t[t.length-1]] = v; }
+function nf(v,d){ if (v == null || !isFinite(v)) return '—'; d = d == null ? 2 : d; return v.toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function cm2(v){ return nf(v*1e4,2); }
+
+/* ---------- étapes et champs ---------- */
+var ETAPES = [
+  ['Données', [['projet','Projet'],['hydro','Hydraulique'],['normes','Normes et matériaux'],['geo','Géométrie'],['sol','Sol et remblai'],['charges','Charges'],['coef','Combinaisons']]],
+  ['Résultats', [['efforts','Efforts'],['ferraillage','Ferraillage'],['metre','Métré'],['note','Note de calcul']]],
+  ['Aide', [['tutoriel','Tutoriel'],['comprendre','Comprendre le calcul'],['verification','Méthode de vérification']]]
+];
+var ENV = {
+  humide:{enrobage:0.04,fissuration:'prejudiciable',wmax:0.3},
+  littoral:{enrobage:0.05,fissuration:'tres',wmax:0.2},
+  agressif:{enrobage:0.05,fissuration:'tres',wmax:0.2}
+};
+var SOLS = {
+  basfond:{ks:10000,sigmaAdm:50}, sableargileux:{ks:30000,sigmaAdm:150},
+  laterite:{ks:60000,sigmaAdm:250}, roche:{ks:150000,sigmaAdm:400}
+};
+var estF61 = function(){ return P.charges.reglement === 'F61'; };
+var CHAMPS = {
+  projet:[
+    {k:'projet.nom',l:'Désignation de l\'ouvrage',t:'txt'},
+    {k:'projet.route',l:'Route ou itinéraire',t:'txt',a:'Exemple : route en terre Bouaflé – Zuénoula.'},
+    {k:'projet.pk',l:'Point kilométrique',t:'txt'},
+    {k:'projet.lieu',l:'Localité',t:'txt'},
+    {k:'projet.maitre',l:'Maître d\'ouvrage',t:'txt'},
+    {k:'projet.auteur',l:'Auteur de la note',t:'txt'},
+    {k:'projet.date',l:'Date',t:'txt'}],
+  hydro:[
+    {k:'hydro.Q',l:'Débit de projet Q',u:'m³/s',p:0.5,a:'Issu de l\'étude hydrologique (crue décennale pour un dalot courant).'},
+    {k:'hydro.pente',l:'Pente longitudinale du radier',u:'%',p:0.1},
+    {k:'hydro.K',l:'Coefficient de Strickler K',u:'m^⅓/s',p:1,a:'Béton coffré : 60 à 75. Valeur usuelle 67.'},
+    {k:'hydro.tauxMax',l:'Taux de remplissage maximal',u:'%',m:100,p:5,a:'Garde d\'air pour les corps flottants (troncs, végétaux).'},
+    {k:'hydro.vMin',l:'Vitesse minimale d\'autocurage',u:'m/s',p:0.1},
+    {k:'hydro.vMax',l:'Vitesse maximale admise',u:'m/s',p:0.1}],
+  rationnel:[
+    {k:'hydro.C',l:'Coefficient de ruissellement C',u:'—',p:0.05},
+    {k:'hydro.I',l:'Intensité de pluie I',u:'mm/h',p:5,a:'À lire sur les courbes IDF de la station SODEXAM la plus proche, pour le temps de concentration.'},
+    {k:'hydro.A',l:'Superficie du bassin versant A',u:'km²',p:0.1}],
+  normes:[
+    {k:'norme',l:'Règlement de calcul béton armé',t:'sel',o:[['BAEL','BAEL 91 révisé 99'],['EC2','Eurocode 2 (EN 1992-1-1)']],hook:'norme'},
+    {k:'mat.fc',l:function(){return P.norme==='EC2'?'Résistance caractéristique fck':'Résistance fc28';},u:'MPa',p:5,a:'Dalots courants en Côte d\'Ivoire : 25 à 30 MPa (béton dosé à 350 kg/m³ au minimum).'},
+    {k:'mat.fe',l:'Limite élastique de l\'acier',t:'sel',num:1,o:[[500,'HA Fe E500'],[400,'HA Fe E400']]},
+    {k:'mat.env',l:'Environnement de l\'ouvrage',t:'sel',o:[['humide','Intérieur du pays, climat tropical humide'],['littoral','Zone lagunaire ou littorale (chlorures)'],['agressif','Eaux agressives ou usées']],hook:'env',a:'Le choix règle l\'enrobage et la sévérité de fissuration. Modifiable ensuite.'},
+    {k:'mat.enrobage',l:'Enrobage des armatures',u:'cm',m:100,p:0.5},
+    {k:'mat.fissuration',l:'Fissuration',t:'sel',o:[['peu','Peu préjudiciable'],['prejudiciable','Préjudiciable'],['tres','Très préjudiciable']],si:function(){return P.norme==='BAEL';}},
+    {k:'mat.wmax',l:'Ouverture de fissure admissible wmax',u:'mm',p:0.05,si:function(){return P.norme==='EC2';}},
+    {k:'mat.phiEst',l:'Diamètre estimé des barres',u:'mm',p:2,a:'Sert au calcul de la hauteur utile d.'}],
+  geo:[
+    {k:'geo.n',l:'Nombre de cellules',u:'—',p:1,min:1,max:6,entier:1},
+    {k:'geo.L',l:'Ouverture libre d\'une cellule',u:'m',p:0.25},
+    {k:'geo.H',l:'Hauteur libre',u:'m',p:0.25},
+    {k:'geo.es',l:'Épaisseur de la dalle supérieure',u:'cm',m:100,p:1},
+    {k:'geo.er',l:'Épaisseur du radier',u:'cm',m:100,p:1},
+    {k:'geo.ep',l:'Épaisseur des piédroits',u:'cm',m:100,p:1},
+    {k:'geo.ec',l:'Épaisseur des cloisons',u:'cm',m:100,p:1,si:function(){return P.geo.n>1;}},
+    {k:'geo.gousset',l:'Côté des goussets',u:'cm',m:100,p:1,a:'Pris en compte dans le dessin et le métré, pas dans le calcul des efforts.'},
+    {k:'geo.longueur',l:'Longueur de l\'ouvrage',u:'m',p:0.5},
+    {k:'geo.Hr',l:'Hauteur de remblai sur la dalle',u:'m',p:0.1,a:'Hors couche de chaussée.'},
+    {k:'geo.ech',l:'Épaisseur de la chaussée',u:'cm',m:100,p:1,a:'Couche de roulement en latérite ou revêtement.'}],
+  sol:[
+    {k:'sol.type',l:'Sol de fondation (ordre de grandeur)',t:'sel',o:[['libre','Valeurs de l\'étude géotechnique'],['basfond','Argile molle de bas-fond'],['sableargileux','Sable argileux moyennement compact'],['laterite','Graveleux latéritique compact'],['roche','Roche altérée']],hook:'sol',a:'Aide à la saisie. Les valeurs proposées sont indicatives et ne remplacent pas le rapport de sol.'},
+    {k:'sol.ks',l:'Module de réaction du sol k',u:'kN/m³',p:5000},
+    {k:'sol.sigmaAdm',l:'Contrainte admissible du sol',u:'kPa',p:10},
+    {k:'sol.gammaR',l:'Poids volumique du remblai',u:'kN/m³',p:0.5,a:'Graveleux latéritique compacté : 19 à 21.'},
+    {k:'sol.phi',l:'Angle de frottement du remblai',u:'°',p:1},
+    {k:'sol.modeK',l:'Poussée des terres',t:'sel',o:[['K0','Au repos K0 = 1 − sin φ'],['Ka','Active Ka = tan²(45° − φ/2)'],['manuel','Coefficient saisi']],redessine:1},
+    {k:'sol.Kmanuel',l:'Coefficient de poussée K',u:'—',p:0.05,si:function(){return P.sol.modeK==='manuel';}},
+    {k:'sol.gammaCh',l:'Poids volumique de la chaussée',u:'kN/m³',p:0.5},
+    {k:'sol.qRemblai',l:'Surcharge routière sur remblai',u:'kPa',p:1,a:'Fascicule 61 titre II : 10 kPa sur les remblais d\'accès.'},
+    {k:'sol.angleDiff',l:'Angle de diffusion dans le remblai',u:'°',p:1,a:'Mesuré par rapport à la verticale. Valeur usuelle 30°.'}],
+  charges:[
+    {k:'charges.reglement',l:'Règlement de charges routières',t:'sel',o:[['F61','Fascicule 61 titre II (A, Bc, Bt, Br, Mc120)'],['LM1','Eurocode 1-2, modèle LM1']],redessine:1},
+    {k:'charges.classe',l:'Classe du pont',t:'sel',num:1,o:[[1,'1re classe (largeur roulable ≥ 7 m)'],[2,'2e classe (5,50 à 7 m)'],[3,'3e classe (< 5,50 m)']],si:estF61},
+    {k:'charges.largeurRoulable',l:'Largeur roulable',u:'m',p:0.5,si:estF61},
+    {k:'charges.nFiles',l:function(){return estF61()?'Nombre de voies (files de camions)':'Nombre de voies chargées';},u:'—',p:1,min:1,max:5,entier:1},
+    {k:'charges.A',l:'Système A(l)',t:'chk',si:estF61},
+    {k:'charges.Bc',l:'Système Bc (camions de 30 t)',t:'chk',si:estF61},
+    {k:'charges.Bt',l:'Système Bt (tandems de 32 t)',t:'chk',si:estF61,a:'Sans objet en 3e classe.'},
+    {k:'charges.Br',l:'Système Br (roue de 10 t)',t:'chk',si:estF61},
+    {k:'charges.Mc120',l:'Convoi militaire Mc120',t:'chk',si:estF61,a:'Souvent exigé sur le réseau structurant.'},
+    {k:'charges.deltaAuto',l:'Majoration dynamique calculée',t:'chk',si:estF61,redessine:1},
+    {k:'charges.deltaManuel',l:'Majoration dynamique imposée δ',u:'—',p:0.05,si:function(){return estF61()&&!P.charges.deltaAuto;}},
+    {k:'charges.alphaQ',l:'Coefficient αQ (tandems)',u:'—',p:0.1,si:function(){return !estF61();}},
+    {k:'charges.alphaq',l:'Coefficient αq (charge répartie)',u:'—',p:0.1,si:function(){return !estF61();}},
+    {k:'charges.eau',l:'Dalot en eau (poussée intérieure)',t:'chk',redessine:1},
+    {k:'charges.hEau',l:'Hauteur d\'eau intérieure',u:'m',p:0.1,si:function(){return P.charges.eau;}}],
+  coef:[
+    {k:'coef.Gsup',l:'Permanentes défavorables',u:'ELU',p:0.05},{k:'coef.Ginf',l:'Permanentes favorables',u:'ELU',p:0.05},
+    {k:'coef.eluRoute',l:'Charges routières civiles',u:'ELU',p:0.05},{k:'coef.eluMc',l:'Convoi militaire',u:'ELU',p:0.05},
+    {k:'coef.eluLat',l:'Surcharge sur remblai',u:'ELU',p:0.05},{k:'coef.eluEau',l:'Eau intérieure',u:'ELU',p:0.05},
+    {k:'coef.elsRoute',l:'Charges routières civiles',u:'ELS',p:0.05},{k:'coef.elsMc',l:'Convoi militaire',u:'ELS',p:0.05},
+    {k:'coef.elsLat',l:'Surcharge sur remblai',u:'ELS',p:0.05},{k:'coef.elsEau',l:'Eau intérieure',u:'ELS',p:0.05},
+    {k:'coef.psi1',l:'Coefficient ψ1 (combinaison fréquente)',u:'—',p:0.05,si:function(){return P.norme==='EC2';},a:'Sert au calcul de l\'ouverture des fissures.'}]
+};
+var INDEX = {}; Object.keys(CHAMPS).forEach(function(g){ CHAMPS[g].forEach(function(f){ INDEX[f.k] = f; }); });
+
+function champ(f){
+  if (f.si && !f.si()) return '';
+  var id = 'f_' + f.k.replace('.','_'), v = lire(f.k), lib = typeof f.l === 'function' ? f.l() : f.l;
+  var aide = f.a ? '<div class="aide">'+esc(f.a)+'</div>' : '';
+  if (f.t === 'chk') return '<div class="champ coche"><input type="checkbox" id="'+id+'" data-k="'+f.k+'"'+(v?' checked':'')+'><label for="'+id+'">'+esc(lib)+'</label>'+aide+'</div>';
+  if (f.t === 'sel') return '<div class="champ"><label for="'+id+'">'+esc(lib)+'</label><select id="'+id+'" data-k="'+f.k+'">'+f.o.map(function(o){ return '<option value="'+o[0]+'"'+(String(o[0])===String(v)?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+'</select>'+aide+'</div>';
+  if (f.t === 'txt') return '<div class="champ"><label for="'+id+'">'+esc(lib)+'</label><input type="text" id="'+id+'" data-k="'+f.k+'" value="'+esc(v)+'">'+aide+'</div>';
+  var aff = Math.round(v*(f.m||1)*1e6)/1e6;
+  return '<div class="champ"><label for="'+id+'">'+esc(lib)+'</label><div class="saisie"><input type="number" inputmode="decimal" id="'+id+'" data-k="'+f.k+'" value="'+aff+'" step="'+(f.p||'any')+'"'+(f.min!=null?' min="'+f.min+'"':'')+(f.max!=null?' max="'+f.max+'"':'')+'><span class="unite">'+esc(f.u||'')+'</span></div>'+aide+'</div>';
+}
+function formulaire(groupe){ return '<div class="grille">'+CHAMPS[groupe].map(champ).join('')+'</div>'; }
+function bloc(titre, contenu, intro){ return '<section class="bloc"><h3>'+titre+'</h3>'+(intro?'<p class="intro">'+intro+'</p>':'')+contenu+'</section>'; }
+function etat(ok, oui, non){ return '<span class="etat '+(ok?'ok':'ko')+'">'+(ok?(oui||'Vérifié'):(non||'Non vérifié'))+'</span>'; }
+function tableau(entetes, lignes){
+  return '<div class="tableau"><table><thead><tr>'+entetes.map(function(e){ var n = e.charAt(0)==='#'; return '<th'+(n?' class="num"':'')+'>'+(n?e.slice(1):e)+'</th>'; }).join('')+'</tr></thead><tbody>'+
+    lignes.map(function(l){ return '<tr>'+l.map(function(c,i){ return '<td'+(entetes[i].charAt(0)==='#'?' class="num"':'')+'>'+c+'</td>'; }).join('')+'</tr>'; }).join('')+'</tbody></table></div>';
+}
+function alertes(liste){ return liste.map(function(a){ return '<div class="alerte">'+esc(a)+'</div>'; }).join(''); }
+
+/* ---------- dessins ---------- */
+function svgCoupe(opts){
+  opts = opts || {};
+  var g = P.geo, geo = M.geometrie(P), S = 100;
+  var cote = Math.max(0.8, 0.25*geo.B), haut = g.Hr + g.ech, bas = 0.45;
+  var W = geo.B + 2*cote, Ht = geo.Hext + haut + bas + 0.35;
+  var X = function(x){ return (x+cote)*S; }, Y = function(y){ return (geo.Hext + haut + 0.3 - y)*S; };
+  var o = '<svg viewBox="0 0 '+(W*S).toFixed(0)+' '+(Ht*S).toFixed(0)+'" role="img" aria-label="Coupe transversale du dalot">';
+  var fs = Math.max(11, W*S/46);
+  o += '<rect class="s-sol" x="0" y="'+Y(0)+'" width="'+W*S+'" height="'+bas*S+'"/>';
+  o += '<rect class="s-remblai" x="0" y="'+Y(geo.Hext+g.Hr)+'" width="'+W*S+'" height="'+(geo.Hext+g.Hr)*S+'"/>';
+  if (g.ech>0) o += '<rect class="s-chaussee" x="0" y="'+Y(geo.Hext+haut)+'" width="'+W*S+'" height="'+g.ech*S+'"/>';
+  o += '<rect class="s-beton" x="'+X(0)+'" y="'+Y(geo.Hext)+'" width="'+geo.B*S+'" height="'+geo.Hext*S+'"/>';
+  var x = g.ep, yEau = opts.eau && R && R.ok && isFinite(R.hydro.y) ? R.hydro.y : 0, k = g.gousset;
+  for (var i=0;i<geo.n;i++){
+    var x1 = x, x2 = x+g.L, y1 = g.er, y2 = g.er+g.H;
+    var pts = k>0 ? [[x1+k,y1],[x2-k,y1],[x2,y1+k],[x2,y2-k],[x2-k,y2],[x1+k,y2],[x1,y2-k],[x1,y1+k]] : [[x1,y1],[x2,y1],[x2,y2],[x1,y2]];
+    o += '<polygon class="s-vide" points="'+pts.map(function(q){ return X(q[0]).toFixed(1)+','+Y(q[1]).toFixed(1); }).join(' ')+'"/>';
+    if (yEau>0) o += '<rect class="s-eau" x="'+X(x1+0.02)+'" y="'+Y(y1+yEau)+'" width="'+(g.L-0.04)*S+'" height="'+Math.max(0,(yEau-Math.min(k,yEau)*0))*S+'" opacity=".75"/>';
+    if (opts.cotes!==false && i===0){
+      o += '<text x="'+X(x1+g.L/2)+'" y="'+(Y(y1+g.H/2)+fs/3)+'" text-anchor="middle" font-size="'+fs+'">'+nf(g.L,2)+' × '+nf(g.H,2)+'</text>';
+    }
+    x += g.L + (i<geo.n-1 ? g.ec : g.ep);
+  }
+  if (opts.cotes!==false){
+    o += '<text class="t-m" x="'+X(geo.B/2)+'" y="'+(Y(geo.Hext+haut)-6)+'" text-anchor="middle" font-size="'+fs*0.85+'">remblai '+nf(g.Hr,2)+' m + chaussée '+nf(g.ech*100,0)+' cm</text>';
+    o += '<text class="t-m" x="'+X(geo.B/2)+'" y="'+(Y(0)+fs*1.5)+'" text-anchor="middle" font-size="'+fs*0.85+'">largeur hors tout '+nf(geo.B,2)+' m — e = '+nf(g.es*100,0)+' / '+nf(g.er*100,0)+' / '+nf(g.ep*100,0)+' cm</text>';
+  }
+  if (opts.aciers && R && R.ok){
+    var c = P.mat.enrobage + 0.01, n = 0;
+    var trait = function(xa,ya,xb,yb,cl){ o += '<line class="'+cl+'" x1="'+X(xa)+'" y1="'+Y(ya)+'" x2="'+X(xb)+'" y2="'+Y(yb)+'"/>'; };
+    var rep = function(xr,yr,t){ o += '<circle class="s-rep" cx="'+X(xr)+'" cy="'+Y(yr)+'" r="'+fs*0.75+'"/><text x="'+X(xr)+'" y="'+(Y(yr)+fs*0.33)+'" text-anchor="middle" font-size="'+fs*0.9+'" font-weight="700">'+t+'</text>'; };
+    var B = geo.B, He = geo.Hext, xm = g.ep + g.L/2;
+    R.ferraillage.forEach(function(f){
+      n++;
+      if (f.id==='ds_inf'){ trait(c,He-g.es+c,B-c,He-g.es+c,'s-acier'); rep(xm,He-g.es+c,n); }
+      if (f.id==='ds_sup'){ trait(c,He-c,B-c,He-c,'s-acier2'); rep(xm+g.L*0.25,He-c,n); }
+      if (f.id==='rd_sup'){ trait(c,g.er-c,B-c,g.er-c,'s-acier'); rep(xm,g.er-c,n); }
+      if (f.id==='rd_inf'){ trait(c,c,B-c,c,'s-acier2'); rep(xm+g.L*0.25,c,n); }
+      if (f.id==='pd_int'){ trait(g.ep-c,c,g.ep-c,He-c,'s-acier'); trait(B-g.ep+c,c,B-g.ep+c,He-c,'s-acier'); rep(g.ep-c,g.er+g.H*0.6,n); }
+      if (f.id==='pd_ext'){ trait(c,c,c,He-c,'s-acier2'); trait(B-c,c,B-c,He-c,'s-acier2'); rep(c,g.er+g.H*0.35,n); }
+      if (f.id==='cl'){ var xc = g.ep+g.L; for (var j=1;j<geo.n;j++){ trait(xc+c,c,xc+c,He-c,'s-acier'); trait(xc+g.ec-c,c,xc+g.ec-c,He-c,'s-acier'); if (j===1) rep(xc+g.ec-c,g.er+g.H*0.5,n); xc += g.ec+g.L; } }
+    });
+  }
+  return o + '</svg>';
+}
+
+function valeursMembre(m, tab){ var v = [tab[2*m.elems[0]]]; m.elems.forEach(function(ie){ v.push(tab[2*ie+1]); }); return v; }
+function svgEfforts(code){
+  var q = code.split('_'), k = q[0], env = R.env[q[1]][k], mod = R.mod, geo = R.geo, g = P.geo, S = 100;
+  var marge = Math.max(1.0, 0.45*Math.min(g.L, g.H) + 0.5);
+  var W = geo.W + 2*marge, Ht = geo.Hc + 2*marge;
+  var X = function(x){ return (x+marge)*S; }, Y = function(y){ return (geo.Hc+marge-y)*S; };
+  var amp = 0; for (var i=0;i<env.max.length;i++) amp = Math.max(amp, Math.abs(env.max[i]), Math.abs(env.min[i]));
+  var ech = amp>0 ? 0.42*Math.min(g.L, g.H)/amp : 0, fs = Math.max(11, W*S/52);
+  var o = '<svg viewBox="0 0 '+(W*S).toFixed(0)+' '+(Ht*S).toFixed(0)+'" role="img" aria-label="Diagramme enveloppe">';
+  var etiquettes = '';
+  mod.membres.forEach(function(m){
+    var a = mod.noeuds[m.noeuds[0]], b = mod.noeuds[m.noeuds[m.noeuds.length-1]];
+    var c = (b.x-a.x)/m.long, s = (b.y-a.y)/m.long;
+    ['max','min'].forEach(function(sens){
+      var v = valeursMembre(m, env[sens]), pts = [];
+      m.noeuds.forEach(function(nd){ pts.push(X(mod.noeuds[nd].x).toFixed(1)+','+Y(mod.noeuds[nd].y).toFixed(1)); });
+      for (var j=m.noeuds.length-1;j>=0;j--){ var nq = mod.noeuds[m.noeuds[j]]; pts.push(X(nq.x+v[j]*ech*s).toFixed(1)+','+Y(nq.y-v[j]*ech*c).toFixed(1)); }
+      o += '<polygon class="s-'+sens+'" points="'+pts.join(' ')+'"/>';
+      var premier = (m.type==='dalle'&&m.idx===0)||(m.type==='radier'&&m.idx===0)||(m.type==='pied'&&m.idx===0)||(m.type==='cloison'&&m.idx===1);
+      if (premier){
+        var ix = 0; v.forEach(function(x,j){ if (sens==='max' ? x>v[ix] : x<v[ix]) ix = j; });
+        if (Math.abs(v[ix]) > 0.04*amp){
+          var nd = mod.noeuds[m.noeuds[ix]], dec = v[ix]*ech + (v[ix]>0?0.14:-0.14);
+          etiquettes += '<text x="'+X(nd.x+dec*s).toFixed(1)+'" y="'+(Y(nd.y-dec*c)+fs/3).toFixed(1)+'" text-anchor="middle" font-size="'+fs+'" font-weight="600">'+nf(v[ix],1)+'</text>';
+        }
+      }
+    });
+    o += '<line class="s-axe" x1="'+X(a.x)+'" y1="'+Y(a.y)+'" x2="'+X(b.x)+'" y2="'+Y(b.y)+'"/>';
+  });
+  return o + etiquettes + '</svg>';
+}
+function svgSol(){
+  var mod = R.mod, geo = R.geo, S = 100, e = R.env.els.sol, amp = Math.max.apply(null, e.max), Hd = 1.2, marge = 0.6;
+  var W = geo.W + 2*marge, X = function(x){ return (x+marge)*S; }, fs = Math.max(11, W*S/52);
+  var pts = [X(0)+',20'], ptsMin = [X(0)+',20'];
+  mod.noeudsRadier.forEach(function(nd,i){ var x = X(mod.noeuds[nd].x); pts.push(x.toFixed(1)+','+(20+e.max[i]/amp*Hd*S*0.75).toFixed(1)); ptsMin.push(x.toFixed(1)+','+(20+Math.max(0,e.min[i])/amp*Hd*S*0.75).toFixed(1)); });
+  pts.push(X(geo.W)+',20'); ptsMin.push(X(geo.W)+',20');
+  return '<svg viewBox="0 0 '+(W*S).toFixed(0)+' '+(Hd*S+30).toFixed(0)+'" role="img" aria-label="Pression sur le sol"><polygon class="s-max" points="'+pts.join(' ')+'"/><polygon class="s-min" points="'+ptsMin.join(' ')+'"/><line class="s-axe" x1="'+X(0)+'" y1="20" x2="'+X(geo.W)+'" y2="20"/>'+
+    '<text x="'+X(geo.W/2)+'" y="'+(Hd*S+22)+'" text-anchor="middle" font-size="'+fs+'">max '+nf(R.sol.max,0)+' kPa — min '+nf(R.sol.min,0)+' kPa (ELS)</text></svg>';
+}
+
+/* ---------- contenus des étapes ---------- */
+var NOMS = {dalle:'Dalle supérieure',radier:'Radier',pied:'Piédroits',cloison:'Cloisons'};
+var GRANDEURS = [['M_elu','Moment fléchissant ELU (kN.m/m)'],['M_els','Moment fléchissant ELS (kN.m/m)'],['V_elu','Effort tranchant ELU (kN/m)'],['N_elu','Effort normal ELU (kN/m)'],['M_perm','Moment sous charges permanentes (kN.m/m)']];
+function reserve(){ return '<div class="reserve">Niveau de vérification : contrôle manuel effectué sur les cas documentés ; comparaison à un logiciel indépendant non encore réalisée. Les résultats doivent être visés par un ingénieur avant exécution. <a href="#verification" data-etape="verification">Méthode de vérification</a></div>'; }
+function tabHydro(){
+  var hy = R.hydro, reg = isFinite(hy.froude) ? (hy.froude<1?'fluvial':'torrentiel') : '—';
+  return tableau(['Grandeur','#Valeur','Unité'],[
+    ['Tirant d\'eau normal pour le débit de projet',nf(hy.y,2),'m'],['Taux de remplissage',nf(hy.taux*100,0),'%'],
+    ['Vitesse d\'écoulement',nf(hy.V,2),'m/s'],['Nombre de Froude (régime '+reg+')',nf(hy.froude,2),'—'],
+    ['Hauteur critique',nf(hy.yc,2),'m'],['Revanche sous dalle',nf(hy.revanche,2),'m'],
+    ['Capacité au taux de remplissage maximal',nf(hy.Qmax,2),'m³/s'],['Capacité à pleine section, surface libre',nf(hy.Qplein,2),'m³/s']]);
+}
+function tabConvois(){
+  return tableau(['Charge','#Coefficient','#δ','#Empreinte diffusée (m)','#Charge sur la bande','Observation'], R.convois.map(function(c){
+    return [esc(c.nom), nf(c.coef,2), nf(c.delta,3), c.a ? nf(c.a,2)+' × '+nf(c.b,2) : '—', c.q!=null ? nf(c.q,1)+' kPa' : nf(c.lin,1)+' kN/m par ligne', esc(c.note||'')]; }));
+}
+function tabEfforts(){
+  var l = [];
+  R.ferraillage.forEach(function(f){ l.push([esc(f.nom), nf(f.Melu,1), nf(f.Mels,1)]); });
+  return tableau(['Section','#M ELU (kN.m/m)','#M ELS (kN.m/m)'], l) +
+    tableau(['Élément','#V ELU max (kN/m)','#N ELU min (kN/m)','#N ELU max (kN/m)'], R.tranchant.map(function(t){ return [NOMS[t.membre], nf(t.Vu,1), nf(t.Nmin,1), nf(t.Nmax,1)]; }));
+}
+function tabFerraillage(){
+  var ec = P.norme==='EC2';
+  return tableau(['N°','Nappe','#As ELU','#As ELS','#As min','#As requis','Gouverne','Armatures principales','#As mis','Répartition'].concat(ec?['#wk (mm)']:[]).concat(['État']),
+    R.ferraillage.map(function(f,i){
+      return [i+1, esc(f.nom), cm2(f.AsElu), cm2(f.AsEls), cm2(f.AsMin), cm2(f.AsReq), f.gouverne, '<b>'+M.texteBarres(f.barres)+'</b>', cm2(f.AsP), M.texteBarres(f.rep)]
+        .concat(ec?[nf(f.wk,2)]:[]).concat([etat(f.ok)]); }));
+}
+function tabContraintes(){
+  return tableau(['Nappe','#d (cm)','#µ ELU','#σ béton (MPa)','#limite','#σ acier (MPa)','#limite'], R.ferraillage.map(function(f){
+    return [esc(f.nom), nf(f.d*100,1), nf(f.elu.mu,3), nf(f.sc,1), nf(R.mat.sigmaC,1), nf(f.ss,0), nf(R.mat.sigmaS,0)]; }));
+}
+function tabTranchant(){
+  return tableau(['Élément','#Vu (kN/m)','#τu (MPa)','#Limite (MPa)','#Résistance (kN/m)','État'], R.tranchant.map(function(t){
+    return [NOMS[t.membre], nf(t.Vu,1), nf(t.tau,2), nf(t.limite,2), nf(t.VRd,1), etat(t.ok)]; }));
+}
+function tabMetre(){
+  var m = R.metre;
+  return tableau(['Poste','#Quantité','Unité','Base de calcul'],[
+    ['Fouille en déblai',nf(m.fouille,1),'m³','Largeur hors tout + 2 × 0,50 m de surlargeur'],
+    ['Béton de propreté dosé à 150 kg/m³',nf(m.proprete,2),'m³','Épaisseur 10 cm, débord 10 cm de chaque côté'],
+    ['Béton armé du cadre',nf(m.beton,2),'m³','Section '+nf(m.aire,3)+' m² × longueur '+nf(P.geo.longueur,2)+' m, goussets compris'],
+    ['Coffrage',nf(m.coffrage,1),'m²','Faces extérieures des piédroits, parois et sous-face des cellules'],
+    ['Aciers HA',nf(m.acier,0),'kg','Nappes principales et de répartition, majoration '+nf(P.metre.majorationAcier,0)+' % (recouvrements, ancrages, chutes)'],
+    ['Ratio d\'acier',nf(m.ratio,0),'kg/m³','Contrôle d\'ordre de grandeur']]) +
+    '<p class="pied">Les têtes d\'ouvrage (murs en aile, parafouilles, guide-roues) ne sont ni calculées ni métrées.</p>';
+}
+function prelim(){ return R && R.ok ? '' : '<div class="alerte">'+(R ? R.erreurs.map(esc).join('<br>') : 'Calcul impossible.')+'</div>'; }
+
+var VUES = {
+  projet:function(){ return bloc('Identification du projet', formulaire('projet'), 'Ces informations figurent dans le cartouche de la note de calcul.') +
+    bloc('Déroulement', '<div class="prose"><ol><li><b>Hydraulique</b> : vérifier que l\'ouverture choisie évacue le débit de projet.</li><li><b>Normes et matériaux</b>, <b>Géométrie</b>, <b>Sol et remblai</b>, <b>Charges</b> : décrire l\'ouvrage.</li><li><b>Combinaisons</b> : contrôler les coefficients de pondération.</li><li><b>Efforts</b>, <b>Ferraillage</b>, <b>Métré</b> : lire les résultats, recalculés à chaque modification.</li><li><b>Note de calcul</b> : imprimer ou exporter vers Word.</li></ol></div>'); },
+  hydro:function(){ return bloc('Écoulement dans l\'ouvrage', formulaire('hydro'), 'Formule de Manning-Strickler en régime uniforme à surface libre, par cellule. La section saisie à l\'étape Géométrie est utilisée.') +
+    '<div id="res"></div>' + bloc('Estimation rapide du débit (méthode rationnelle)', formulaire('rationnel')+'<div id="res2"></div>', 'Valable pour les petits bassins versants, de l\'ordre de quelques km². Au-delà, employer les méthodes ORSTOM ou CIEH de l\'étude hydrologique.'); },
+  normes:function(){ return bloc('Règlement et matériaux', formulaire('normes')) + '<div id="res"></div>'; },
+  geo:function(){ return bloc('Section transversale', '<div class="puces">'+[[1,1,1,20],[1,1.5,1.5,20],[1,2,2,25],[2,2,1.5,25],[2,2,2,25],[3,3,2,30],[3,3,3,35]].map(function(q){ return '<button data-gabarit="'+q.join(',')+'">'+q[0]+' × '+nf(q[1],2)+' × '+nf(q[2],2)+'</button>'; }).join('')+'</div>'+formulaire('geo'), 'Gabarits courants (cellules × ouverture × hauteur, en mètres). Les épaisseurs proposées sont un point de départ que le calcul confirme ou non.') + '<div id="res"></div>'; },
+  sol:function(){ return bloc('Sol de fondation et remblai', formulaire('sol'), 'Le radier repose sur des appuis élastiques (modèle de Winkler). Les piédroits reçoivent la poussée du remblai.') + '<div id="res"></div>'; },
+  charges:function(){ return bloc('Charges d\'exploitation', formulaire('charges'), 'Le Fascicule 61 titre II reste la référence des marchés routiers ivoiriens. Le modèle LM1 de l\'Eurocode 1 est proposé pour les projets financés aux Eurocodes.') + '<div id="res"></div>'; },
+  coef:function(){ return bloc('Coefficients de pondération', '<div><button id="bCoef">Rétablir les valeurs du règlement</button></div>'+formulaire('coef'), 'Chaque action variable est tantôt présente, tantôt absente. Les actions permanentes prennent leur valeur défavorable ou favorable. L\'enveloppe couvre toutes ces combinaisons.') + '<div id="res"></div>'; },
+  efforts:function(){ return '<div id="res"></div>'; },
+  ferraillage:function(){ return '<div id="res"></div>'; },
+  metre:function(){ return bloc('Majoration', '<div class="grille">'+champ({k:'metre.majorationAcier',l:'Majoration des aciers',u:'%',p:1})+'</div>') + '<div id="res"></div>'; },
+  note:function(){ return '<div id="res"></div>'; },
+  tutoriel:function(){ return document.getElementById('tplTutoriel').innerHTML; },
+  comprendre:function(){ return document.getElementById('tplComprendre').innerHTML; },
+  verification:function(){ return document.getElementById('tplVerification').innerHTML; }
+};
+var RESULTATS = {
+  hydro:function(){ var hy = R.hydro; return bloc('Vérification hydraulique '+etat(hy.ok,'Satisfaisante','À revoir'), alertes(hy.alertes)+tabHydro()+svgCoupe({eau:true})+'<p class="pied">Contrôle amont ou aval, remous et affouillement en sortie non étudiés.</p>'); },
+  normes:function(){ var m = R.mat, b = P.norme==='BAEL';
+    return bloc('Valeurs de calcul', tableau(['Grandeur','#Valeur','Unité'],[
+      [b?'Contrainte de calcul du béton fbu = 0,85 fc28 / 1,5':'Résistance de calcul fcd = fck / 1,5',nf(m.fcu,2),'MPa'],
+      [b?'Résistance à la traction ft28 = 0,6 + 0,06 fc28':'Résistance moyenne à la traction fctm',nf(m.ft,2),'MPa'],
+      ['Contrainte de calcul de l\'acier fe / 1,15',nf(m.fsu,0),'MPa'],
+      ['Contrainte limite du béton en service',nf(m.sigmaC,1),'MPa'],['Contrainte limite de l\'acier en service',nf(m.sigmaS,0),'MPa'],
+      ['Module d\'élasticité du béton',nf(m.E,0),'MPa']])+
+      '<div class="info">Climat chaud : limiter la température du béton frais selon le CCTP, bétonner aux heures fraîches, arroser les coffrages et assurer une cure humide d\'au moins 7 jours.</div>'); },
+  geo:function(){ var g = R.geo; return bloc('Coupe transversale', svgCoupe()+'<p class="pied">Largeur hors tout '+nf(g.B,2)+' m, hauteur hors tout '+nf(g.Hext,2)+' m, portée entre axes des piédroits '+nf(g.W,2)+' m.</p>'); },
+  sol:function(){ return bloc('Poussée et réaction du sol', tableau(['Grandeur','#Valeur','Unité'],[
+      ['Coefficient de poussée retenu K',nf(R.K,3),'—'],['Charge de remblai et chaussée sur la dalle',nf(R.qRem,1),'kPa'],
+      ['Pression moyenne sous charges permanentes',nf(R.sol.moyennePerm,0),'kPa'],['Pression maximale à l\'ELS',nf(R.sol.max,0),'kPa'],
+      ['Pression minimale à l\'ELS',nf(R.sol.min,0),'kPa'],['Contrainte admissible',nf(R.sol.adm,0),'kPa']])+svgSol()+
+      '<p>'+etat(R.sol.ok,'Sol vérifié','Sol non vérifié')+'</p><div class="info">Sols latéritiques : leur portance chute fortement lorsqu\'ils sont saturés en saison des pluies. Purger les sols de bas-fond compressibles et asseoir le radier sur une couche de forme compactée.</div>'); },
+  charges:function(){ return bloc('Charges ramenées à la bande de 1 m', tabConvois()+'<p class="pied">'+R.nbCas+' positions de charge calculées. Chaque convoi parcourt l\'ouvrage dans les deux sens.</p>'); },
+  coef:function(){ return bloc('Rappel', '<div class="prose"><p>ELU : '+nf(P.coef.Gsup,2)+' G ou '+nf(P.coef.Ginf,2)+' G + '+nf(P.coef.eluRoute,2)+' Q routière + '+nf(P.coef.eluLat,2)+' Q remblai'+(P.charges.eau?' + '+nf(P.coef.eluEau,2)+' Q eau':'')+'.</p><p>ELS : G + '+nf(P.coef.elsRoute,2)+' Q routière + '+nf(P.coef.elsLat,2)+' Q remblai'+(P.charges.eau?' + '+nf(P.coef.elsEau,2)+' Q eau':'')+'.</p></div>'); },
+  efforts:function(){ return bloc('Diagrammes enveloppes', '<div class="champ" style="max-width:360px"><label for="selG">Grandeur affichée</label><select id="selG">'+GRANDEURS.map(function(q){ return '<option value="'+q[0]+'"'+(q[0]===grandeur?' selected':'')+'>'+q[1]+'</option>'; }).join('')+'</select></div>'+svgEfforts(grandeur)+
+      '<div class="legende"><span><i style="background:var(--accent)"></i>Enveloppe maximale</span><span><i style="background:var(--navy)"></i>Enveloppe minimale</span><span>Moment positif : face intérieure du cadre tendue, tracé du côté tendu.</span></div>') +
+    bloc('Valeurs extrêmes', tabEfforts()) + bloc('Pression sur le sol', svgSol()) + reserve(); },
+  ferraillage:function(){ return alertes(R.alertes) + bloc('Armatures par mètre de longueur d\'ouvrage', tabFerraillage()+'<p class="pied">Sections en cm² par mètre. Calcul en flexion simple : l\'effort normal de compression, favorable, est négligé.</p>') +
+    bloc('Schéma de ferraillage', svgCoupe({aciers:true,cotes:false})+'<div class="legende"><span><i style="background:var(--accent)"></i>Faces intérieures</span><span><i style="background:var(--navy)"></i>Faces extérieures</span><span>Les numéros renvoient au tableau.</span></div>') +
+    bloc('Contraintes en service', tabContraintes()) + bloc('Effort tranchant', tabTranchant()) +
+    bloc('Dispositions constructives', document.getElementById('tplDispositions').innerHTML) + reserve(); },
+  metre:function(){ return bloc('Avant-métré', tabMetre()); },
+  note:function(){ return '<div class="ecran info">La note reprend les données et les résultats en cours. « Imprimer / PDF » produit le document complet avec les figures. « Note Word » télécharge un fichier .doc avec en-tête, sans les figures.</div>' + noteHTML(true); }
+};
+
+/* ---------- note de calcul ---------- */
+function noteHTML(figures){
+  var pr = P.projet, g = P.geo, s = P.sol, c = P.coef, b = P.norme==='BAEL';
+  var o = '<article class="note" id="note">';
+  o += '<div class="cartouche"><div><div class="t">NOTE DE CALCUL — '+esc(pr.nom)+'</div><div>'+esc([pr.route,pr.pk,pr.lieu].filter(Boolean).join(' — '))+'</div><div>Maître d\'ouvrage : '+esc(pr.maitre)+'</div></div><div style="text-align:right"><div><b>'+esc(pr.auteur)+'</b></div><div>Technicien génie civil BTP — Abidjan</div><div>'+esc(pr.date)+'</div></div></div>';
+  o += '<h2>1. Objet et références</h2><div class="prose"><p>Justification d\'un dalot cadre fermé en béton armé de '+R.geo.n+' cellule(s) de '+nf(g.L,2)+' × '+nf(g.H,2)+' m, long de '+nf(g.longueur,2)+' m, sous '+nf(g.Hr,2)+' m de remblai.</p><ul>'+
+    '<li>Béton armé : '+(b?'BAEL 91 révisé 99, états limites ultime et de service':'NF EN 1992-1-1 (Eurocode 2), valeurs recommandées')+'.</li>'+
+    '<li>Charges routières : '+(estF61()?'Fascicule 61 titre II du CPC, pont de '+P.charges.classe+(P.charges.classe===1?'re':'e')+' classe':'NF EN 1991-2, modèle de charge LM1')+'.</li>'+
+    '<li>Hydraulique : formule de Manning-Strickler.</li></ul></div>';
+  o += '<h2>2. Hypothèses</h2>'+tableau(['Donnée','#Valeur','Unité'],[
+    [b?'Béton fc28':'Béton fck',nf(P.mat.fc,0),'MPa'],['Acier fe',nf(P.mat.fe,0),'MPa'],['Enrobage',nf(P.mat.enrobage*100,1),'cm'],
+    [b?'Fissuration':'Ouverture de fissure admissible', b?{peu:'peu préjudiciable',prejudiciable:'préjudiciable',tres:'très préjudiciable'}[P.mat.fissuration]:nf(P.mat.wmax,2), b?'':'mm'],
+    ['Épaisseurs dalle / radier / piédroits'+(R.geo.n>1?' / cloisons':''),[g.es,g.er,g.ep].concat(R.geo.n>1?[g.ec]:[]).map(function(v){return nf(v*100,0);}).join(' / '),'cm'],
+    ['Remblai : hauteur, poids volumique, angle de frottement',nf(g.Hr,2)+' ; '+nf(s.gammaR,1)+' ; '+nf(s.phi,0),'m ; kN/m³ ; °'],
+    ['Coefficient de poussée K',nf(R.K,3),'—'],['Module de réaction du sol',nf(s.ks,0),'kN/m³'],['Contrainte admissible du sol',nf(s.sigmaAdm,0),'kPa'],
+    ['Surcharge routière sur remblai',nf(s.qRemblai,1),'kPa']]);
+  if (figures) o += svgCoupe();
+  o += '<h2>3. Vérification hydraulique</h2><p>Débit de projet '+nf(P.hydro.Q,2)+' m³/s, pente '+nf(P.hydro.pente,2)+' %, K = '+nf(P.hydro.K,0)+'. '+etat(R.hydro.ok,'Satisfaisante','À revoir')+'</p>'+alertes(R.hydro.alertes)+tabHydro();
+  o += '<h2>4. Modélisation</h2><div class="prose"><p>Bande de 1 m de longueur d\'ouvrage. Portique plan fermé tracé aux axes des parois, résolu par la méthode des déplacements. Le radier repose sur des ressorts verticaux de raideur k × largeur d\'influence. Module du béton '+nf(R.mat.E,0)+' MPa.</p><p>Charges permanentes : poids propre (25 kN/m³), remblai et chaussée ('+nf(R.qRem,1)+' kPa), poussée des terres sur les piédroits. Charges variables : charges routières diffusées jusqu\'au feuillet moyen de la dalle, surcharge sur remblai d\'un seul côté ou des deux'+(P.charges.eau?', eau intérieure sur '+nf(P.charges.hEau,2)+' m':'')+'.</p></div>';
+  o += '<h2>5. Charges routières</h2>'+tabConvois();
+  o += '<h2>6. Combinaisons</h2>'+tableau(['Action','#ELU','#ELS'],[
+    ['Permanentes (défavorable / favorable)',nf(c.Gsup,2)+' / '+nf(c.Ginf,2),'1,00'],['Charges routières civiles',nf(c.eluRoute,2),nf(c.elsRoute,2)],
+    ['Convoi militaire',nf(c.eluMc,2),nf(c.elsMc,2)],['Surcharge sur remblai',nf(c.eluLat,2),nf(c.elsLat,2)]].concat(P.charges.eau?[['Eau intérieure',nf(c.eluEau,2),nf(c.elsEau,2)]]:[]));
+  o += '<h2>7. Sollicitations enveloppes</h2>'+(figures?svgEfforts('M_elu')+'<p class="pied">Moments fléchissants à l\'ELU (kN.m/m), tracés du côté de la fibre tendue.</p>':'')+tabEfforts();
+  o += '<h2>8. Ferraillage</h2>'+tabFerraillage()+(figures?svgCoupe({aciers:true,cotes:false}):'')+tabContraintes();
+  o += '<h2>9. Effort tranchant</h2>'+tabTranchant();
+  o += '<h2>10. Sol de fondation</h2><p>Pression maximale à l\'ELS '+nf(R.sol.max,0)+' kPa pour une contrainte admissible de '+nf(R.sol.adm,0)+' kPa ; pression minimale '+nf(R.sol.min,0)+' kPa. '+etat(R.sol.ok)+'</p>';
+  o += '<h2>11. Avant-métré</h2>'+tabMetre();
+  o += '<h2>12. Dispositions constructives et exécution</h2>'+document.getElementById('tplDispositions').innerHTML;
+  o += '<h2>13. Conclusion</h2>'+(R.conforme?'<p>'+etat(true,'Ouvrage justifié')+' Toutes les vérifications du périmètre calculé sont satisfaites.</p>':'<p>'+etat(false,'','Ouvrage non justifié')+'</p>'+alertes(R.alertes));
+  o += '<p class="pied">Dalot Pro CI, moteur version '+M.VERSION+'. Niveau de vérification : contrôle manuel et références analytiques sur les cas documentés ; comparaison à un logiciel indépendant non réalisée. Hors périmètre : murs en aile, biais, nappe phréatique et flottabilité, tassements, séisme, phases de chantier. Cette note doit être vérifiée et visée par un ingénieur structure avant exécution.</p>';
+  return o + '</article>';
+}
+
+/* ---------- rendu ---------- */
+function recalculer(){ try { R = M.calculer(P); } catch(e){ R = {ok:false, erreurs:[e.message]}; } try { localStorage.setItem(CLE, JSON.stringify(P)); } catch(e){} }
+function rendreNav(){
+  var n = 0;
+  document.getElementById('nav').innerHTML = ETAPES.map(function(gp){
+    return '<div class="groupe">'+gp[0]+'</div>'+gp[1].map(function(e){ n++; return '<button data-etape="'+e[0]+'"'+(e[0]===etape?' aria-current="true"':'')+'><span class="n">'+(gp[0]==='Aide'?'?':n)+'</span>'+e[1]+'</button>'; }).join('');
+  }).join('');
+}
+function rendreAside(){
+  var o = '';
+  if (!R || !R.ok) o = '<section class="bloc verdict"><h3>Données à corriger</h3>'+prelim()+'</section>';
+  else {
+    o += '<section class="bloc verdict"><h3>Verdict</h3><div>'+(R.conforme?'<span class="etat ok">Ouvrage justifié</span>':'<span class="etat ko">'+R.alertes.length+' point(s) à corriger</span>')+' <span class="etat '+(R.hydro.ok?'ok':'av')+'">Hydraulique '+(R.hydro.ok?'satisfaisante':'à revoir')+'</span></div>'+
+      (R.alertes.length?'<ul>'+R.alertes.map(function(a){ return '<li>'+esc(a)+'</li>'; }).join('')+'</ul>':'')+
+      '<div class="chiffres"><div class="chiffre"><b>'+nf(Math.max.apply(null,R.ferraillage.map(function(f){return f.Melu;})),1)+'</b><span>M ELU max, kN.m/m</span></div><div class="chiffre"><b>'+nf(R.sol.max,0)+' / '+nf(R.sol.adm,0)+'</b><span>sol, kPa</span></div><div class="chiffre"><b>'+nf(R.metre.beton,1)+'</b><span>béton, m³</span></div><div class="chiffre"><b>'+nf(R.metre.ratio,0)+'</b><span>acier, kg/m³</span></div></div></section>';
+    o += '<section class="bloc"><h3>Coupe</h3>'+svgCoupe({eau:true,cotes:false})+'<p class="pied">'+R.geo.n+' × '+nf(P.geo.L,2)+' × '+nf(P.geo.H,2)+' m, remblai '+nf(P.geo.Hr,2)+' m. Niveau d\'eau pour le débit de projet.</p></section>';
+  }
+  o += reserve();
+  document.getElementById('aside').innerHTML = o;
+  document.getElementById('nomProjet').textContent = P.projet.nom;
+}
+function rendreResultats(){
+  var z = document.getElementById('res');
+  if (z) z.innerHTML = (R && R.ok) ? (RESULTATS[etape] ? '<div style="display:grid;gap:16px">'+RESULTATS[etape]()+'</div>' : '') : prelim();
+  var z2 = document.getElementById('res2');
+  if (z2 && R && R.ok) z2.innerHTML = '<p>Q = C × I × A / 3,6 = <b>'+nf(R.hydro.Qrationnel,2)+' m³/s</b> <button id="bQ">Reprendre ce débit</button></p>';
+}
+function rendreEtape(){
+  if (!VUES[etape]) etape = 'projet';
+  document.getElementById('main').innerHTML = VUES[etape]();
+  rendreNav(); rendreResultats(); rendreAside();
+}
+function aller(e){ etape = e; try { history.replaceState(null,'','#'+e); } catch(x){} rendreEtape(); window.scrollTo(0,0); }
+
+/* ---------- événements ---------- */
+var minuterie = null;
+function modifie(el){
+  var k = el.getAttribute('data-k'); if (!k) return;
+  var f = INDEX[k] || {};
+  var v;
+  if (el.type === 'checkbox') v = el.checked;
+  else if (el.tagName === 'SELECT') v = f.num ? Number(el.value) : el.value;
+  else if (el.type === 'text') v = el.value;
+  else { v = parseFloat(String(el.value).replace(',','.')); if (!isFinite(v)) return; v = v/(f.m||1); if (f.entier) v = Math.round(v); if (f.min!=null) v = Math.max(f.min, v); if (f.max!=null) v = Math.min(f.max, v); }
+  ecrire(k, v);
+  var complet = el.type === 'checkbox' || el.tagName === 'SELECT' || k === 'geo.n';
+  if (f.hook === 'norme') P.coef = M.coefficientsDefaut(P.norme);
+  if (f.hook === 'env') { var e = ENV[v]; P.mat.enrobage = e.enrobage; P.mat.fissuration = e.fissuration; P.mat.wmax = e.wmax; }
+  if (f.hook === 'sol' && SOLS[v]) { P.sol.ks = SOLS[v].ks; P.sol.sigmaAdm = SOLS[v].sigmaAdm; }
+  if (k === 'sol.ks' || k === 'sol.sigmaAdm') P.sol.type = 'libre';
+  clearTimeout(minuterie);
+  if (complet && el.type !== 'number') { recalculer(); rendreEtape(); }
+  else minuterie = setTimeout(function(){ recalculer(); rendreResultats(); rendreAside(); }, 180);
+}
+document.addEventListener('input', function(ev){ var el = ev.target; if (el.matches('input[type=number],input[type=text]')) modifie(el); });
+document.addEventListener('change', function(ev){
+  var el = ev.target;
+  if (el.id === 'selG') { grandeur = el.value; rendreResultats(); return; }
+  if (el.id === 'fichier') { ouvrir(el); return; }
+  if (el.matches('select,input[type=checkbox]')) modifie(el);
+  else if (el.matches('input[type=number]') && el.getAttribute('data-k') === 'geo.n') { recalculer(); rendreEtape(); }
+});
+document.addEventListener('click', function(ev){
+  var el = ev.target.closest('[data-etape],[data-gabarit],button'); if (!el) return;
+  if (el.hasAttribute('data-etape')) { ev.preventDefault(); aller(el.getAttribute('data-etape')); return; }
+  if (el.hasAttribute('data-gabarit')) { var q = el.getAttribute('data-gabarit').split(',').map(Number); P.geo.n = q[0]; P.geo.L = q[1]; P.geo.H = q[2]; P.geo.es = P.geo.er = P.geo.ep = P.geo.ec = q[3]/100; P.charges.hEau = q[2]; recalculer(); rendreEtape(); return; }
+  if (el.id === 'bCoef') { P.coef = M.coefficientsDefaut(P.norme); recalculer(); rendreEtape(); }
+  if (el.id === 'bQ') { P.hydro.Q = Math.round(R.hydro.Qrationnel*100)/100; recalculer(); rendreEtape(); }
+  if (el.id === 'bNouveau') { if (el.getAttribute('data-sur')) { P = nouveau(); el.removeAttribute('data-sur'); el.textContent = 'Nouveau'; recalculer(); aller('projet'); } else { el.setAttribute('data-sur','1'); el.textContent = 'Confirmer : effacer la saisie'; setTimeout(function(){ el.removeAttribute('data-sur'); el.textContent = 'Nouveau'; }, 4000); } }
+  if (el.id === 'bOuvrir') document.getElementById('fichier').click();
+  if (el.id === 'bEnregistrer') telecharger(JSON.stringify({logiciel:'Dalot Pro CI',version:M.VERSION,parametres:P},null,2), nomFichier()+'.json', 'application/json');
+  if (el.id === 'bImprimer') { if (R && R.ok) { aller('note'); setTimeout(function(){ window.print(); }, 150); } }
+  if (el.id === 'bWord') exporterWord();
+});
+function nomFichier(){ return (P.projet.nom || 'dalot').replace(/[^\wÀ-ÿ]+/g,'_').replace(/^_|_$/g,''); }
+function telecharger(texte, nom, type){
+  var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([texte],{type:type})); a.download = nom;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
+}
+function ouvrir(input){
+  var f = input.files && input.files[0]; if (!f) return;
+  var lecteur = new FileReader();
+  lecteur.onload = function(){
+    try { var d = JSON.parse(lecteur.result); var p = nouveau(); fusion(p, d.parametres || d); P = p; recalculer(); aller('projet'); }
+    catch(e){ document.getElementById('aside').insertAdjacentHTML('afterbegin','<div class="alerte">Fichier illisible : ce n\'est pas un projet Dalot Pro CI enregistré au format JSON.</div>'); }
+    input.value = '';
+  };
+  lecteur.readAsText(f);
+}
+function exporterWord(){
+  if (!R || !R.ok) return;
+  var pr = P.projet, corps = noteHTML(false);
+  var entete = esc(pr.auteur)+' — Technicien génie civil BTP, Abidjan &nbsp;|&nbsp; '+esc(pr.nom)+' &nbsp;|&nbsp; '+esc(pr.date);
+  var doc = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>'+esc(pr.nom)+'</title>'+
+    '<!--[if gte mso 9]><xml><o:DocumentProperties><o:Author>'+esc(pr.auteur)+'</o:Author></o:DocumentProperties><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->'+
+    '<style>@page Section1{size:21cm 29.7cm;margin:2.2cm 2cm 2cm 2cm;mso-header-margin:1cm;mso-footer-margin:1cm;mso-header:h1;mso-footer:f1}div.Section1{page:Section1}'+
+    'body{font-family:Calibri,Arial,sans-serif;font-size:10.5pt}h2{font-size:13pt;color:#1d3557;border-bottom:1.5pt solid #b4532a}table{border-collapse:collapse;width:100%}th,td{border:.5pt solid #999;padding:3pt 5pt;font-size:9.5pt;text-align:left}th{background:#e3e9f2}td.num,th.num{text-align:right}'+
+    '.cartouche{border:1.5pt solid #000;padding:6pt}.t{font-size:15pt;font-weight:bold}.pied{font-size:8.5pt;color:#555}.alerte{color:#b42318}p.MsoHeader,p.MsoFooter{font-size:8.5pt;color:#444;border-bottom:.5pt solid #999}table#hf{margin:0 0 0 900in;width:1px}</style></head><body><div class="Section1">'+
+    corps+'<table id="hf"><tr><td><div style="mso-element:header" id="h1"><p class="MsoHeader">'+entete+'</p></div></td><td><div style="mso-element:footer" id="f1"><p class="MsoFooter">Dalot Pro CI '+M.VERSION+' — Auteur : '+esc(pr.auteur)+' — Page <span style="mso-field-code:PAGE"></span></p></div></td></tr></table></div></body></html>';
+  telecharger('﻿'+doc, 'Note_de_calcul_'+nomFichier()+'.doc', 'application/msword');
+}
+window.addEventListener('hashchange', function(){ var h = location.hash.slice(1); if (h && h !== etape && VUES[h]) { etape = h; rendreEtape(); } });
+
+document.addEventListener('DOMContentLoaded', function(){ recalculer(); rendreEtape(); });
+})();
+</script>
+
+<template id="tplDispositions"><div class="prose"><ul>
+<li>Recouvrements et ancrages : 40 Ø pour les barres HA Fe E400, 50 Ø pour les HA Fe E500 en l'absence de calcul détaillé (BAEL A.6.1.2). Décaler les recouvrements d'une nappe à l'autre.</li>
+<li>Angles du cadre : assurer la continuité des nappes extérieures par des équerres, et armer les goussets par des barres inclinées ancrées dans les deux parois.</li>
+<li>Reprise de bétonnage : au-dessus du gousset bas des piédroits, surface repiquée et humidifiée ; prévoir une bande d'arrêt d'eau si l'ouvrage reste en eau.</li>
+<li>Joints : ouvrage coulé par plots de 10 à 15 m, joints de dilatation étanches entre plots.</li>
+<li>Béton : dosage minimal 350 kg/m³ de ciment CPJ / CEM II 42,5, granulats lavés, éprouvettes à 7 et 28 jours contrôlées par un laboratoire agréé (LBTP ou équivalent).</li>
+<li>Climat tropical : bétonnage aux heures fraîches, protection contre le soleil et la pluie battante, cure humide d'au moins 7 jours, décoffrage de la dalle après obtention de la résistance prescrite.</li>
+<li>Assise : béton de propreté de 10 cm sur fond de fouille compacté ; purge et substitution des sols de bas-fond compressibles.</li>
+<li>Remblais contigus : graveleux latéritique compacté par couches de 20 cm, montée symétrique des deux côtés, engins lourds interdits à moins de 1 m des piédroits avant mise en place du remblai sur dalle.</li>
+<li>Protection : parafouilles amont et aval, enrochements ou perrés maçonnés en sortie si la vitesse dépasse la limite d'érosion du sol.</li>
+</ul></div></template>
+
+<template id="tplTutoriel">
+<section class="bloc"><h3>Démarrage rapide</h3><div class="prose">
+<p>Le logiciel s'ouvre sur un exemple complet : dalot de 2 cellules de 2,00 × 1,50 m sous 0,60 m de remblai. Chaque modification relance le calcul. Le panneau « Verdict » indique en permanence si l'ouvrage est justifié.</p>
+<ol>
+<li><b>Projet</b> : renseigner le nom de l'ouvrage, la route, le PK. Ces champs alimentent le cartouche.</li>
+<li><b>Hydraulique</b> : saisir le débit de projet et la pente. Si le taux de remplissage dépasse le maximum, augmenter l'ouverture ou le nombre de cellules à l'étape Géométrie.</li>
+<li><b>Normes et matériaux</b> : choisir BAEL ou Eurocode 2, la résistance du béton et l'environnement. L'environnement fixe l'enrobage et la sévérité de fissuration.</li>
+<li><b>Géométrie</b> : partir d'un gabarit, puis ajuster les épaisseurs.</li>
+<li><b>Sol et remblai</b> : reporter les valeurs du rapport géotechnique.</li>
+<li><b>Charges</b> : cocher les systèmes exigés par le CCTP (A, Bc, Bt, Br, Mc120).</li>
+<li><b>Combinaisons</b> : les coefficients du règlement sont proposés et restent modifiables.</li>
+<li><b>Efforts, Ferraillage, Métré</b> : lire les résultats. Un point rouge signale une vérification non satisfaite, avec la correction à apporter.</li>
+<li><b>Note de calcul</b> : imprimer en PDF ou exporter vers Word.</li>
+</ol></div></section>
+<section class="bloc"><h3>Unités</h3><div class="prose"><ul>
+<li>Longueurs en mètres, épaisseurs et enrobage en centimètres, diamètres en millimètres.</li>
+<li>Forces en kN, moments en kN.m par mètre de longueur d'ouvrage, pressions en kPa (100 kPa = 1 bar ≈ 10 t/m²).</li>
+<li>Résistances des matériaux en MPa. Sections d'acier en cm² par mètre.</li>
+</ul></div></section>
+<section class="bloc"><h3>Lire les résultats</h3><div class="prose"><ul>
+<li><b>Moment positif</b> : la face intérieure du cadre est tendue. Il dimensionne les nappes intérieures (sous-face de la dalle, dessus du radier, face côté eau des piédroits).</li>
+<li><b>Moment négatif</b> : la face extérieure est tendue. Il dimensionne les nappes extérieures, surtout aux angles.</li>
+<li><b>Gouverne</b> : indique si la section d'acier vient de l'ELU, de l'ELS ou de la section minimale. En fissuration préjudiciable, l'ELS gouverne presque toujours.</li>
+<li><b>Effort tranchant</b> : si la vérification échoue, augmenter l'épaisseur est la réponse la plus simple pour un dalot.</li>
+</ul></div></section>
+<section class="bloc"><h3>Enregistrer et archiver</h3><div class="prose"><p>« Enregistrer » télécharge le projet au format JSON, à conserver avec le dossier d'exécution. « Ouvrir » le recharge. La saisie en cours est aussi mémorisée dans le navigateur de cet appareil. Le logiciel fonctionne hors connexion.</p></div></section>
+<section class="bloc"><h3>Limites d'utilisation</h3><div class="prose"><ul>
+<li>Dalot droit : l'axe de la route est perpendiculaire à l'ouvrage. Les ouvrages biais ne sont pas traités.</li>
+<li>Murs en aile, murs de tête, parafouilles et guide-roues ne sont pas calculés.</li>
+<li>Nappe phréatique extérieure, flottabilité, tassements et séisme ne sont pas étudiés.</li>
+<li>Phases de chantier (compactage dissymétrique, circulation d'engins sur dalle peu remblayée) non vérifiées.</li>
+<li>Sous faible remblai (moins de 0,50 m environ), la répartition transversale des roues est prise au seul droit de l'empreinte diffusée. Le résultat est alors du côté de la sécurité, parfois nettement.</li>
+<li>Les ouvrages préfabriqués et les buses ne sont pas couverts.</li>
+</ul></div></section>
+</template>
+
+<template id="tplComprendre">
+<section class="bloc"><h3>Principe</h3><div class="prose">
+<p>Un dalot cadre est un tube rectangulaire en béton armé. On en isole une tranche de 1 m et on l'étudie comme un portique fermé : la dalle supérieure porte le remblai et les roues, les piédroits résistent à la poussée des terres, le radier renvoie l'ensemble au sol.</p>
+<p>Le sol n'est pas un appui rigide. Il est représenté par des ressorts (modèle de Winkler) : la pression de contact vaut k fois le tassement. Un sol raide concentre la réaction sous les piédroits, un sol mou la répartit.</p></div></section>
+<section class="bloc"><h3>Charges permanentes</h3><div class="prose">
+<span class="formule">Poids propre       g = 25 × épaisseur                      (kN/m² )
+Remblai            q = γ_remblai × Hr + γ_chaussée × e_ch  (kPa)
+Poussée des terres p(z) = K × σv(z)      avec K0 = 1 − sin φ (formule de Jaky)</span>
+<p>Un cadre fermé ne peut pas se déplacer pour mobiliser la poussée active : la poussée au repos K0 est donc proposée par défaut.</p></div></section>
+<section class="bloc"><h3>Charges routières du Fascicule 61 titre II</h3><div class="prose">
+<span class="formule">A(l) = 2,3 + 360 / (l + 12)   (kN/m², l en m), multiplié par a1 et a2 = v0 / v
+δ    = 1 + 0,4 / (1 + 0,2 L) + 0,6 / (1 + 4 G / S)</span>
+<ul><li>Bc : camions de 300 kN, essieux arrière de 120 kN distants de 1,50 m, roue de 60 kN sur 0,25 × 0,25 m.</li>
+<li>Bt : deux essieux de 160 kN distants de 1,35 m, roue de 80 kN sur 0,60 × 0,25 m.</li>
+<li>Br : roue isolée de 100 kN sur 0,60 × 0,30 m.</li>
+<li>Mc120 : char de 1 100 kN, deux chenilles de 6,10 × 1,00 m.</li></ul>
+<p>Chaque empreinte est élargie en traversant la chaussée (3/4 de son épaisseur de chaque côté), le remblai (angle saisi, 30° usuel) et la demi-épaisseur de la dalle (45°). Les roues voisines dont les zones diffusées se rejoignent sont regroupées, et l'on retient le regroupement qui donne la charge la plus forte par mètre de longueur d'ouvrage. Le convoi est ensuite déplacé pas à pas sur la dalle, dans les deux sens.</p></div></section>
+<section class="bloc"><h3>Combinaisons</h3><div class="prose">
+<span class="formule">BAEL + Fascicule 61   ELU : 1,35 G + 1,6 Q (A, B)   ou 1,35 Mc120
+                      ELS :      G + 1,2 Q (A, B)   ou 1,00 Mc120
+Eurocodes             ELU : 1,35 G + 1,35 Q trafic ;  ELS caractéristique : G + Q</span>
+<p>Les actions permanentes sont aussi prises avec leur valeur favorable (1,0), et chaque action variable est présente ou absente. C'est ce qui produit, par exemple, le moment maximal en travée de dalle avec la poussée des terres minimale.</p></div></section>
+<section class="bloc"><h3>Section d'acier en flexion simple</h3><div class="prose">
+<span class="formule">ELU   µ = Mu / (b d² fbu)       α = 1,25 (1 − √(1 − 2µ))
+      z = d (1 − 0,4 α)        As = Mu / (z fe / 1,15)
+ELS   b x² / 2 = n As (d − x), n = 15     I = b x³ / 3 + n As (d − x)²
+      σbc = M x / I ≤ 0,6 fc28            σs = n M (d − x) / I ≤ σs limite
+BAEL, fissuration préjudiciable : σs limite = min( 2/3 fe ; max( 0,5 fe ; 110 √(1,6 ft28) ) )
+Section minimale BAEL : As ≥ 0,23 b d ft28 / fe</span>
+<p><b>Application numérique à refaire à la main</b> : Mu = 100 kN.m, b = 1 m, d = 0,25 m, fc28 = 25 MPa, Fe E500. fbu = 14,17 MPa ; µ = 0,100 / (0,25² × 14,17) = 0,1129 ; α = 0,1501 ; z = 0,235 m ; As = 0,100 / (0,235 × 434,8) = 9,79 cm². Le logiciel donne la même valeur (test automatique n° 4).</p>
+<p>En Eurocode 2, la démarche est la même avec fcd = fck / 1,5. L'ouverture des fissures est calculée selon le § 7.3.4 sous la combinaison fréquente.</p></div></section>
+<section class="bloc"><h3>Effort tranchant</h3><div class="prose">
+<span class="formule">BAEL A.5.2.2 (dalle sans armature transversale) : τu = Vu / (b d) ≤ 0,07 fc28 / 1,5
+EC2 § 6.2.2 : VRd,c = max( 0,12 k (100 ρ fck)^(1/3) ; 0,035 k^1,5 √fck ) b d,  k = 1 + √(200/d) ≤ 2</span></div></section>
+<section class="bloc"><h3>Hydraulique</h3><div class="prose">
+<span class="formule">Q = K × S × R^(2/3) × √i      S = L × y      R = S / (L + 2 y)</span>
+<p>Exemple : K = 67, L = 2 m, y = 1 m, i = 0,5 %. S = 2 m², R = 0,5 m, Q = 67 × 2 × 0,63 × 0,0707 = 5,97 m³/s.</p></div></section>
+</template>
+
+<template id="tplVerification">
+<section class="bloc"><h3>Niveau de preuve actuel</h3><div class="prose">
+<p><span class="etat av">Contrôle manuel effectué</span> <span class="etat av">Benchmark logiciel non réalisé</span></p>
+<p>Le moteur de calcul est séparé de l'interface et couvert par des tests automatiques. Chaque valeur attendue provient d'une solution analytique ou d'un calcul manuel. Ce niveau correspond au statut interne « contrôlé manuellement » du standard STD-GC-001. Il ne vaut ni validation ni certification.</p></div>
+<div class="tableau"><table><thead><tr><th>Cas vérifié</th><th>Référence</th><th>Écart toléré</th></tr></thead><tbody>
+<tr><td>Poutre bi-encastrée sous charge répartie</td><td>qL²/12 aux appuis, qL²/24 en travée</td><td>0,001 kN.m</td></tr>
+<tr><td>Cadre fermé symétrique chargé haut et bas</td><td>M angle = qL²/12 / (1 + (Is/L)/(Iw/H))</td><td>0,2 %</td></tr>
+<tr><td>Équilibre vertical du dalot</td><td>Somme des réactions du sol = poids total</td><td>0,01 %</td></tr>
+<tr><td>Flexion simple BAEL à l'ELU</td><td>Calcul manuel, Mu = 100 kN.m</td><td>0,01 cm²</td></tr>
+<tr><td>Contraintes en service, section fissurée</td><td>Calcul manuel, M = 60 kN.m, As = 10 cm²</td><td>0,2 MPa</td></tr>
+<tr><td>A(l), majoration dynamique, K0, Strickler</td><td>Formules fermées</td><td>arrondi</td></tr>
+</tbody></table></div></section>
+<section class="bloc"><h3>Réserves</h3><div class="prose"><ul>
+<li>Aucune comparaison avec un logiciel indépendant (CYPE, Robot, SCIA) n'a encore été faite sur un dalot complet. Un dossier de reproduction est décrit dans la fiche de validation du dépôt.</li>
+<li>La répartition transversale des roues, le calcul d'ouverture des fissures EC2 et les charges LM1 sont implantés d'après les textes, sans cas de référence publié recalculé.</li>
+<li>Les coefficients de pondération de l'eau intérieure sont des valeurs par défaut à confirmer par le projeteur.</li>
+<li>Les valeurs de sol proposées dans la liste déroulante sont des ordres de grandeur, sans valeur contractuelle.</li>
+<li>Les textes réglementaires ne sont pas reproduits. Les formules citées doivent être confrontées aux documents officiels détenus par le bureau d'études.</li>
+</ul></div></section>
+</template>
+</body>
+</html>

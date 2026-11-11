@@ -4,7 +4,7 @@
 
 | N° | Limite | Module | Conséquence pour l'utilisateur | Contournement actuel |
 |---|---|---|---|---|
-| L-01 | Aucun calcul de structure, de géotechnique ou d'hydraulique | Global | Le logiciel ne justifie pas les ouvrages qu'il chiffre | Utiliser une note de calcul séparée (Robot, CYPE, calcul manuel EC2/BAEL) |
+| L-01 | Aucun calcul de structure, de géotechnique ou d'hydraulique dans l'application web (seul l'outil autonome Dalot Pro CI calcule un dalot) | Global | Le logiciel ne justifie pas les ouvrages qu'il chiffre | Utiliser une note de calcul séparée (Robot, CYPE, calcul manuel EC2/BAEL) |
 | L-02 | Prix du catalogue par défaut indicatifs, sans source ni date | Bibliothèque de prix | Risque de devis éloigné des prix du marché | Calibrer chaque article avec les coûts réels du cabinet |
 | L-03 | Import DQE heuristique (détection d'en-têtes, de codes et de titres ; tolérance Qté × P.U. = Montant de 0,5 % à 1 % ou 2 F) | Import DQE | Articles mal lus, lots mal regroupés, sous-totaux pris pour des articles | Relire le rapport d'analyse. Un avertissement apparaît si le total recalculé s'écarte de plus de max(10 F ; 0,5 %) du total HT lu dans le document |
 | L-04 | PDF scannés (images) non lus : il n'y a pas d'OCR | Import DQE | Import refusé avec un message explicite | Fournir le fichier Excel ou un PDF texte |
@@ -16,3 +16,5 @@
 | L-10 | Le « plan IA » est un moteur à règles (mots-clés), pas un modèle d'IA | Plans | Demandes libres mal comprises | Utiliser les formulations proposées |
 | L-11 | Conversion de devises au taux saisi manuellement, sans date ni source | Devises | Taux obsolète possible | Mettre à jour les taux |
 | L-12 | Récupération de mot de passe sans e-mail : code administrateur | Authentification | Procédure manuelle | Variable `PASSWORD_RESET_CODE` ou script `scripts/reset-password.ts` |
+| L-13 | Dalot Pro CI : dalot droit uniquement, flexion simple, sans murs en aile, nappe, flottabilité, tassements, séisme ni phases de chantier ; formules réglementaires non confrontées aux textes ; aucun benchmark logiciel | Outil Dalot | Résultats de pré-dimensionnement, non validés pour l'exécution | Faire viser la note par un ingénieur structure ; voir la fiche de validation |
+| L-14 | Dalot Pro CI : la vidéo et les fichiers CYPE de référence n'ont pas été reçus ; l'enchaînement des étapes n'est pas aligné écran par écran sur la vidéo | Outil Dalot | Paramètres possiblement différents de la vidéo | Fournir la vidéo ou des captures |

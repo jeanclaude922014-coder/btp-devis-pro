@@ -35,3 +35,12 @@ Statuts conformes à STD-GC-001 § 2.2. Les références A-xx renvoient à `AUDI
 | CI : lint + build + tests | P2 | `À FAIRE` (A-12) |
 | Documentation STD-GC-001 § 9 | P2 | `EN COURS` (créée le 2026-11-08, à maintenir) |
 | Tutoriel intégré au logiciel (§ 10) | P2 | `À FAIRE` (plan dans `docs/tutorial/`) |
+
+## Outil Dalot Pro CI (ajout du 2026-11-11)
+| Contrôle | Criticité | Statut |
+|---|---|---|
+| Solveur de portique et sections BA recoupés par solutions analytiques et calculs manuels | P0 | `VÉRIFIÉ – CONTRÔLE MANUEL` (7 tests) |
+| Formules réglementaires confrontées aux textes officiels (BAEL, Fascicule 61, EC) | **P0** | `À FAIRE` : textes non déposés au référentiel. `BLOQUANT POUR PUBLICATION PROFESSIONNELLE` |
+| Benchmark sur dalot complet avec un logiciel indépendant | P1 | `À FAIRE` (dossier de reproduction dans la fiche de validation) |
+| Alignement sur la vidéo CYPE de référence | P1 | `À RECHERCHER` : vidéo non reçue |
+| Signal de confiance, tutoriel et « Comprendre le calcul » intégrés | P2 | Fait |

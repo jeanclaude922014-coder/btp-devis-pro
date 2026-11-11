@@ -15,6 +15,12 @@ Historique reconstitué à partir de l'historique Git le 2026-11-08 (Moulo Jean 
 - 2026-11-08 — Ajout du standard STD-GC-001 à la racine du projet.
 - 2026-11-08 — Initialisation de la bibliothèque technique `REFERENTIEL_GC/`.
 
+## Non publié — 2026-11-11
+### Ajouté
+- Outil autonome `outils/Dalot_Pro_CI.html` (Dalot Pro CI 0.1.0) : hydraulique Manning-Strickler, portique sur appuis élastiques, charges Fascicule 61 titre II ou LM1, ferraillage BAEL 91 rév. 99 ou Eurocode 2, métré, note de calcul imprimable et export Word.
+- Moteur `outils/dalot/moteur-dalot.cjs` séparé de l'interface, 7 tests (`npm test`), assemblage par `npm run build:dalot`.
+- Fiche `docs/validation/FICHE_VALIDATION_DALOT.md`.
+
 ## 0.1.0 — développements du 2026-07-07 au 2026-11-02
 ### Ajouté
 - 2026-11-02 — Création automatique des tables manquantes au démarrage (`src/lib/schema.ts`).

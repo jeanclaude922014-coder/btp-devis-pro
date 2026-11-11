@@ -24,6 +24,7 @@ btp-devis-pro/
 ├── prisma/  schema.prisma · migrations/ · seed.ts (catalogue de prix par défaut)
 ├── scripts/ migrate.mjs (migrations au build) · reset-password.ts
 ├── outils/  DQE_Lots_et_Suivi.html (outil autonome hors ligne)
+│            Dalot_Pro_CI.html (généré) · dalot/ moteur-dalot.cjs + tests · interface.html
 └── src/
     ├── proxy.ts                 garde d'accès (redirection /login)
     ├── app/(auth)/              connexion, inscription, mot de passe oublié

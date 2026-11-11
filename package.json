@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
-    "test": "tsx --test \"src/**/*.test.ts\""
+    "test": "tsx --test \"src/**/*.test.ts\" && node --test outils/dalot/moteur-dalot.test.mjs",
+    "build:dalot": "node scripts/build-dalot.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",

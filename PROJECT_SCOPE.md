@@ -22,9 +22,10 @@ Cabinets d'études, économistes, entreprises du BTP et techniciens de chantier 
 | Générateur de plan | Esquisse de plan d'habitation 2D/3D par dialogue guidé, export PDF à l'échelle 1/50 ou 1/100 |
 | Gestion de projet | Tableau de tâches À faire / En cours / Terminé |
 | Outil hors ligne | `outils/DQE_Lots_et_Suivi.html` |
+| Outil hors ligne de calcul | `outils/Dalot_Pro_CI.html` : dimensionnement de dalot cadre (hydraulique, efforts, ferraillage BAEL / EC2, métré, note de calcul). **Prototype contrôlé manuellement**, voir `docs/validation/FICHE_VALIDATION_DALOT.md` |
 
 ## Hors périmètre (exclus explicitement)
-- **Tout dimensionnement de structure** : béton armé EC2 ou BAEL, charpente EC3, fondations, dalots, hydraulique. Les désignations d'ouvrages du catalogue sont des libellés de prix, pas des résultats de calcul.
+- **Dans l'application web** (hors outil autonome Dalot Pro CI) : **tout dimensionnement de structure** : béton armé EC2 ou BAEL, charpente EC3, fondations, dalots, hydraulique. Les désignations d'ouvrages du catalogue sont des libellés de prix, pas des résultats de calcul.
 - Le générateur de plan produit une **esquisse indicative**. Il ne vérifie ni les règles d'urbanisme, ni les surfaces réglementaires, ni la faisabilité structurelle.
 - Comptabilité, facturation légale, paie.
 - Validation fiscale : le taux de TVA est paramétrable, il appartient à l'utilisateur de le vérifier.
