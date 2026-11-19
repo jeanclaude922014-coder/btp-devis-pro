@@ -50,7 +50,7 @@
         deltaAuto: true, deltaManuel: 1.2, alphaQ: 1, alphaq: 1,
         eau: true, hEau: 1.5, surface: true, qSurface: 10, fond: false, qFond: 10 },
       coef: coefficientsDefaut('BAEL'),
-      metre: { majorationAcier: 10 }
+      metre: { majorationAcier: 5 }
     };
   }
 
@@ -495,7 +495,7 @@
     return sr * dEps * 1000; // mm
   }
   const DIAMS = [10, 12, 14, 16, 20, 25];
-  const ESPACEMENTS = [0.2, 0.15, 0.125, 0.1];
+  const ESPACEMENTS = [0.25, 0.2, 0.15, 0.125, 0.1];
   function catalogueBarres() {
     const cat = [];
     DIAMS.forEach(function (phi) { ESPACEMENTS.forEach(function (e) { cat.push({ phi: phi, esp: e, As: Math.PI * phi * phi / 4 * 1e-6 / e }); }); });
@@ -506,6 +506,34 @@
     for (let i = 0; i < cat.length; i++) if (cat[i].As >= AsReq - 1e-9 && (!test || test(cat[i]))) return cat[i];
     return null;
   }
+  /* Limites d'espacement et de diamètre des dalles (bande de 1 m).
+     BAEL A.4.5.33 / A.4.5.34 et A.8.2.42 ; EC2 § 9.3.1.1 (3) (zones de charges concentrées) et § 8.2 (2). */
+  function limitesArmatures(p, mat, h) {
+    let eMax, eMaxRep, ref;
+    if (mat.norme === 'EC2') { eMax = Math.min(2 * h, 0.25); eMaxRep = Math.min(3 * h, 0.40); ref = 'EC2 § 9.3.1.1'; }
+    else if (p.mat.fissuration === 'peu') { eMax = Math.min(3 * h, 0.33); eMaxRep = Math.min(4 * h, 0.45); ref = 'BAEL A.8.2.42'; }
+    else if (p.mat.fissuration === 'tres') { eMax = eMaxRep = Math.min(1.5 * h, 0.20); ref = 'BAEL A.4.5.34'; }
+    else { eMax = eMaxRep = Math.min(2 * h, 0.25); ref = 'BAEL A.4.5.33'; }
+    const phiMin = mat.norme === 'BAEL' ? (p.mat.fissuration === 'tres' ? 8 : (p.mat.fissuration === 'prejudiciable' ? 6 : 0)) : 0;
+    const phiMax = mat.norme === 'BAEL' ? h * 100 : Infinity; // BAEL A.7.2.1 : diamètre ≤ h / 10 (h en mm / 10 = h en cm)
+    const eLibreMin = function (phi) { return Math.max(phi, (p.mat.dmax || 25) + 5, 20) / 1000; }; // EC2 § 8.2 (2)
+    return { eMax: eMax, eMaxRep: eMaxRep, ref: ref, phiMin: phiMin, phiMax: phiMax, eLibreMin: eLibreMin };
+  }
+
+  /* Longueurs d'ancrage droit et de recouvrement (m) d'une barre HA.
+     BAEL A.6.1.23 : ls = Ø fe / (4 τsu), τsu = 0,6 ψs² ft28, ψs = 1,5 ; recouvrement = ls.
+     EC2 § 8.4.3 et § 8.7.3 : lb,rqd = Ø/4 × fyd / fbd, fbd = 2,25 × 0,7 fctm / 1,5 (η1 = η2 = 1) ;
+     recouvrement l0 = 1,5 lb,rqd (plus de 50 % des barres recouvertes dans la même section). */
+  function ancrage(phiMm, mat) {
+    const phi = phiMm / 1000;
+    if (mat.norme === 'EC2') {
+      const fbd = 2.25 * 0.7 * mat.ft / 1.5, lb = phi / 4 * mat.fsu / fbd;
+      return { ls: lb, lr: 1.5 * lb };
+    }
+    const ls = phi * mat.fe / (4 * 0.6 * 1.5 * 1.5 * mat.ft);
+    return { ls: ls, lr: ls };
+  }
+
   function texteBarres(b) { return b ? 'HA' + b.phi + ' e = ' + (b.esp * 100).toLocaleString('fr-FR') + ' cm' : '—'; }
 
   function dimensionnerNappe(p, mat, h, c, Melu, Mels, Mfreq) {
@@ -515,20 +543,42 @@
     if (!elu.ok) alertes.push('Moment réduit µ = ' + fr(elu.mu, 3) + ' > µ limite : augmenter l\'épaisseur.');
     if (!els.ok) alertes.push('Contraintes limites de service impossibles à respecter : augmenter l\'épaisseur.');
     const AsReq = Math.max(elu.ok ? elu.As : 0, els.ok ? els.As : 0, AsMin);
+    const lim = limitesArmatures(p, mat, h);
+    const admissible = function (b, eMax) {
+      return b.esp <= eMax + 1e-9 && b.phi >= lim.phiMin && b.phi <= lim.phiMax + 1e-9 && b.esp - b.phi / 1000 >= lim.eLibreMin(b.phi) - 1e-9;
+    };
     let barres = null;
     if (elu.ok && els.ok) {
-      barres = choisirBarres(AsReq, mat.norme === 'EC2' ? function (b) {
-        return ouvertureFissure(Mfreq, b.As, d, h, c, b.phi / 1000, b.esp, mat) <= p.mat.wmax + 1e-9;
-      } : null);
-      if (!barres) alertes.push('Aucune disposition courante (HA10 à HA25, e ≥ 10 cm) ne convient : augmenter l\'épaisseur.');
+      barres = choisirBarres(AsReq, function (b) {
+        return admissible(b, lim.eMax) && (mat.norme !== 'EC2' || ouvertureFissure(Mfreq, b.As, d, h, c, b.phi / 1000, b.esp, mat) <= p.mat.wmax + 1e-9);
+      });
+      if (!barres) alertes.push('Aucune disposition courante (HA10 à HA25, e de 10 à 25 cm) ne respecte la section et les règles d\'espacement : augmenter l\'épaisseur.');
     }
     const AsP = barres ? barres.As : 0, ct = contraintesELS(Mels, AsP, d);
     const wk = mat.norme === 'EC2' && barres ? ouvertureFissure(Mfreq, AsP, d, h, c, barres.phi / 1000, barres.esp, mat) : null;
     const ratioRep = mat.norme === 'EC2' ? 0.2 : 1 / 3; // EC2 § 9.3.1.1 ; BAEL A.8.2.41 (charges concentrées)
-    const rep = choisirBarres(Math.max(ratioRep * AsP, 3.9e-4)); // plancher usuel HA10 e = 20 cm
+    const AsRep = Math.max(ratioRep * AsP, 3.9e-4); // plancher usuel HA10 e = 20 cm
+    const rep = choisirBarres(AsRep, function (b) { return admissible(b, lim.eMaxRep); });
+    // Rapport de vérification de la nappe (présentation du rapport « Vérification complète » de CYPE)
+    const verifs = [];
+    function v(nom, ref, limite, valeur, ok) { verifs.push({ nom: nom, ref: ref, limite: limite, valeur: valeur, ok: ok }); }
+    if (barres) {
+      v('Section d\'acier', 'ELU / ELS / minimum', 'min. ' + fr(AsReq * 1e4, 2) + ' cm²', fr(AsP * 1e4, 2) + ' cm²', AsP >= AsReq - 1e-12);
+      v('Espacement maximal', lim.ref, 'max. ' + fr(lim.eMax * 100, 1) + ' cm', fr(barres.esp * 100, 1) + ' cm', barres.esp <= lim.eMax + 1e-9);
+      v('Espacement libre minimal', 'EC2 § 8.2 (2)', 'min. ' + fr(lim.eLibreMin(barres.phi) * 100, 1) + ' cm', fr((barres.esp - barres.phi / 1000) * 100, 1) + ' cm', true);
+      if (mat.norme === 'BAEL') v('Diamètre maximal Ø ≤ h / 10', 'BAEL A.7.2.1', 'max. ' + fr(lim.phiMax, 0) + ' mm', barres.phi + ' mm', barres.phi <= lim.phiMax + 1e-9);
+      v('Contrainte du béton en service', mat.norme === 'EC2' ? 'EC2 § 7.2' : 'BAEL A.4.5.2', 'max. ' + fr(mat.sigmaC, 1) + ' MPa', fr(ct.sc, 1) + ' MPa', ct.sc <= mat.sigmaC + 1e-6);
+      v('Contrainte de l\'acier en service', mat.norme === 'EC2' ? 'EC2 § 7.2' : 'BAEL A.4.5.33', 'max. ' + fr(mat.sigmaS, 0) + ' MPa', fr(ct.ss, 0) + ' MPa', ct.ss <= mat.sigmaS + 1e-6);
+      if (wk != null) v('Ouverture des fissures', 'EC2 § 7.3.4', 'max. ' + fr(p.mat.wmax, 2) + ' mm', fr(wk, 2) + ' mm', wk <= p.mat.wmax + 1e-9);
+      if (rep) v('Armature de répartition', mat.norme === 'EC2' ? 'EC2 § 9.3.1.1' : 'BAEL A.8.2.41', 'min. ' + fr(AsRep * 1e4, 2) + ' cm², e ≤ ' + fr(lim.eMaxRep * 100, 1) + ' cm', texteBarres(rep), true);
+      const an = ancrage(barres.phi, mat);
+      v('Longueur d\'ancrage droit ls', mat.norme === 'EC2' ? 'EC2 § 8.4.3' : 'BAEL A.6.1.23', 'information', fr(an.ls * 100, 0) + ' cm', true);
+      v('Longueur de recouvrement', mat.norme === 'EC2' ? 'EC2 § 8.7.3' : 'BAEL A.6.1.2', 'information', fr(an.lr * 100, 0) + ' cm', true);
+    }
+    if (!rep && barres) alertes.push('Aucune armature de répartition courante ne respecte l\'espacement maximal.');
     const gouverne = AsReq === AsMin ? 'section minimale' : (els.ok && AsReq === els.As ? 'ELS' : 'ELU');
     return { h: h, d: d, c: c, Melu: Melu, Mels: Mels, Mfreq: Mfreq, elu: elu, AsElu: elu.As, AsEls: els.As, AsMin: AsMin,
-      AsReq: AsReq, gouverne: gouverne, barres: barres, AsP: AsP, sc: ct.sc, ss: ct.ss, wk: wk, rep: rep, alertes: alertes,
+      AsReq: AsReq, gouverne: gouverne, barres: barres, AsP: AsP, sc: ct.sc, ss: ct.ss, wk: wk, rep: rep, AsRep: AsRep, lim: lim, verifs: verifs, alertes: alertes,
       ok: alertes.length === 0 };
   }
 
@@ -720,7 +770,7 @@
   return { VERSION: VERSION, parametresDefaut: parametresDefaut, coefficientsDefaut: coefficientsDefaut, calculer: calculer, predimensionner: predimensionner,
     creerPortique: creerPortique, materiaux: materiaux, geometrie: geometrie, flexionELU: flexionELU, contraintesELS: contraintesELS,
     sectionELS: sectionELS, sectionMin: sectionMin, ouvertureFissure: ouvertureFissure, verifierTranchant: verifierTranchant,
-    choisirBarres: choisirBarres, texteBarres: texteBarres, coefA: coefA, coefPoussee: coefPoussee, intensiteLigne: intensiteLigne,
+    choisirBarres: choisirBarres, limitesArmatures: limitesArmatures, ancrage: ancrage, texteBarres: texteBarres, coefA: coefA, coefPoussee: coefPoussee, intensiteLigne: intensiteLigne,
     majorationDynamique: majorationDynamique, debitStrickler: debitStrickler, hydraulique: hydraulique, diffusion: diffusion,
     convoisRoutiers: convoisRoutiers };
 });

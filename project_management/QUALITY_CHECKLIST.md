@@ -42,5 +42,6 @@ Statuts conformes à STD-GC-001 § 2.2. Les références A-xx renvoient à `AUDI
 | Solveur de portique et sections BA recoupés par solutions analytiques et calculs manuels | P0 | `VÉRIFIÉ – CONTRÔLE MANUEL` (7 tests) |
 | Formules réglementaires confrontées aux textes officiels (BAEL, Fascicule 61, EC) | **P0** | `À FAIRE` : textes non déposés au référentiel. `BLOQUANT POUR PUBLICATION PROFESSIONNELLE` |
 | Benchmark sur dalot complet avec un logiciel indépendant | P1 | `À FAIRE` (dossier de reproduction dans la fiche de validation) |
-| Alignement sur la vidéo CYPE de référence | P1 | `EN COURS` : aligné sur le manuel officiel (GC-0025) ; vidéo YouTube inaccessible depuis l'environnement |
+| Alignement sur la vidéo CYPE de référence | P1 | `ACCEPTÉ AVEC RÉSERVE` : vidéo reçue et lue le 2026-11-19, étapes et plans alignés ; ferraillages comparés, écarts de −20 % à +63 % non expliqués |
+| Plans et nomenclature : barres dans le béton, totaux, DXF et SVG bien formés | P1 | `VÉRIFIÉ – CONTRÔLE MANUEL` (tests 9 à 11) ; relecture humaine des plans `À FAIRE` |
 | Signal de confiance, tutoriel et « Comprendre le calcul » intégrés | P2 | Fait |

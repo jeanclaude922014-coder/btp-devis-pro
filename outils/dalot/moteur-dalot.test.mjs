@@ -119,3 +119,70 @@ test('Règle de prédimensionnement de l\'assistant CYPE et cas de charge ajout�
   proche(r2.ferraillage.find(f => f.id === 'pd_ext').d, 0.25 - 0.05 - 0.007, 1e-12, 'd face extérieure');
   proche(r2.ferraillage.find(f => f.id === 'pd_int').d, 0.25 - 0.04 - 0.007, 1e-12, 'd face intérieure');
 });
+
+const PL = createRequire(import.meta.url)('./plans-dalot.cjs');
+
+test('Ancrages et espacements : valeurs recalculées à la main', () => {
+  const bael = M.materiaux({ norme: 'BAEL', mat: { fc: 25, fe: 500, fissuration: 'prejudiciable' } });
+  // BAEL A.6.1.23 : ls = Ø fe / (4 × 0,6 × 1,5² × ft28) = 12 × 500 / (4 × 0,6 × 2,25 × 2,1) = 529 mm
+  proche(M.ancrage(12, bael).ls * 1000, 529.1, 0.1, 'ls HA12 BAEL');
+  const ec2 = M.materiaux({ norme: 'EC2', mat: { fc: 25, fe: 500 } });
+  // EC2 § 8.4.3 : fbd = 2,25 × 0,7 × 2,565 / 1,5 = 2,693 MPa ; lb = 12/4 × 434,8 / 2,693 = 484 mm
+  proche(M.ancrage(12, ec2).ls * 1000, 484.3, 0.5, 'lb,rqd HA12 EC2');
+  const p = M.parametresDefaut();
+  const lim = M.limitesArmatures(p, bael, 0.25);
+  proche(lim.eMax, 0.25, 1e-12, 'Espacement maximal en fissuration préjudiciable, h = 25 cm');
+  p.mat.fissuration = 'tres';
+  proche(M.limitesArmatures(p, bael, 0.25).eMax, 0.2, 1e-12, 'Espacement maximal en fissuration très préjudiciable');
+  // toutes les nappes du cas par défaut respectent l'espacement maximal et ont un rapport de vérification
+  const r = M.calculer(M.parametresDefaut());
+  for (const f of r.ferraillage) {
+    assert.ok(f.barres.esp <= f.lim.eMax + 1e-9, f.nom);
+    assert.ok(f.verifs.length >= 6 && f.verifs.every(v => v.ok), f.nom);
+  }
+});
+
+test('Nomenclature : masses linéiques, façonnage et cohérence des totaux', () => {
+  proche(PL.masseLineique(12), 0.888, 0.001, 'kg/m HA12');
+  proche(PL.masseLineique(10), 0.617, 0.001, 'kg/m HA10');
+  const p = M.parametresDefaut(), r = M.calculer(p), nm = PL.nomenclature(p, r);
+  const B = r.geo.B, c = p.mat.enrobageExt;
+  const p1 = nm.lignes.find(l => l.id === 'ds_sup');
+  assert.equal(p1.forme, 'U-bas');
+  proche(p1.segments[1], B - 2 * c, 0.01, 'Partie horizontale du U = B − 2 c');
+  // nombre de barres : (longueur − 2 c) / e + 1, arrondi inférieur
+  assert.equal(p1.nbre, Math.floor((p.geo.longueur - 2 * c) / p1.esp + 1e-9) + 1);
+  const somme = nm.lignes.reduce((a, l) => a + l.nbre * l.Lunit * l.kgm, 0);
+  proche(nm.masse, somme, 1e-6, 'Masse = Σ n × L × kg/m');
+  proche(nm.recap.reduce((a, x) => a + x.masse, 0), nm.masse, 1e-6, 'Récapitulatif par diamètre');
+  // une barre de plus de 12 m reçoit des recouvrements
+  const q = M.parametresDefaut(); q.geo.longueur = 30;
+  const rq = M.calculer(q), lg = PL.nomenclature(q, rq).lignes.find(l => l.forme === 'longitudinal');
+  assert.ok(lg.recouvrements >= 2 && lg.Lunit > 30 - 2 * c);
+});
+
+test('Plans : armatures dans le béton, quatre planches A3, SVG et DXF bien formés', () => {
+  for (const n of [1, 2, 3]) {
+    const p = M.parametresDefaut(); p.geo.n = n;
+    const r = M.calculer(p), d = PL.planches(p, r);
+    // chaque barre dessinée en coupe reste dans le contour béton, à l'enrobage près
+    const coupe = PL.dessinFerraillageCoupe(p, r, d.nomenclature, 0.05);
+    const tol = 1e-6;
+    for (const q of coupe.prims.filter(q => q.c === 'ACIER' && q.t !== 'c')) {
+      const pts = q.t === 'l' ? [[q.x1, q.y1], [q.x2, q.y2]] : q.pts;
+      for (const [x, y] of pts) assert.ok(x >= p.mat.enrobageExt - tol && x <= r.geo.B - p.mat.enrobageExt + tol && y >= p.mat.enrobageExt - tol && y <= r.geo.Hext - p.mat.enrobageExt + tol, `barre hors béton (${x.toFixed(3)} ; ${y.toFixed(3)}), ${n} cellule(s)`);
+    }
+    assert.equal(d.planches.length, 4);
+    for (const pl of d.planches) for (const q of pl.prims) {
+      const pts = q.t === 'l' ? [[q.x1, q.y1], [q.x2, q.y2]] : q.t === 'p' ? q.pts : [[q.x, q.y]];
+      for (const [x, y] of pts) assert.ok(x >= 0 && x <= PL.A3.w && y >= 0 && y <= PL.A3.h, `${pl.titre} : tracé hors de la feuille A3`);
+    }
+    const svg = PL.versSVG(d.planches[1]);
+    assert.ok(svg.startsWith('<svg') && svg.endsWith('</svg>') && !svg.includes('NaN'));
+    const dxf = PL.versDXF(d.planches).split('\r\n');
+    assert.equal(dxf[1], 'SECTION'); assert.equal(dxf.at(-2), 'EOF');
+    assert.ok(dxf.length % 2 === 1, 'paires code / valeur');
+    for (let i = 0; i < dxf.length - 1; i += 2) assert.ok(/^\s*-?\d+$/.test(dxf[i]), `code de groupe DXF invalide ligne ${i}`);
+    assert.ok(dxf.every(s => /^[\x20-\x7e]*$/.test(s)), 'DXF en ASCII (accents codés \\U+XXXX)');
+  }
+});
