@@ -101,7 +101,7 @@ test('Les deux règlements et les cas limites tournent sans erreur', () => {
   assert.equal(M.calculer(p).ok, false);
 });
 
-test('Règle de prédimensionnement de l\'assistant CYPE et cas de charge ajoutés', () => {
+test('Règle de prédimensionnement des épaisseurs et cas de charge ajoutés', () => {
   const e = M.predimensionner(2, 1.5);
   proche(e.dalle, 0.18, 1e-12, 'Dalle pour L = 2 m');
   proche(e.pied, 0.145, 1e-12, 'Piédroit pour G = 1,5 m');
@@ -189,7 +189,7 @@ test('Plans : armatures dans le béton, quatre planches A3, SVG et DXF bien form
 
 const TT = createRequire(import.meta.url)('./tetes-dalot.cjs');
 const RAD = Math.PI / 180;
-function casPDF() { // dalot 2 x 3,00 x 2,00, L = 8 m, ailes à 27° sur radier de tête (dossier AGEROUTE fourni)
+function casReference() { // dalot 2 x 3,00 x 2,00, L = 8 m, ailes à 27° sur radier de tête
   const p = M.parametresDefaut();
   Object.assign(p.geo, { n: 2, L: 3, H: 2, es: 0.3, er: 0.3, ep: 0.25, ec: 0.25, gousset: 0, longueur: 8, Hr: 0.3, ech: 0.05 });
   p.tetes = TT.parametresDefaut();
@@ -199,9 +199,9 @@ function casPDF() { // dalot 2 x 3,00 x 2,00, L = 8 m, ailes à 27° sur radier 
 test('Têtes : coefficient de Coulomb et moment d\'encastrement des ailes recalculés à la main', () => {
   proche(TT.kaCoulomb(30 * RAD, 0, 0), 1 / 3, 1e-12, 'Ka, φ = 30°, talus horizontal');
   proche(TT.kaCoulomb(30 * RAD, 30 * RAD, 0), Math.cos(30 * RAD) ** 2, 1e-12, 'Ka, β = φ : cos² φ');
-  // φ = 33°, β = 26° : cos²33 / (1 + √(sin33 sin7 / cos26))² = 0,7034 / 1,2718² = 0,4349 (cas de la vidéo CYPE)
-  proche(TT.kaCoulomb(33 * RAD, 26 * RAD, 0), 0.4349, 1e-4, 'Ka vidéo');
-  const p = casPDF(), r = M.calculer(p), t = TT.calculerTetes(p, r);
+  // φ = 33°, β = 26° : cos²33 / (1 + √(sin33 sin7 / cos26))² = 0,7034 / 1,2718² = 0,4349
+  proche(TT.kaCoulomb(33 * RAD, 26 * RAD, 0), 0.4349, 1e-4, 'Ka, φ = 33°, β = 26°');
+  const p = casReference(), r = M.calculer(p), t = TT.calculerTetes(p, r);
   // H0 = H + es + longrine = 2,00 + 0,30 + 0,20 = 2,50 m ; q = 10 × sin 27° = 4,540 kPa
   proche(t.G.H0, 2.5, 1e-12, 'Hauteur de l\'aile au départ');
   proche(t.q, 10 * Math.sin(27 * RAD), 1e-12, 'Surcharge sur remblai');
@@ -212,7 +212,7 @@ test('Têtes : coefficient de Coulomb et moment d\'encastrement des ailes recalc
 });
 
 test('Têtes en T sur semelle : stabilité recalculée indépendamment', () => {
-  const p = casPDF();
+  const p = casReference();
   Object.assign(p.tetes, { type: 'semelle', angle: 15, longueurAuto: false, longueur: 12.8, plat: 0.7, hFin: 0.5, epAuto: false, ep: 0.5, eSemelle: 0.5 });
   const r = M.calculer(p), t = TT.calculerTetes(p, r);
   assert.equal(t.troncons.length, 4, 'tronçons de 3,20 m pour une longueur minimale de 3 m');
@@ -231,7 +231,7 @@ test('Têtes en T sur semelle : stabilité recalculée indépendamment', () => {
 
 test('Dossier complet : 8 planches (têtes et garde-corps), 7 sans garde-corps, nomenclatures cohérentes', () => {
   for (const [type, gc, attendu] of [['radier', true, 8], ['semelle', false, 7]]) {
-    const p = casPDF(); p.tetes.type = type; p.tetes.gc.actif = gc;
+    const p = casReference(); p.tetes.type = type; p.tetes.gc.actif = gc;
     const r = M.calculer(p); r.tetes = TT.calculerTetes(p, r);
     const d = PL.planches(p, r);
     assert.equal(d.planches.length, attendu, type);

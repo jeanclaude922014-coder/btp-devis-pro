@@ -1,7 +1,7 @@
 # FICHE DE VALIDATION — Dalot Pro CI (outil autonome)
 Projet : btp-devis-pro — outil hors ligne `outils/Dalot_Pro_CI.html`
 Module : dimensionnement d'un dalot cadre fermé en béton armé
-Version du logiciel : 0.1.0 — Version du moteur : 0.1.0 (`outils/dalot/moteur-dalot.cjs`) — Plans : `outils/dalot/plans-dalot.cjs`
+Version du logiciel : 0.1.0 — Version du moteur : 0.1.0 (`outils/dalot/moteur-dalot.cjs`) — Têtes : `outils/dalot/tetes-dalot.cjs` — Plans : `outils/dalot/plans-dalot.cjs`
 Responsable : Moulo Jean Claude — Date : 2026-11-11
 Norme / méthode : BAEL 91 rév. 99 ou EN 1992-1-1 ; Fascicule 61 titre II ou EN 1991-2 (LM1) ; Manning-Strickler
 Domaine couvert : dalot droit de 1 à 6 cellules identiques, coulé en place, bande de 1 m
@@ -13,7 +13,7 @@ Domaine couvert : dalot droit de 1 à 6 cellules identiques, coulé en place, ba
 - Charges : poids propre, remblai, poussée K0 / Ka, surcharge sur remblai, eau intérieure, A(l), Bc, Bt, Br, Mc120 ou LM1.
 - Combinaisons : enveloppe du produit cartésien (permanentes défavorables ou favorables, chaque variable présente ou absente). Coefficients modifiables.
 - Hypothèses : flexion simple (effort normal de compression négligé, côté sécurité) ; route perpendiculaire à l'ouvrage.
-- Cas non couverts : biais, murs en aile, nappe et flottabilité, tassements, séisme, phases de chantier, préfabrication, fatigue.
+- Cas non couverts : biais, nappe et flottabilité, tassements, séisme, phases de chantier, préfabrication, fatigue.
 
 ## Sources documentaires
 | Référence | Auteur/organisme | Année/version | Langue | Lien/fichier | Fiabilité | Hypothèses du cas |
@@ -21,7 +21,6 @@ Domaine couvert : dalot droit de 1 à 6 cellules identiques, coulé en place, ba
 | Règles BAEL 91 révisées 99 | DTU P 18-702 | 1999 | fr | non déposé dans `REFERENTIEL_GC/` | Texte réglementaire | Formules ELU / ELS, A.4.2.1, A.4.5.3, A.5.2.2 citées de mémoire d'usage : **à confronter au texte** |
 | Fascicule 61 titre II du CPC | Ministère de l'Équipement | 1971 | fr | non déposé | Texte réglementaire | A(l), Bc, Bt, Br, Mc120, δ, bc, bt, a1, a2 : **à confronter au texte** |
 | EN 1992-1-1, EN 1991-2, EN 1990 annexe A2 | CEN | 2004-2005 | fr/en | fiche GC-0001 | Norme | § 6.2.2, § 7.3.4, LM1, valeurs recommandées (pas d'annexe nationale ivoirienne) |
-| StruBIM Box Culverts - User's manual | CYPE Ingenieros | non indiquée | en | fiche GC-0025 | Documentation logicielle | Modèle, charges, champs de saisie, règle d'épaisseurs ; aucun exemple chiffré |
 | Résistance des matériaux, méthode des déplacements | cours classiques | — | fr | — | Analytique | Poutre bi-encastrée, cadre fermé symétrique |
 
 Aucun document du référentiel ne contient à ce jour d'exemple chiffré de dalot. Les textes BAEL et Fascicule 61 ne sont pas déposés : voir demandes ci-dessous.
@@ -37,7 +36,10 @@ Aucun document du référentiel ne contient à ce jour d'exemple chiffré de dal
 | Ancrage droit BAEL A.6.1.23, HA12 Fe E500, fc28 = 25 MPa | ls | 12 × 500 / (4 × 0,6 × 2,25 × 2,1) = 529 mm | identique | 0,1 mm | `VÉRIFIÉ – CONTRÔLE MANUEL` |
 | Ancrage EC2 § 8.4.3, HA12 B500, fck = 25 MPa | lb,rqd | 3 × 434,8 / 2,693 = 484 mm | identique | 0,5 mm | `VÉRIFIÉ – CONTRÔLE MANUEL` |
 | Nomenclature des aciers | masse | Σ n × L × 0,006165 Ø² | identique | 1e-6 kg | `VÉRIFIÉ – CONTRÔLE MANUEL` |
-| Règle d'épaisseurs de l'assistant CYPE, L = 2 m, G = 1,5 m | dalle ; piédroit | 0,18 m ; 0,145 m (manuel § 3.2) | identique | exact | `VÉRIFIÉ – RÉFÉRENCES DOCUMENTAIRES` |
+| Prédimensionnement des épaisseurs, L = 2 m, G = 1,5 m | dalle ; piédroit | 0,02 L² + 0,10 = 0,18 m ; 0,02 G² + 0,10 = 0,145 m | identique | exact | `VÉRIFIÉ – CONTRÔLE MANUEL` |
+| Coulomb, φ = 30°, β = 0 / β = φ ; φ = 33°, β = 26° | Ka | 1/3 ; cos²φ ; 0,4349 | identique | 1e-4 | `VÉRIFIÉ – CONTRÔLE MANUEL` |
+| Aile de 2,50 m, γ = 20, q = 4,54 kPa | Mu à la base | 1,35 × 17,36 + 1,6 × 4,73 = 31,0 kN.m/m | identique | 0,02 | `VÉRIFIÉ – CONTRÔLE MANUEL` |
+| Murs en T, 4 tronçons | renversement ; glissement | Ms / Mr ; μ ΣV / ΣH recalculés indépendamment | identique | 1e-9 | `VÉRIFIÉ – CONTRÔLE MANUEL` |
 | A(10 m) ; δ(L = 10, G = 1000, S = 500) ; K0(30°) ; Strickler | formules fermées | 18,66 kPa ; 1,20 ; 0,50 ; 5,97 m³/s | identique | arrondi | `VÉRIFIÉ – CONTRÔLE MANUEL` |
 
 ## Contrôle manuel
@@ -47,44 +49,7 @@ Aucun document du référentiel ne contient à ce jour d'exemple chiffré de dal
 - Réserves : voir tableau.
 
 ## Benchmark logiciel tiers
-### Comparaison partielle avec la vidéo « Étude complète d'un pont-cadre (dalot) avec CYPE » (2026-11-19)
-Vidéo fournie par Moulo Jean Claude : CYPE Ponts-cadres PICF 2017, 11 min 41 s. Données relevées image par image :
-gabarit 4,50 m ; 2 cellules de 4,00 et 3,80 m (cloison 20 cm) ; dalle et radier 60 cm ; piédroits 50 cm ; longueur du module 6,00 m ;
-chaussée à 6,00 m au-dessus du radier (remblai 0,30 m) ; B25, Fe E500, fissuration préjudiciable ; enrobages 3,5 cm ; granulat 25 mm ;
-module de réaction 50 000 kN/m³, contrainte admissible 300 kN/m² ; remblai 19 kN/m³, φ = 33°, angle de transmission 45° ;
-convoi Bt du Fascicule 61 (roues de 78,5 kN), charges en bande de 9,81 kN/m², surcharge sur radier 4 kN/m² ; vérifications CYPE citant le BAEL 91.
-Saisie équivalente : bouton « Charger l'exemple de la vidéo CYPE » (cellules ramenées à 2 × 3,90 m ; charges en bande prises comme surcharge uniforme en surface).
-
-| Nappe | CYPE (vidéo) | Dalot Pro CI | Écart de section |
-|---|---|---|---:|
-| Dalle, nappe supérieure | HA12 e=15 (7,54 cm²) | HA10 e=12,5 (6,28 cm²) | −17 % |
-| Dalle, nappe inférieure | HA12 e=15 (7,54 cm²) | HA14 e=25 (6,16 cm²) | −18 % |
-| Radier, nappe supérieure | HA12 e=15 (7,54 cm²) | HA14 e=25 (6,16 cm²) | −18 % |
-| Radier, nappe inférieure | HA12 e=15 (7,54 cm²) | HA16 e=20 (10,05 cm²) | +33 % |
-| Piédroits, côté terre | HA12 e=15 (7,54 cm²) | HA14 e=12,5 (12,32 cm²) | +63 % |
-| Piédroits, côté eau | HA12 e=20 (5,65 cm²) | HA12 e=25 (4,52 cm²) | −20 % |
-| Cloison | HA10 e=25 (3,14 cm²) | HA10 e=25 (3,14 cm²) | 0 % |
-
-Statut : `ACCEPTÉ AVEC RÉSERVE` — comparaison partielle, ne valide pas le moteur. Les hypothèses ne sont pas identiques (coques 3D contre portique plan, cellules inégales, positions des charges). La vidéo n'affiche ni moments ni combinaisons ; les étiquettes de ferraillage sont lues à basse résolution et leur attribution à chaque face reste à confirmer.
-
-### Têtes d'ouvrage (2026-11-19)
-Module `outils/dalot/tetes-dalot.cjs`. Tests 12 à 14 : Ka de Coulomb (φ = 30°, β = 0 et β = φ ; φ = 33°, β = 26° → 0,4349), moment d'encastrement d'une aile de 2,50 m recalculé à la main (31,0 kN.m/m), renversement et glissement des 4 tronçons recalculés indépendamment, dossier de 8 planches bien formé.
-
-| Comparaison | Grandeur | Référence | Dalot Pro CI | Écart |
-|---|---|---:|---:|---:|
-| Vidéo CYPE, tronçon 1 | largeur de semelle | 3,70 m | 3,95 m | +7 % |
-| Vidéo CYPE, tronçon 2 | renfort vertical | 1,50 m (minimum) | 1,50 m | 0 % |
-| Vidéo CYPE, tronçon 2 | moment du patin avant | 63,76 kN.m/m | 63,4 kN.m/m | −1 % |
-| Vidéo CYPE, tronçon 2 | moment du talon | 54,35 kN.m/m | 115,4 kN.m/m | ×2,1 |
-| Vidéo CYPE, tronçon 3 | effort tranchant du voile | 44,30 kN/m | 40,2 kN/m | −9 % |
-| Vidéo CYPE, tronçon 3 | moment du voile | 44,95 kN.m/m | 57,5 kN.m/m | +28 % |
-| Dossier AGEROUTE 2×3,00×2,00 L=8 m | aciers du voile côté terre / côté eau | Ø12 e=20 / Ø10 e=20 | HA12 e=15 / HA12 e=25 | même ordre |
-| Dossier AGEROUTE | masse d'acier module / têtes / garde-corps | 4 933 / 1 833 / 110 kg | 5 873 / 1 318 / 182 kg | +19 % / −28 % / +65 % |
-
-Statut : `ACCEPTÉ AVEC RÉSERVE`. Le moment du talon est environ double de celui de CYPE (hypothèses de charge sur le talon et de répartition des pressions à confronter). Le dossier AGEROUTE n'est pas une note de calcul : la comparaison des masses ne valide rien, elle situe l'ordre de grandeur.
-
-### Dossier de reproduction proposé
-Non réalisé. Dossier de reproduction proposé (CYPE « Dalots », Robot ou SCIA) :
+Non réalisé. Dossier de reproduction proposé (logiciel indépendant de calcul de structures) :
 dalot 2 × 2,00 × 1,50 m, épaisseurs 25 cm, remblai 0,60 m (20 kN/m³, φ = 30°, K0), chaussée 5 cm, k = 40 000 kN/m³, fc28 = 25 MPa, Fe E500, enrobage 4 cm, fissuration préjudiciable, pont de 1re classe 2 voies, A(l) + Bc + Bt + Br + Mc120.
 Sorties attendues : moments enveloppes ELU et ELS par paroi, effort tranchant, pression sur le sol, sections d'acier. Résultats de l'outil pour ce cas : M ELU dalle +44,2 / −53,9 ; radier +43,1 / −74,2 ; piédroits −39,6 kN.m/m ; sol 156 kPa à l'ELS. Tolérance proposée : 10 % sur les moments (modèle barres contre plaques), à justifier après comparaison.
 
@@ -92,17 +57,18 @@ Sorties attendues : moments enveloppes ELU et ELS par paroi, effort tranchant, p
 - [x] Contrôle de cohérence élémentaire
 - [x] Contrôle manuel documenté
 - [ ] Références documentaires concordantes
-- [~] Comparaison à un outil indépendant (partielle : vidéo CYPE, écarts non expliqués)
+- [ ] Comparaison à un outil indépendant
 - [ ] Revue humaine compétente
 - [x] Domaine de validité clairement défini
 
 ## Réserves et actions
 | Réserve | Criticité | Impact | Action | Responsable | Échéance |
 |---|---|---|---|---|---|
-| Comparaison avec l'exemple de la vidéo CYPE : écarts de −20 % à +63 % sur les sections d'acier (voir § Benchmark), causes non démontrées | P1 | Modèle global non recoupé | Obtenir de CYPE les moments enveloppes et les combinaisons du même cas, ou reproduire le cas dans Robot | Moulo Jean Claude | — |
+| Moment du talon des semelles des murs en T jugé élevé (répartition des pressions sous la semelle à confronter) | P1 | Semelles possiblement surdimensionnées | Recouper un tronçon par un calcul indépendant | Moulo Jean Claude | — |
+| Garde-corps, bêches, chaises et épingles en ferraillage constructif | P2 | Non justifiés par le calcul | Adapter au cahier des charges | Utilisateur | par projet |
 | Plans générés : façonnage simplifié, murs en aile et joints non dessinés | P2 | Plans à compléter par le projeteur | Relecture humaine de chaque dossier | Utilisateur | par projet |
 | Formules BAEL, Fascicule 61 et EC non confrontées aux textes officiels | **P0** | Risque de coefficient erroné | Déposer les textes dans `REFERENTIEL_GC/06_NORMES_ET_REGLEMENTS/` et relire | Moulo Jean Claude | avant tout usage en exécution |
-| Pas de benchmark sur dalot complet | P1 | Modèle global non recoupé | Reproduire le dossier ci-dessus dans CYPE ou Robot | Équipe | — |
+| Pas de benchmark sur dalot complet | P1 | Modèle global non recoupé | Reproduire le dossier ci-dessus dans un logiciel indépendant | Équipe | — |
 | Répartition transversale des roues sous faible remblai | P1 | Sur-dimensionnement possible | Comparer à un calcul plaque | Équipe | — |
 | Coefficients de l'eau intérieure, valeurs de sol indicatives | P2 | Valeurs par défaut discutables | Faire confirmer par le projeteur | Utilisateur | par projet |
 

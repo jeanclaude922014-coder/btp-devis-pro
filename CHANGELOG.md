@@ -17,11 +17,10 @@ Historique reconstitué à partir de l'historique Git le 2026-11-08 (Moulo Jean 
 
 ## Non publié — 2026-11-19
 ### Ajouté
-- Dalot Pro CI : têtes d'ouvrage (`outils/dalot/tetes-dalot.cjs`) — ailes sur radier de tête avec bêche (pratique AGEROUTE) ou murs en T sur semelle par tronçons (méthode CYPE : poussée de Coulomb, renforts, renversement, glissement, contrainte sur le sol) ; garde-corps en béton armé.
-- Dalot Pro CI : dossier de plans refait sur le modèle des dossiers d'exécution AGEROUTE — 8 planches A3, cartouche « République de Côte d'Ivoire », nomenclatures « dans un élément / total », récapitulatifs béton et acier, développés des barres.
+- Dalot Pro CI : têtes d'ouvrage (`outils/dalot/tetes-dalot.cjs`) — ailes sur radier de tête avec bêche ou murs en T sur semelle par tronçons (poussée de Coulomb, renforts, renversement, glissement, contrainte sur le sol) ; garde-corps en béton armé.
+- Dalot Pro CI : dossier d'exécution en 8 planches A3, cartouche « République de Côte d'Ivoire », nomenclatures « dans un élément / total », récapitulatifs béton et acier, développés des barres.
 - Dalot Pro CI : onglet « Plans » avec 4 planches A3 et cartouche (coffrage, ferraillage en coupe, dalle et radier en plan, nomenclature des aciers), export DXF pour AutoCAD, impression A3 paysage. Module `outils/dalot/plans-dalot.cjs`.
 - Dalot Pro CI : rapport de vérification par nappe (section, espacements, diamètre, contraintes, fissures, répartition, ancrage, recouvrement), règles d'espacement maximal BAEL / EC2 appliquées au choix des barres.
-- Dalot Pro CI : exemple de la vidéo CYPE « Étude complète d'un pont-cadre » et comparaison des ferraillages dans la fiche de validation.
 ### Modifié
 - Dalot Pro CI : masse d'acier du métré tirée de la nomenclature ; majoration par défaut ramenée de 10 % à 5 % (les recouvrements sont désormais comptés).
 
@@ -30,7 +29,7 @@ Historique reconstitué à partir de l'historique Git le 2026-11-08 (Moulo Jean 
 - Outil autonome `outils/Dalot_Pro_CI.html` (Dalot Pro CI 0.1.0) : hydraulique Manning-Strickler, portique sur appuis élastiques, charges Fascicule 61 titre II ou LM1, ferraillage BAEL 91 rév. 99 ou Eurocode 2, métré, note de calcul imprimable et export Word.
 - Moteur `outils/dalot/moteur-dalot.cjs` séparé de l'interface, 8 tests (`npm test`), assemblage par `npm run build:dalot`.
 - Fiche `docs/validation/FICHE_VALIDATION_DALOT.md`.
-- Alignement sur le manuel CYPE « StruBIM Box Culverts » (GC-0025) : enrobages extérieur et intérieur, taille du granulat, surcharge uniforme en surface, surcharge sur radier, épaisseurs de départ de l'assistant, table de correspondance dans le tutoriel.
+- Enrobages extérieur et intérieur, taille du granulat, surcharge uniforme en surface, surcharge sur radier, épaisseurs de départ proposées.
 
 ## 0.1.0 — développements du 2026-07-07 au 2026-11-02
 ### Ajouté

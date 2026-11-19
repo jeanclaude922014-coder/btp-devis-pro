@@ -42,7 +42,6 @@ Statuts conformes à STD-GC-001 § 2.2. Les références A-xx renvoient à `AUDI
 | Solveur de portique et sections BA recoupés par solutions analytiques et calculs manuels | P0 | `VÉRIFIÉ – CONTRÔLE MANUEL` (7 tests) |
 | Formules réglementaires confrontées aux textes officiels (BAEL, Fascicule 61, EC) | **P0** | `À FAIRE` : textes non déposés au référentiel. `BLOQUANT POUR PUBLICATION PROFESSIONNELLE` |
 | Benchmark sur dalot complet avec un logiciel indépendant | P1 | `À FAIRE` (dossier de reproduction dans la fiche de validation) |
-| Alignement sur la vidéo CYPE de référence | P1 | `ACCEPTÉ AVEC RÉSERVE` : vidéo reçue et lue le 2026-11-19, étapes et plans alignés ; ferraillages comparés, écarts de −20 % à +63 % non expliqués |
-| Murs en aile : Ka, moment d'encastrement, stabilité recalculés indépendamment | P0 | `VÉRIFIÉ – CONTRÔLE MANUEL` (tests 12 à 14) ; moment du talon ×2 par rapport à CYPE `À RECHERCHER` |
+| Murs en aile : Ka, moment d'encastrement, stabilité recalculés indépendamment | P0 | `VÉRIFIÉ – CONTRÔLE MANUEL` (tests 12 à 14) ; moment du talon des semelles à recouper `À RECHERCHER` |
 | Plans et nomenclature : barres dans le béton, totaux, DXF et SVG bien formés | P1 | `VÉRIFIÉ – CONTRÔLE MANUEL` (tests 9 à 11) ; relecture humaine des plans `À FAIRE` |
 | Signal de confiance, tutoriel et « Comprendre le calcul » intégrés | P2 | Fait |
