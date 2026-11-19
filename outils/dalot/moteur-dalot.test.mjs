@@ -186,3 +186,67 @@ test('Plans : armatures dans le béton, quatre planches A3, SVG et DXF bien form
     assert.ok(dxf.every(s => /^[\x20-\x7e]*$/.test(s)), 'DXF en ASCII (accents codés \\U+XXXX)');
   }
 });
+
+const TT = createRequire(import.meta.url)('./tetes-dalot.cjs');
+const RAD = Math.PI / 180;
+function casPDF() { // dalot 2 x 3,00 x 2,00, L = 8 m, ailes à 27° sur radier de tête (dossier AGEROUTE fourni)
+  const p = M.parametresDefaut();
+  Object.assign(p.geo, { n: 2, L: 3, H: 2, es: 0.3, er: 0.3, ep: 0.25, ec: 0.25, gousset: 0, longueur: 8, Hr: 0.3, ech: 0.05 });
+  p.tetes = TT.parametresDefaut();
+  return p;
+}
+
+test('Têtes : coefficient de Coulomb et moment d\'encastrement des ailes recalculés à la main', () => {
+  proche(TT.kaCoulomb(30 * RAD, 0, 0), 1 / 3, 1e-12, 'Ka, φ = 30°, talus horizontal');
+  proche(TT.kaCoulomb(30 * RAD, 30 * RAD, 0), Math.cos(30 * RAD) ** 2, 1e-12, 'Ka, β = φ : cos² φ');
+  // φ = 33°, β = 26° : cos²33 / (1 + √(sin33 sin7 / cos26))² = 0,7034 / 1,2718² = 0,4349 (cas de la vidéo CYPE)
+  proche(TT.kaCoulomb(33 * RAD, 26 * RAD, 0), 0.4349, 1e-4, 'Ka vidéo');
+  const p = casPDF(), r = M.calculer(p), t = TT.calculerTetes(p, r);
+  // H0 = H + es + longrine = 2,00 + 0,30 + 0,20 = 2,50 m ; q = 10 × sin 27° = 4,540 kPa
+  proche(t.G.H0, 2.5, 1e-12, 'Hauteur de l\'aile au départ');
+  proche(t.q, 10 * Math.sin(27 * RAD), 1e-12, 'Surcharge sur remblai');
+  // Mu = 1,35 × (1/3 × 20 × 2,5³ / 6) + 1,6 × (1/3 × 4,540 × 2,5² / 2) = 23,44 + 7,57 = 31,01 kN.m/m
+  proche(t.troncons[0].voile.Mu, 31.01, 0.02, 'Mu à la base de l\'aile');
+  assert.equal(t.ok, true, t.alertes.join(' ; '));
+  assert.ok(t.radier.inf.barres.As * 1e4 >= t.radier.inf.AsReq * 1e4 - 1e-9);
+});
+
+test('Têtes en T sur semelle : stabilité recalculée indépendamment', () => {
+  const p = casPDF();
+  Object.assign(p.tetes, { type: 'semelle', angle: 15, longueurAuto: false, longueur: 12.8, plat: 0.7, hFin: 0.5, epAuto: false, ep: 0.5, eSemelle: 0.5 });
+  const r = M.calculer(p), t = TT.calculerTetes(p, r);
+  assert.equal(t.troncons.length, 4, 'tronçons de 3,20 m pour une longueur minimale de 3 m');
+  for (const o of t.troncons) {
+    const s = o.semelle.stab, H = o.tr.H, e = 0.5, es = 0.5, Ht = H + es, g = p.sol.gammaR, Ka = t.Ka, q = t.q;
+    // moments autour de l'arête avant : voile, semelle, terre sur le talon / poussée des terres et de la surcharge
+    const Ms = 25 * e * H * (s.av + e / 2) + 25 * s.B * es * s.B / 2 + g * H * s.ar * (s.av + e + s.ar / 2);
+    const Mr = Ka * g * Ht * Ht / 2 * Ht / 3 + Ka * q * Ht * Ht / 2;
+    proche(s.FSr, Ms / Mr, 1e-9, `renversement tronçon ${o.tr.i}`);
+    const N = 25 * e * H + 25 * s.B * es + g * H * s.ar;
+    proche(s.FSg, N * p.tetes.mu / (Ka * g * Ht * Ht / 2 + Ka * q * Ht), 1e-9, `glissement tronçon ${o.tr.i}`);
+    assert.ok(s.FSr >= 1.5 && s.FSg >= 1.5 && s.sref <= p.sol.sigmaAdm, `tronçon ${o.tr.i} stable`);
+  }
+  assert.ok(t.troncons[0].semelle.stab.B >= t.troncons[3].semelle.stab.B, 'semelle plus large au tronçon le plus haut');
+});
+
+test('Dossier complet : 8 planches (têtes et garde-corps), 7 sans garde-corps, nomenclatures cohérentes', () => {
+  for (const [type, gc, attendu] of [['radier', true, 8], ['semelle', false, 7]]) {
+    const p = casPDF(); p.tetes.type = type; p.tetes.gc.actif = gc;
+    const r = M.calculer(p); r.tetes = TT.calculerTetes(p, r);
+    const d = PL.planches(p, r);
+    assert.equal(d.planches.length, attendu, type);
+    for (const pl of d.planches) for (const q of pl.prims) {
+      const pts = q.t === 'l' ? [[q.x1, q.y1], [q.x2, q.y2]] : q.t === 'p' ? q.pts : [[q.x, q.y]];
+      for (const [x, y] of pts) assert.ok(Number.isFinite(x) && Number.isFinite(y) && x >= 0 && x <= PL.A3.w && y >= 0 && y <= PL.A3.h, `${pl.titre} : tracé hors de la feuille`);
+    }
+    for (const nm of [d.nomenclature, d.nomenclatureTetes, d.nomenclatureGC].filter(Boolean)) {
+      proche(nm.masse, nm.lignes.reduce((a, l) => a + l.nbre * l.Lunit * l.kgm, 0), 1e-6, 'masse');
+      assert.ok(nm.lignes.every(l => l.nbre === l.nElem * l.nPar && l.Lunit > 0));
+    }
+    // numérotation continue du module aux têtes
+    assert.equal(d.nomenclatureTetes.lignes[0].pos, d.nomenclature.lignes.length + 1);
+    const dxf = PL.versDXF(d.planches).split('\r\n');
+    assert.equal(dxf.at(-2), 'EOF');
+    assert.ok(dxf.every(s => /^[\x20-\x7e]*$/.test(s)));
+  }
+});

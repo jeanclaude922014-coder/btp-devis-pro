@@ -35,11 +35,12 @@
   function parametresDefaut() {
     return {
       projet: { nom: 'Dalot 2 x 2,00 x 1,50', lieu: 'Abidjan', route: '', pk: '', maitre: 'AGEROUTE',
-        auteur: 'Moulo Jean Claude', date: '' },
+        auteur: 'Moulo Jean Claude', date: '', marche: '', controle: '', entreprise: '', phase: 'Etude d\'exécution',
+        pays: 'REPUBLIQUE DE COTE D\'IVOIRE', devise: 'Union - Discipline - Travail', ministere: 'Ministère de l\'Equipement et de l\'Entretien Routier' },
       hydro: { Q: 12, K: 67, pente: 0.5, tauxMax: 0.8, vMin: 0.5, vMax: 4.0,
         C: 0.6, I: 100, A: 0.5 },
       norme: 'BAEL', // 'BAEL' | 'EC2'
-      mat: { fc: 25, fe: 500, enrobageExt: 0.04, enrobageInt: 0.04, dmax: 25, env: 'humide', fissuration: 'prejudiciable',
+      mat: { fc: 25, fe: 500, dosage: 400, enrobageExt: 0.04, enrobageInt: 0.04, dmax: 25, env: 'humide', fissuration: 'prejudiciable',
         wmax: 0.3, phiEst: 14 },
       geo: { n: 2, L: 2.0, H: 1.5, es: 0.25, er: 0.25, ep: 0.25, ec: 0.25, gousset: 0.15,
         longueur: 10, Hr: 0.6, ech: 0.05 },

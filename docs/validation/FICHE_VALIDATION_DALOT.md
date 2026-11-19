@@ -26,7 +26,7 @@ Domaine couvert : dalot droit de 1 à 6 cellules identiques, coulé en place, ba
 
 Aucun document du référentiel ne contient à ce jour d'exemple chiffré de dalot. Les textes BAEL et Fascicule 61 ne sont pas déposés : voir demandes ci-dessous.
 
-## Comparaison des résultats (11 tests automatiques `outils/dalot/moteur-dalot.test.mjs`)
+## Comparaison des résultats (14 tests automatiques `outils/dalot/moteur-dalot.test.mjs`)
 | Cas | Grandeur | Référence analytique / manuelle | Notre logiciel | Tolérance | Statut |
 |---|---|---:|---:|---:|---|
 | Poutre bi-encastrée L = 4 m, q = 10 kN/m | M appui ; M travée | −13,333 ; +6,667 kN.m | identique | 0,001 | `VÉRIFIÉ – CONTRÔLE MANUEL` |
@@ -66,6 +66,22 @@ Saisie équivalente : bouton « Charger l'exemple de la vidéo CYPE » (cellules
 | Cloison | HA10 e=25 (3,14 cm²) | HA10 e=25 (3,14 cm²) | 0 % |
 
 Statut : `ACCEPTÉ AVEC RÉSERVE` — comparaison partielle, ne valide pas le moteur. Les hypothèses ne sont pas identiques (coques 3D contre portique plan, cellules inégales, positions des charges). La vidéo n'affiche ni moments ni combinaisons ; les étiquettes de ferraillage sont lues à basse résolution et leur attribution à chaque face reste à confirmer.
+
+### Têtes d'ouvrage (2026-11-19)
+Module `outils/dalot/tetes-dalot.cjs`. Tests 12 à 14 : Ka de Coulomb (φ = 30°, β = 0 et β = φ ; φ = 33°, β = 26° → 0,4349), moment d'encastrement d'une aile de 2,50 m recalculé à la main (31,0 kN.m/m), renversement et glissement des 4 tronçons recalculés indépendamment, dossier de 8 planches bien formé.
+
+| Comparaison | Grandeur | Référence | Dalot Pro CI | Écart |
+|---|---|---:|---:|---:|
+| Vidéo CYPE, tronçon 1 | largeur de semelle | 3,70 m | 3,95 m | +7 % |
+| Vidéo CYPE, tronçon 2 | renfort vertical | 1,50 m (minimum) | 1,50 m | 0 % |
+| Vidéo CYPE, tronçon 2 | moment du patin avant | 63,76 kN.m/m | 63,4 kN.m/m | −1 % |
+| Vidéo CYPE, tronçon 2 | moment du talon | 54,35 kN.m/m | 115,4 kN.m/m | ×2,1 |
+| Vidéo CYPE, tronçon 3 | effort tranchant du voile | 44,30 kN/m | 40,2 kN/m | −9 % |
+| Vidéo CYPE, tronçon 3 | moment du voile | 44,95 kN.m/m | 57,5 kN.m/m | +28 % |
+| Dossier AGEROUTE 2×3,00×2,00 L=8 m | aciers du voile côté terre / côté eau | Ø12 e=20 / Ø10 e=20 | HA12 e=15 / HA12 e=25 | même ordre |
+| Dossier AGEROUTE | masse d'acier module / têtes / garde-corps | 4 933 / 1 833 / 110 kg | 5 873 / 1 318 / 182 kg | +19 % / −28 % / +65 % |
+
+Statut : `ACCEPTÉ AVEC RÉSERVE`. Le moment du talon est environ double de celui de CYPE (hypothèses de charge sur le talon et de répartition des pressions à confronter). Le dossier AGEROUTE n'est pas une note de calcul : la comparaison des masses ne valide rien, elle situe l'ordre de grandeur.
 
 ### Dossier de reproduction proposé
 Non réalisé. Dossier de reproduction proposé (CYPE « Dalots », Robot ou SCIA) :

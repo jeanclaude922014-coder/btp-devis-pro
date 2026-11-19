@@ -183,11 +183,12 @@ tr.groupe-nappe td{background:var(--surface-2);font-weight:700;font-size:12.5px}
 </div>
 
 <script>/*__MOTEUR__*/</script>
+<script>/*__TETES__*/</script>
 <script>/*__PLANS__*/</script>
 <script>
 (function(){
 'use strict';
-var M = DalotMoteur, PL = DalotPlans;
+var M = DalotMoteur, PL = DalotPlans, TT = DalotTetes;
 var CLE = 'dalot-pro-ci-projet';
 
 /* ---------- état ---------- */
@@ -199,7 +200,7 @@ function fusion(base, src){
   });
   return base;
 }
-function nouveau(){ var p = M.parametresDefaut(); p.projet.date = new Date().toISOString().slice(0,10); p.sol.type = 'libre'; return p; }
+function nouveau(){ var p = M.parametresDefaut(); p.tetes = TT.parametresDefaut(); p.projet.date = new Date().toISOString().slice(0,10); p.sol.type = 'libre'; return p; }
 var P = nouveau();
 try { var s = localStorage.getItem(CLE); if (s) fusion(P, JSON.parse(s)); } catch(e){}
 var R = null, etape = 'projet', grandeur = 'M_elu';
@@ -213,8 +214,8 @@ function cm2(v){ return nf(v*1e4,2); }
 
 /* ---------- étapes et champs ---------- */
 var ETAPES = [
-  ['Données', [['projet','Projet'],['hydro','Hydraulique'],['normes','Normes et matériaux'],['geo','Géométrie'],['sol','Sol et remblai'],['charges','Charges'],['coef','Combinaisons']]],
-  ['Résultats', [['efforts','Efforts'],['ferraillage','Ferraillage'],['plans','Plans'],['metre','Métré'],['note','Note de calcul']]],
+  ['Données', [['projet','Projet'],['hydro','Hydraulique'],['normes','Normes et matériaux'],['geo','Géométrie'],['sol','Sol et remblai'],['charges','Charges'],['tetes','Têtes et garde-corps'],['coef','Combinaisons']]],
+  ['Résultats', [['efforts','Efforts'],['ferraillage','Ferraillage'],['resTetes','Murs en aile'],['plans','Plans'],['metre','Métré'],['note','Note de calcul']]],
   ['Aide', [['tutoriel','Tutoriel'],['comprendre','Comprendre le calcul'],['verification','Méthode de vérification']]]
 ];
 var ENV = {
@@ -235,7 +236,12 @@ var CHAMPS = {
     {k:'projet.lieu',l:'Localité',t:'txt'},
     {k:'projet.maitre',l:'Maître d\'ouvrage',t:'txt'},
     {k:'projet.auteur',l:'Auteur de la note',t:'txt'},
-    {k:'projet.date',l:'Date',t:'txt'}],
+    {k:'projet.date',l:'Date',t:'txt'},
+    {k:'projet.marche',l:'Intitulé des travaux (cartouche des plans)',t:'txt',a:'Exemple : Travaux de réhabilitation de routes rurales dans la région du Bounkani.'},
+    {k:'projet.controle',l:'Mission de contrôle',t:'txt'},
+    {k:'projet.entreprise',l:'Entreprise',t:'txt'},
+    {k:'projet.phase',l:'Phase',t:'txt'},
+    {k:'projet.ministere',l:'Ministère',t:'txt'}],
   hydro:[
     {k:'hydro.Q',l:'Débit de projet Q',u:'m³/s',p:0.5,a:'Issu de l\'étude hydrologique (crue décennale pour un dalot courant).'},
     {k:'hydro.pente',l:'Pente longitudinale du radier',u:'%',p:0.1},
@@ -257,7 +263,8 @@ var CHAMPS = {
     {k:'mat.dmax',l:'Dimension maximale du granulat',u:'mm',p:5,a:'Rappelée dans la note. Conditionne l\'espacement minimal entre barres.'},
     {k:'mat.fissuration',l:'Fissuration',t:'sel',o:[['peu','Peu préjudiciable'],['prejudiciable','Préjudiciable'],['tres','Très préjudiciable']],si:function(){return P.norme==='BAEL';}},
     {k:'mat.wmax',l:'Ouverture de fissure admissible wmax',u:'mm',p:0.05,si:function(){return P.norme==='EC2';}},
-    {k:'mat.phiEst',l:'Diamètre estimé des barres',u:'mm',p:2,a:'Sert au calcul de la hauteur utile d.'}],
+    {k:'mat.phiEst',l:'Diamètre estimé des barres',u:'mm',p:2,a:'Sert au calcul de la hauteur utile d.'},
+    {k:'mat.dosage',l:'Dosage du béton',u:'kg/m³',p:25,a:'Repris dans les récapitulatifs des plans (BÉTON Q400).'}],
   geo:[
     {k:'geo.n',l:'Nombre de cellules',u:'—',p:1,min:1,max:6,entier:1},
     {k:'geo.L',l:'Ouverture libre d\'une cellule',u:'m',p:0.25},
@@ -301,6 +308,40 @@ var CHAMPS = {
     {k:'charges.qFond',l:'Valeur de la surcharge sur radier',u:'kPa',p:1,si:function(){return P.charges.fond;}},
     {k:'charges.eau',l:'Dalot en eau (charge hydraulique intérieure)',t:'chk',redessine:1},
     {k:'charges.hEau',l:'Hauteur d\'eau intérieure',u:'m',p:0.1,si:function(){return P.charges.eau;}}],
+  tetes:[
+    {k:'tetes.actif',l:'Calculer et dessiner les têtes d\'ouvrage',t:'chk',redessine:1},
+    {k:'tetes.type',l:'Type de murs en aile',t:'sel',o:[['radier','Ailes sur radier de tête avec bêche (pratique AGEROUTE)'],['semelle','Murs en T sur semelle, par tronçons (méthode CYPE)']],si:aT},
+    {k:'tetes.angle',l:'Angle des ailes avec l\'axe de l\'ouvrage',u:'°',p:1,si:aT},
+    {k:'tetes.longueurAuto',l:'Longueur des ailes proposée d\'après le talus',t:'chk',si:aT},
+    {k:'tetes.longueur',l:'Longueur d\'une aile',u:'m',p:0.05,si:function(){return aT()&&!P.tetes.longueurAuto;}},
+    {k:'tetes.plat',l:'Partie horizontale en tête de l\'aile',u:'m',p:0.05,si:aT},
+    {k:'tetes.hFin',l:'Hauteur de l\'aile en bout',u:'cm',m:100,p:5,si:aT},
+    {k:'tetes.talus',l:'Pente du talus de remblai',u:'°',p:0.5,si:aT,a:'3/2 = 33,7° ; 2/1 = 26,6°. Fixe la longueur proposée.'},
+    {k:'tetes.betaPoussee',l:'Inclinaison du remblai derrière le voile',u:'°',p:1,si:aT,a:'0° si le talus suit l\'aile. CYPE prend l\'angle du talus, limité à φ.'},
+    {k:'tetes.deltaPct',l:'Frottement terre-mur',u:'% de φ',p:5,si:aT},
+    {k:'tetes.epAuto',l:'Épaisseur du voile proposée (H/12 sur radier, H/10 sur semelle)',t:'chk',si:aT},
+    {k:'tetes.ep',l:'Épaisseur du voile',u:'cm',m:100,p:1,si:function(){return aT()&&!P.tetes.epAuto;}},
+    {k:'tetes.qAuto',l:'Surcharge sur remblai = surcharge routière × sin(angle) (règle CYPE)',t:'chk',si:aT},
+    {k:'tetes.q',l:'Surcharge sur le remblai des ailes',u:'kPa',p:0.5,si:function(){return aT()&&!P.tetes.qAuto;}},
+    {k:'tetes.eRadier',l:'Épaisseur du radier de tête',u:'cm',m:100,p:1,si:function(){return aT()&&P.tetes.type==='radier';}},
+    {k:'tetes.becheProf',l:'Profondeur de la bêche (depuis le dessus du radier)',u:'cm',m:100,p:5,si:function(){return aT()&&P.tetes.type==='radier';}},
+    {k:'tetes.becheLarg',l:'Largeur de la bêche',u:'cm',m:100,p:5,si:function(){return aT()&&P.tetes.type==='radier';}},
+    {k:'tetes.eSemelle',l:'Épaisseur de la semelle',u:'cm',m:100,p:5,si:function(){return aT()&&P.tetes.type==='semelle';}},
+    {k:'tetes.tronconMin',l:'Longueur minimale d\'un tronçon',u:'m',p:0.5,si:function(){return aT()&&P.tetes.type==='semelle';}},
+    {k:'tetes.mu',l:'Coefficient de frottement sol-fondation',u:'—',p:0.01,si:function(){return aT()&&P.tetes.type==='semelle';}},
+    {k:'tetes.FSr',l:'Coefficient de sécurité au renversement',u:'—',p:0.1,si:function(){return aT()&&P.tetes.type==='semelle';}},
+    {k:'tetes.FSg',l:'Coefficient de sécurité au glissement',u:'—',p:0.1,si:function(){return aT()&&P.tetes.type==='semelle';}},
+    {k:'tetes.renforts',l:'Armer les voiles avec des renforts verticaux',t:'chk',si:function(){return aT()&&P.tetes.type==='semelle';}},
+    {k:'tetes.renfortMin',l:'Hauteur minimale des renforts',u:'m',p:0.1,si:function(){return aT()&&P.tetes.type==='semelle'&&P.tetes.renforts;}}],
+  gc:[
+    {k:'tetes.gc.actif',l:'Garde-corps en béton armé sur les deux têtes',t:'chk',si:aT},
+    {k:'tetes.gc.vide',l:'Hauteur libre entre longrine et lisse',u:'cm',m:100,p:5,si:aGC},
+    {k:'tetes.gc.lisse',l:'Hauteur de la lisse haute',u:'cm',m:100,p:1,si:aGC},
+    {k:'tetes.gc.longrine',l:'Hauteur de la longrine (poutre de tête)',u:'cm',m:100,p:1,si:aGC},
+    {k:'tetes.gc.epaisseur',l:'Épaisseur du garde-corps',u:'cm',m:100,p:1,si:aGC},
+    {k:'tetes.gc.poteau',l:'Largeur des poteaux principaux',u:'cm',m:100,p:1,si:aGC},
+    {k:'tetes.gc.poteauInter',l:'Largeur des poteaux intermédiaires',u:'cm',m:100,p:1,si:aGC},
+    {k:'tetes.gc.ouvertureMax',l:'Ouverture maximale entre poteaux',u:'cm',m:100,p:5,si:aGC}],
   coef:[
     {k:'coef.Gsup',l:'Permanentes défavorables',u:'ELU',p:0.05},{k:'coef.Ginf',l:'Permanentes favorables',u:'ELU',p:0.05},
     {k:'coef.eluRoute',l:'Charges routières civiles',u:'ELU',p:0.05},{k:'coef.eluMc',l:'Convoi militaire',u:'ELU',p:0.05},
@@ -309,11 +350,13 @@ var CHAMPS = {
     {k:'coef.elsLat',l:'Surcharge sur remblai',u:'ELS',p:0.05},{k:'coef.elsEau',l:'Eau intérieure',u:'ELS',p:0.05},
     {k:'coef.psi1',l:'Coefficient ψ1 (combinaison fréquente)',u:'—',p:0.05,si:function(){return P.norme==='EC2';},a:'Sert au calcul de l\'ouverture des fissures.'}]
 };
+function aT(){ return !!(P.tetes && P.tetes.actif); }
+function aGC(){ return aT() && P.tetes.gc.actif; }
 var INDEX = {}; Object.keys(CHAMPS).forEach(function(g){ CHAMPS[g].forEach(function(f){ INDEX[f.k] = f; }); });
 
 function champ(f){
   if (f.si && !f.si()) return '';
-  var id = 'f_' + f.k.replace('.','_'), v = lire(f.k), lib = typeof f.l === 'function' ? f.l() : f.l;
+  var id = 'f_' + f.k.replace(/\./g,'_'), v = lire(f.k), lib = typeof f.l === 'function' ? f.l() : f.l;
   var aide = f.a ? '<div class="aide">'+esc(f.a)+'</div>' : '';
   if (f.t === 'chk') return '<div class="champ coche"><input type="checkbox" id="'+id+'" data-k="'+f.k+'"'+(v?' checked':'')+'><label for="'+id+'">'+esc(lib)+'</label>'+aide+'</div>';
   if (f.t === 'sel') return '<div class="champ"><label for="'+id+'">'+esc(lib)+'</label><select id="'+id+'" data-k="'+f.k+'">'+f.o.map(function(o){ return '<option value="'+o[0]+'"'+(String(o[0])===String(v)?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+'</select>'+aide+'</div>';
@@ -482,8 +525,12 @@ function tabMetre(){
     ['Béton armé du cadre',nf(m.beton,2),'m³','Section '+nf(m.aire,3)+' m² × longueur '+nf(P.geo.longueur,2)+' m, goussets compris'],
     ['Coffrage',nf(m.coffrage,1),'m²','Faces extérieures des piédroits, parois et sous-face des cellules'],
     ['Aciers HA',nf(nm.total,0),'kg','Nomenclature des aciers ('+nm.lignes.length+' positions, recouvrements compris) + '+nf(P.metre.majorationAcier,0)+' % de chutes et attentes'],
-    ['Ratio d\'acier',nf(nm.ratio,0),'kg/m³','Contrôle d\'ordre de grandeur']]) +
-    '<p class="pied">Les têtes d\'ouvrage (murs en aile, parafouilles, guide-roues) ne sont ni calculées ni métrées.</p>';
+    ['Ratio d\'acier',nf(nm.ratio,0),'kg/m³','Contrôle d\'ordre de grandeur']].concat(R.tetes ? [
+    ['Béton armé des têtes',nf(R.tetes.beton,2),'m³', P.tetes.type==='radier' ? '4 ailes, 2 radiers de tête et 2 bêches' : '4 murs en aile et leurs semelles'],
+    ['Aciers HA des têtes',nf(dossier().nomenclatureTetes.total,0),'kg','Nomenclature des têtes, chutes comprises']] : []).concat(R.tetes && R.tetes.gc ? [
+    ['Béton armé des garde-corps',nf(R.tetes.betonGC,2),'m³','2 garde-corps, longrines comprises'],
+    ['Aciers HA des garde-corps',nf(dossier().nomenclatureGC.total,0),'kg','Ferraillage constructif']] : [])) +
+    (R.tetes ? '' : '<p class="pied">Têtes d\'ouvrage non calculées : activer l\'étape « Têtes et garde-corps ».</p>');
 }
 function prelim(){ return R && R.ok ? '' : '<div class="alerte">'+(R ? R.erreurs.map(esc).join('<br>') : 'Calcul impossible.')+'</div>'; }
 
@@ -497,6 +544,9 @@ var VUES = {
   geo:function(){ return bloc('Section transversale', '<div class="puces">'+[[1,1,1,20],[1,1.5,1.5,20],[1,2,2,25],[2,2,1.5,25],[2,2,2,25],[3,3,2,30],[3,3,3,35]].map(function(q){ return '<button data-gabarit="'+q.join(',')+'">'+q[0]+' × '+nf(q[1],2)+' × '+nf(q[2],2)+'</button>'; }).join('')+'<button id="bPredim">Épaisseurs de départ (règle de l\'assistant CYPE)</button></div>'+formulaire('geo'), 'Gabarits courants (cellules × ouverture × hauteur, en mètres). Les épaisseurs proposées sont un point de départ que le calcul confirme ou non.') + '<div id="res"></div>'; },
   sol:function(){ return bloc('Sol de fondation et remblai', formulaire('sol'), 'Le radier repose sur des appuis élastiques (modèle de Winkler). Les piédroits reçoivent la poussée du remblai.') + '<div id="res"></div>'; },
   charges:function(){ return bloc('Charges d\'exploitation', formulaire('charges'), 'Le Fascicule 61 titre II reste la référence des marchés routiers ivoiriens. Le modèle LM1 de l\'Eurocode 1 est proposé pour les projets financés aux Eurocodes.') + '<div id="res"></div>'; },
+  tetes:function(){ return bloc('Murs en aile', formulaire('tetes'), 'Deux dispositions : les ailes minces sur radier de tête avec bêche des dossiers AGEROUTE, ou les murs en T sur semelle découpés en tronçons de la vidéo CYPE. Poussée de Coulomb, voile calculé en console à sa base.') +
+    bloc('Garde-corps', formulaire('gc'), 'Garde-corps en béton armé posé sur une longrine en bout de tablier. Ferraillage constructif, non calculé.') + '<div id="res"></div>'; },
+  resTetes:function(){ return '<div id="res"></div>'; },
   coef:function(){ return bloc('Coefficients de pondération', '<div><button id="bCoef">Rétablir les valeurs du règlement</button></div>'+formulaire('coef'), 'Chaque action variable est tantôt présente, tantôt absente. Les actions permanentes prennent leur valeur défavorable ou favorable. L\'enveloppe couvre toutes ces combinaisons.') + '<div id="res"></div>'; },
   efforts:function(){ return '<div id="res"></div>'; },
   ferraillage:function(){ return '<div id="res"></div>'; },
@@ -507,6 +557,35 @@ var VUES = {
   comprendre:function(){ return document.getElementById('tplComprendre').innerHTML; },
   verification:function(){ return document.getElementById('tplVerification').innerHTML; }
 };
+function tabTetes(){
+  var T = R.tetes; if (!T) return '<div class="info">Les têtes d\'ouvrage ne sont pas calculées : cocher l\'option à l\'étape « Têtes et garde-corps ».</div>';
+  var G = T.G, t = P.tetes, o = '';
+  o += bloc('Géométrie et poussée', tableau(['Grandeur','#Valeur','Unité'],[
+    ['Type', t.type==='radier'?'ailes sur radier de tête avec bêche':'murs en T sur semelle', ''],
+    ['Hauteur de l\'aile au départ, au-dessus de sa base', nf(G.H0,2), 'm'], ['Longueur d\'une aile', nf(G.La,2), 'm'],
+    ['Épaisseur du voile', nf(G.ep*100,0), 'cm'], ['Nombre de tronçons', G.troncons.length, ''],
+    ['Coefficient de poussée de Coulomb Ka', nf(T.Ka,3), '—'], ['Surcharge sur le remblai', nf(T.q,2), 'kPa']]));
+  o += bloc('Voiles : efforts à la base et ferraillage', tableau(['Tronçon','#H (m)','#Mu (kN.m/m)','#Ms (kN.m/m)','#Vu (kN/m)','#τu / limite (MPa)','Côté terre','Renfort','Côté avant','Horizontales','État'],
+    T.troncons.map(function(x){ var v = x.voile; return [x.tr.i, nf(x.tr.H,2), nf(v.Mu,1), nf(v.Ms,1), nf(v.Vu,1), nf(v.tranchant.tau,2)+' / '+nf(v.tranchant.limite,2),
+      M.texteBarres(v.continu.barres), v.renfort ? M.texteBarres(v.renfort.barres)+' sur '+nf(v.renfort.h,2)+' m' : '—', M.texteBarres(v.avant.barres), M.texteBarres(v.horiz), etat(v.base.ok && v.tranchant.ok)]; })));
+  if (t.type === 'semelle') {
+    o += bloc('Semelles : stabilité', tableau(['Tronçon','#B (m)','#Avant / arrière (m)','#Renversement','#Glissement','#σ réf. / adm (kPa)','État'],
+      T.troncons.map(function(x){ var s = x.semelle.stab; return [x.tr.i, nf(s.B,2), nf(s.av,2)+' / '+nf(s.ar,2), nf(s.FSr,2)+' ≥ '+nf(t.FSr,1), nf(s.FSg,2)+' ≥ '+nf(t.FSg,1), nf(s.sref,0)+' / '+nf(P.sol.sigmaAdm,0), etat(s.okR && s.okG && s.okS)]; }))
+      + '<p class="pied">Renversement autour de l\'arête avant, glissement avec μ = '+nf(t.mu,2)+', contrainte de référence (3 σmax + σmin) / 4 comparée à la contrainte admissible.</p>');
+    o += bloc('Semelles : ferraillage', tableau(['Tronçon','#M patin avant (kN.m/m)','#M talon (kN.m/m)','Transversales inférieures','Transversales supérieures','Longitudinales'],
+      T.troncons.map(function(x){ var s = x.semelle; return [x.tr.i, nf(s.Mav,1), nf(s.Mar,1), M.texteBarres(s.inf.barres), M.texteBarres(s.sup.barres), M.texteBarres(s.longi)]; })));
+  } else if (T.radier) {
+    var rd = T.radier;
+    o += bloc('Radier de tête', tableau(['Grandeur','#Valeur','Unité'],[
+      ['Longueur selon l\'axe', nf(rd.Lr,2), 'm'], ['Largeur au départ / en bout', nf(rd.largeurDebut,2)+' / '+nf(rd.largeurFin,2), 'm'],
+      ['Moment d\'encastrement des ailes repris (ELU)', nf(T.troncons[0].voile.Mu,1), 'kN.m/m'],
+      ['Nappe inférieure transversale', M.texteBarres(rd.inf.barres), ''], ['Nappe supérieure transversale', M.texteBarres(rd.sup.barres), ''],
+      ['Longitudinales (deux nappes)', M.texteBarres(rd.longi), ''], ['Pression moyenne sur le sol', nf(rd.sol,0)+' / '+nf(P.sol.sigmaAdm,0), 'kPa']]) +
+      '<p class="pied">Les deux ailes et le radier forment un U ouvert : les poussées s\'équilibrent, le radier reprend le moment d\'encastrement des ailes sur toute sa largeur.</p>');
+  }
+  if (T.gc) o += bloc('Garde-corps', '<p>'+T.gc.poteaux.length+' poteaux par garde-corps, longueur '+nf(T.gc.longueur,2)+' m, hauteur '+nf(T.gc.hauteur,2)+' m. Ferraillage constructif.</p>');
+  return alertes(T.alertes) + o;
+}
 var RESULTATS = {
   hydro:function(){ var hy = R.hydro; return bloc('Vérification hydraulique '+etat(hy.ok,'Satisfaisante','À revoir'), alertes(hy.alertes)+tabHydro()+svgCoupe({eau:true})+'<p class="pied">Contrôle amont ou aval, remous et affouillement en sortie non étudiés.</p>'); },
   normes:function(){ var m = R.mat, b = P.norme==='BAEL';
@@ -533,7 +612,9 @@ var RESULTATS = {
     bloc('Rapport de vérification par nappe', tabVerifications(), 'Présentation du rapport « Vérification complète » de CYPE : chaque règle avec sa limite, la valeur obtenue et son état.') +
     bloc('Contraintes en service', tabContraintes()) + bloc('Effort tranchant', tabTranchant()) +
     bloc('Dispositions constructives', document.getElementById('tplDispositions').innerHTML) + reserve(); },
-  metre:function(){ return bloc('Avant-métré', tabMetre()) + bloc('Nomenclature des aciers', tabNomenclature(dossier().nomenclature)); },
+  metre:function(){ var d = dossier(); return bloc('Avant-métré', tabMetre()) + bloc('Nomenclature des aciers du module', tabNomenclature(d.nomenclature)) + (d.nomenclatureTetes ? bloc('Nomenclature des aciers des têtes', tabNomenclature(d.nomenclatureTetes)) : '') + (d.nomenclatureGC ? bloc('Nomenclature des aciers des garde-corps', tabNomenclature(d.nomenclatureGC)) : ''); },
+  tetes:function(){ return tabTetes(); },
+  resTetes:function(){ return tabTetes(); },
   plans:function(){
     var d = dossier(), n = d.planches.length;
     var o = bloc('Dossier de plans d\'exécution', '<div class="actions-plans"><button id="bDXF" class="fort">Exporter en DXF (AutoCAD)</button><button id="bImpPlans">Imprimer les plans (A3 paysage)</button></div>' +
@@ -574,6 +655,7 @@ function noteHTML(figures){
   o += '<h2>9. Effort tranchant</h2>'+tabTranchant();
   o += '<h2>10. Sol de fondation</h2><p>Pression maximale à l\'ELS '+nf(R.sol.max,0)+' kPa pour une contrainte admissible de '+nf(R.sol.adm,0)+' kPa ; pression minimale '+nf(R.sol.min,0)+' kPa. '+etat(R.sol.ok)+'</p>';
   o += '<h2>11. Avant-métré et nomenclature des aciers</h2>'+tabMetre()+tabNomenclature(dossier().nomenclature);
+  if (R.tetes) o += '<h2>11 bis. Têtes d\'ouvrage</h2>' + tabTetes() + tabNomenclature(dossier().nomenclatureTetes) + (dossier().nomenclatureGC ? tabNomenclature(dossier().nomenclatureGC) : '');
   o += '<h2>12. Dispositions constructives et exécution</h2>'+document.getElementById('tplDispositions').innerHTML;
   o += '<h2>13. Conclusion</h2>'+(R.conforme?'<p>'+etat(true,'Ouvrage justifié')+' Toutes les vérifications du périmètre calculé sont satisfaites.</p>':'<p>'+etat(false,'','Ouvrage non justifié')+'</p>'+alertes(R.alertes));
   o += '<p class="pied">Dalot Pro CI, moteur version '+M.VERSION+'. Niveau de vérification : contrôle manuel et références analytiques sur les cas documentés ; comparaison à un logiciel indépendant non réalisée. Hors périmètre : murs en aile, biais, nappe phréatique et flottabilité, tassements, séisme, phases de chantier. Cette note doit être vérifiée et visée par un ingénieur structure avant exécution.</p>';
@@ -583,7 +665,7 @@ function noteHTML(figures){
 /* ---------- rendu ---------- */
 var D = null, D_R = null;
 function dossier(){ if (!R || !R.ok) return null; if (D_R !== R) { D = PL.planches(P, R); D_R = R; } return D; }
-function recalculer(){ try { R = M.calculer(P); } catch(e){ R = {ok:false, erreurs:[e.message]}; } try { localStorage.setItem(CLE, JSON.stringify(P)); } catch(e){} }
+function recalculer(){ try { R = M.calculer(P); if (R.ok) { R.tetes = TT.calculerTetes(P, R); if (R.tetes) { R.alertes = R.alertes.concat(R.tetes.alertes); R.conforme = R.alertes.length === 0; } } } catch(e){ R = {ok:false, erreurs:[e.message]}; } try { localStorage.setItem(CLE, JSON.stringify(P)); } catch(e){} }
 function rendreNav(){
   var n = 0;
   document.getElementById('nav').innerHTML = ETAPES.map(function(gp){
@@ -675,6 +757,8 @@ function exempleVideo(){
   p.charges.A = false; p.charges.Bc = false; p.charges.Bt = true; p.charges.Br = false; p.charges.Mc120 = false;
   p.charges.surface = true; p.charges.qSurface = 9.81; p.charges.fond = true; p.charges.qFond = 4; p.charges.eau = false; p.charges.hEau = 0;
   p.hydro.Q = 40;
+  p.tetes.type = 'semelle'; p.tetes.angle = 15; p.tetes.longueurAuto = false; p.tetes.longueur = 12.80; p.tetes.plat = 0.70; p.tetes.hFin = 0.50;
+  p.tetes.talus = 26; p.tetes.betaPoussee = 26; p.tetes.epAuto = false; p.tetes.ep = 0.50; p.tetes.eSemelle = 0.50; p.tetes.mu = 0.58; p.tetes.gc.actif = false;
   return p;
 }
 function nomFichier(){ return (P.projet.nom || 'dalot').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\w]+/g,'_').replace(/^_|_$/g,'') || 'dalot'; }
@@ -742,7 +826,8 @@ document.addEventListener('DOMContentLoaded', function(){ recalculer(); rendreEt
 <li><b>Charges</b> : cocher les systèmes exigés par le CCTP (A, Bc, Bt, Br, Mc120).</li>
 <li><b>Combinaisons</b> : les coefficients du règlement sont proposés et restent modifiables.</li>
 <li><b>Efforts, Ferraillage</b> : lire les résultats et le rapport de vérification par nappe. Un point rouge signale une vérification non satisfaite, avec la correction à apporter.</li>
-<li><b>Plans</b> : 4 planches A3 avec cartouche (coffrage, ferraillage en coupe, dalle et radier en plan, nomenclature des aciers). « Exporter en DXF » ouvre les planches dans AutoCAD ; « Imprimer les plans » produit un PDF A3 paysage.</li>
+<li><b>Têtes et garde-corps</b> : choisir les ailes sur radier de tête avec bêche (dossiers AGEROUTE) ou les murs en T sur semelle par tronçons (méthode CYPE), puis le garde-corps. Les résultats sont dans « Murs en aile ».</li>
+<li><b>Plans</b> : dossier d'exécution en 8 planches A3 au cartouche « République de Côte d'Ivoire » : coffrage général et coupes, têtes, ferraillage de la section, du tablier et du radier, nomenclature du module, ferraillage et nomenclature des têtes, garde-corps. « Exporter en DXF » ouvre les planches dans AutoCAD ; « Imprimer les plans » produit un PDF A3 paysage.</li>
 <li><b>Métré</b> : quantités de béton, coffrage et aciers ; la masse d'acier vient de la nomenclature.</li>
 <li><b>Note de calcul</b> : imprimer en PDF ou exporter vers Word.</li>
 </ol></div></section>
@@ -815,6 +900,12 @@ BAEL, fissuration préjudiciable : σs limite = min( 2/3 fe ; max( 0,5 fe ; 110 
 Section minimale BAEL : As ≥ 0,23 b d ft28 / fe</span>
 <p><b>Application numérique à refaire à la main</b> : Mu = 100 kN.m, b = 1 m, d = 0,25 m, fc28 = 25 MPa, Fe E500. fbu = 14,17 MPa ; µ = 0,100 / (0,25² × 14,17) = 0,1129 ; α = 0,1501 ; z = 0,235 m ; As = 0,100 / (0,235 × 434,8) = 9,79 cm². Le logiciel donne la même valeur (test automatique n° 4).</p>
 <p>En Eurocode 2, la démarche est la même avec fcd = fck / 1,5. L'ouverture des fissures est calculée selon le § 7.3.4 sous la combinaison fréquente.</p></div></section>
+<section class="bloc"><h3>Murs en aile</h3><div class="prose">
+<span class="formule">Poussée (Coulomb, parement vertical) : Ka = cos²φ / ( cos δ [1 + √( sin(φ+δ) sin(φ−β) / (cos δ cos β) )]² ),  β ≤ φ
+Voile en console : Mu = 1,35 Ka γ H³/6 + 1,6 Ka q H²/2   (BAEL)      q = surcharge routière × sin(angle de l'aile)
+Semelle : renversement Ms / Mr ≥ 1,5 ; glissement μ ΣV / ΣH ≥ 1,5 ; (3 σmax + σmin) / 4 ≤ σadm</span>
+<p>Application à refaire à la main : aile de 2,50 m, φ = 30°, γ = 20 kN/m³, q = 10 × sin 27° = 4,54 kPa. Ka = 1/3 ; Mu = 1,35 × 17,36 + 1,6 × 4,73 = 31,0 kN.m/m (test automatique n° 12).</p>
+<p>Ailes sur radier de tête : les deux ailes et le radier forment un U ouvert. Les poussées s'équilibrent ; le radier reprend le moment d'encastrement des ailes. Murs en T : chaque tronçon est calculé à sa hauteur maximale, la semelle est élargie par pas de 5 cm jusqu'à vérifier la stabilité, les renforts verticaux s'arrêtent là où les barres continues suffisent, prolongés d'une longueur d'ancrage.</p></div></section>
 <section class="bloc"><h3>Effort tranchant</h3><div class="prose">
 <span class="formule">BAEL A.5.2.2 (dalle sans armature transversale) : τu = Vu / (b d) ≤ 0,07 fc28 / 1,5
 EC2 § 6.2.2 : VRd,c = max( 0,12 k (100 ρ fck)^(1/3) ; 0,035 k^1,5 √fck ) b d,  k = 1 + √(200/d) ≤ 2</span></div></section>
@@ -837,6 +928,7 @@ EC2 § 6.2.2 : VRd,c = max( 0,12 k (100 ρ fck)^(1/3) ; 0,035 k^1,5 √fck ) b d
 <tr><td>Longueurs d'ancrage BAEL et EC2</td><td>Calcul manuel, HA12 Fe E500, fc28 = 25 MPa</td><td>0,5 mm</td></tr>
 <tr><td>Nomenclature des aciers</td><td>Σ n × L × kg/m ; nombre de barres ; recouvrements au-delà de 12 m</td><td>exact</td></tr>
 <tr><td>Plans</td><td>Toutes les barres dessinées restent dans le béton ; DXF et SVG bien formés</td><td>géométrique</td></tr>
+<tr><td>Murs en aile</td><td>Ka de Coulomb, moment d'encastrement, renversement et glissement recalculés indépendamment</td><td>1e-9 à 0,02 kN.m</td></tr>
 </tbody></table></div></section>
 <section class="bloc"><h3>Comparaison avec CYPE sur l'exemple de la vidéo</h3><div class="prose">
 <p>Ferraillage affiché par CYPE à la fin de la vidéo (lu sur l'image, résolution 720 × 480) et ferraillage obtenu ici avec les mêmes données. Les cellules de 4,00 et 3,80 m de la vidéo sont ramenées à deux cellules de 3,90 m.</p></div>
@@ -855,6 +947,7 @@ EC2 § 6.2.2 : VRd,c = max( 0,12 k (100 ρ fck)^(1/3) ; 0,035 k^1,5 √fck ) b d
 <li>La répartition transversale des roues, le calcul d'ouverture des fissures EC2 et les charges LM1 sont implantés d'après les textes, sans cas de référence publié recalculé.</li>
 <li>Les coefficients de pondération de l'eau intérieure sont des valeurs par défaut à confirmer par le projeteur.</li>
 <li>Les valeurs de sol proposées dans la liste déroulante sont des ordres de grandeur, sans valeur contractuelle.</li>
+<li>Murs en T sur la vidéo CYPE : semelle du tronçon 1 de 3,95 m contre 3,70 m, moment du patin avant du tronçon 2 de 63,4 contre 63,8 kN.m/m, mais moment du talon environ deux fois celui de CYPE. Garde-corps et bêches : ferraillage constructif, non calculé.</li>
 <li>Les plans sont des plans types générés automatiquement : façonnage simplifié (U, barres droites, barres de gousset pliées), murs en aile, joints, réservations et barres de montage non dessinés. Ils doivent être relus par le projeteur avant diffusion.</li>
 <li>Les textes réglementaires ne sont pas reproduits. Les formules citées doivent être confrontées aux documents officiels détenus par le bureau d'études.</li>
 </ul></div></section>
