@@ -2,14 +2,13 @@
  * TÊTES D'OUVRAGE — Dalot Pro CI
  * Auteur : Moulo Jean Claude — Technicien génie civil BTP, Abidjan
  * Murs en aile (voiles en console soumis à la poussée des terres), deux dispositions :
- *   - 'radier' : ailes de faible hauteur sur radier de tête avec bêche (pratique AGEROUTE en Côte d'Ivoire) ;
+ *   - 'radier' : ailes de faible hauteur sur radier de tête avec bêche ;
  *     les deux ailes et le radier forment un U ouvert : les poussées s'équilibrent, le radier reprend
  *     le moment d'encastrement des ailes.
- *   - 'semelle' : murs en T sur semelle filante découpés en tronçons (démarche du logiciel CYPE
- *     « Ponts-cadres » : tronçons de longueur minimale, renforts verticaux, stabilité au renversement
- *     et au glissement, contrainte sur le sol).
- * Poussée : formule de Coulomb, talus arrière d'inclinaison β limitée à φ (manuel CYPE § 2.3.1),
- * surcharge sur remblai pondérée par sin(angle de l'aile) (assistant CYPE § 3.2).
+ *   - 'semelle' : murs en T sur semelle filante découpés en tronçons de longueur minimale,
+ *     avec renforts verticaux, stabilité au renversement et au glissement, contrainte sur le sol.
+ * Poussée : formule de Coulomb, talus arrière d'inclinaison β limitée à φ,
+ * surcharge sur remblai pondérée par sin(angle de l'aile).
  * Garde-corps en béton armé : ferraillage constructif, non calculé.
  */
 (function (root, factory) {
@@ -30,13 +29,13 @@
       plat: 0,                 // longueur horizontale en tête avant la pente (m)
       hFin: 0.20,              // hauteur de l'aile en bout, au-dessus de sa base (m)
       talus: 33.7,             // pente du talus de remblai le long de l'aile (3/2 = 33,7°) : fixe la longueur proposée
-      betaPoussee: 0,          // inclinaison du remblai derrière le voile, dans sa section (0 si le talus suit l'aile ; CYPE prend β = φ)
+      betaPoussee: 0,          // inclinaison du remblai derrière le voile, dans sa section (0 si le talus suit l'aile)
       deltaPct: 0,             // frottement terre-mur en % de φ
       epAuto: true, ep: 0.20,  // épaisseur du voile
       qAuto: true, q: 4.5,     // surcharge sur le remblai des ailes (kPa)
       // radier de tête
       eRadier: 0.25, becheProf: 1.00, becheLarg: 0.25,
-      // semelle (type CYPE)
+      // murs en T sur semelle
       eSemelle: 0.50, tronconMin: 3.0, mu: 0.58, FSr: 1.5, FSg: 1.5, renforts: true, renfortMin: 1.5,
       // garde-corps
       gc: { actif: true, vide: 1.00, lisse: 0.20, longrine: 0.20, poteau: 0.20, poteauInter: 0.15, ouvertureMax: 0.70, epaisseur: 0.20 }
@@ -95,9 +94,9 @@
     const MG = function (h) { return Ka * s.gammaR * h * h * h / 6; }, MQ = function (h) { return Ka * q * h * h / 2; };
     const VG = function (h) { return Ka * s.gammaR * h * h / 2; }, VQ = function (h) { return Ka * q * h; };
     const Mu = function (h) { return co.Gsup * MG(h) + co.eluLat * MQ(h); }, Ms = function (h) { return MG(h) + co.elsLat * MQ(h); };
-    const minFace = 0.001 * ep; // 0,1 % par face (vertical : EC2 § 9.6.2 ; horizontal : critère du rapport CYPE)
+    const minFace = 0.001 * ep; // 0,1 % par face (vertical : EC2 § 9.6.2 ; horizontal : 0,1 % par face)
     const base = nappe(p, mat, ep, c, Mu(H), Ms(H), minFace);
-    const avant = nappe(p, mat, ep, c, 0, 0, Math.max(minFace, mat.norme === 'BAEL' ? 4e-4 : 0)); // BAEL A.8.1,21 (repris par CYPE) : 4 cm²/m
+    const avant = nappe(p, mat, ep, c, 0, 0, Math.max(minFace, mat.norme === 'BAEL' ? 4e-4 : 0)); // BAEL A.8.1,21 : 4 cm²/m
     let continu = base, renfort = null, hRenfort = 0;
     if (p.tetes.type === 'semelle' && p.tetes.renforts) {
       const mini = nappe(p, mat, ep, c, 0, 0, minFace);
@@ -156,7 +155,7 @@
       if (st.okR && st.okG && st.okS) { best = st; break; }
     }
     const st = best || etat(Math.max(0.15, cinq(Ht / 3)), cinq(Ht));
-    // flexion de la semelle à l'ELU : sections de référence à 0,15 × épaisseur du voile à l'intérieur du voile (manuel CYPE § 2.6.3)
+    // flexion de la semelle à l'ELU : sections de référence à 0,15 × épaisseur du voile à l'intérieur du voile
     const B = st.B, av = st.av, ar = st.ar, c = p.mat.enrobageExt;
     const kG = co.Gsup, kQ = co.eluLat, kS = co.elsLat;
     function reaction(k1, k2) { // pression linéaire sous la semelle pour des charges pondérées
@@ -181,7 +180,7 @@
       return { av: Math.max(0, Mav), ar: Math.max(0, Mar) };
     }
     const mU = moments(kG, kQ), mS = moments(1, kS);
-    const minS = 0.001 * es; // Fascicule 62 titre V, art. B.4.3, cité par CYPE : 0,1 %
+    const minS = 0.001 * es; // Fascicule 62 titre V, art. B.4.3 : 0,1 %
     const inf = nappe(p, mat, es, c, mU.av, mS.av, minS), sup = nappe(p, mat, es, c, mU.ar, mS.ar, minS);
     const longi = M.choisirBarres(Math.max(minS, (Math.max(inf.barres ? inf.barres.As : 0, sup.barres ? sup.barres.As : 0)) / 4),
       function (b) { return b.esp <= M.limitesArmatures(p, mat, es).eMaxRep + 1e-9; });

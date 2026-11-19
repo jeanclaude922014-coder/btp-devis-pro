@@ -560,7 +560,7 @@
     const ratioRep = mat.norme === 'EC2' ? 0.2 : 1 / 3; // EC2 § 9.3.1.1 ; BAEL A.8.2.41 (charges concentrées)
     const AsRep = Math.max(ratioRep * AsP, 3.9e-4); // plancher usuel HA10 e = 20 cm
     const rep = choisirBarres(AsRep, function (b) { return admissible(b, lim.eMaxRep); });
-    // Rapport de vérification de la nappe (présentation du rapport « Vérification complète » de CYPE)
+    // Rapport de vérification de la nappe : chaque règle avec sa limite, la valeur obtenue et son état
     const verifs = [];
     function v(nom, ref, limite, valeur, ok) { verifs.push({ nom: nom, ref: ref, limite: limite, valeur: valeur, ok: ok }); }
     if (barres) {
@@ -647,7 +647,7 @@
       fouille: (geo.B + 1) * (geo.Hext + 0.1) * Lg };
   }
 
-  /* Épaisseurs de départ : règle de l'assistant de StruBIM Box Culverts (manuel CYPE, § 3.2).
+  /* Épaisseurs de départ (prédimensionnement) :
      Dalle et radier : 0,02 L² + 0,10 pour L ≤ 5 m, 0,50 m entre 5 et 7 m.
      Piédroits : 0,02 G² + 0,10 pour G ≤ 4,5 m, 0,50 m entre 4,5 et 7 m. Au-delà de 7 m : hors périmètre (null). */
   function predimensionner(L, G) {

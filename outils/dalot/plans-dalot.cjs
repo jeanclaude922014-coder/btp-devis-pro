@@ -1,7 +1,7 @@
 /*
  * PLANS ET FERRAILLAGE — Dalot Pro CI
  * Auteur : Moulo Jean Claude — Technicien génie civil BTP, Abidjan
- * Dossier d'exécution en 8 planches A3, sur le modèle des dossiers de dalots AGEROUTE
+ * Dossier d'exécution en 8 planches A3
  * (coffrage, têtes, ferraillage du module, du tablier et du radier, nomenclatures, murs en aile, garde-corps) :
  *   - nomenclatures des aciers (positions, nombre par élément, façonnage coté, longueurs, masses, récapitulatifs) ;
  *   - dessins sous forme de primitives (lignes, polylignes, cercles, textes) indépendantes du rendu ;

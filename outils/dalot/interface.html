@@ -287,7 +287,7 @@ var CHAMPS = {
     {k:'sol.Kmanuel',l:'Coefficient de poussée K',u:'—',p:0.05,si:function(){return P.sol.modeK==='manuel';}},
     {k:'sol.gammaCh',l:'Poids volumique de la chaussée',u:'kN/m³',p:0.5},
     {k:'sol.qRemblai',l:'Surcharge routière sur remblai',u:'kPa',p:1,a:'Fascicule 61 titre II : 10 kPa sur les remblais d\'accès.'},
-    {k:'sol.angleDiff',l:'Angle de diffusion dans le remblai',u:'°',p:1,a:'Mesuré par rapport à la verticale. Valeur usuelle 30° ; CYPE propose 45° par défaut (moins sévère).'}],
+    {k:'sol.angleDiff',l:'Angle de diffusion dans le remblai',u:'°',p:1,a:'Mesuré par rapport à la verticale. Valeur usuelle 30°.'}],
   charges:[
     {k:'charges.reglement',l:'Règlement de charges routières',t:'sel',o:[['F61','Fascicule 61 titre II (A, Bc, Bt, Br, Mc120)'],['LM1','Eurocode 1-2, modèle LM1']],redessine:1},
     {k:'charges.classe',l:'Classe du pont',t:'sel',num:1,o:[[1,'1re classe (largeur roulable ≥ 7 m)'],[2,'2e classe (5,50 à 7 m)'],[3,'3e classe (< 5,50 m)']],si:estF61},
@@ -310,18 +310,18 @@ var CHAMPS = {
     {k:'charges.hEau',l:'Hauteur d\'eau intérieure',u:'m',p:0.1,si:function(){return P.charges.eau;}}],
   tetes:[
     {k:'tetes.actif',l:'Calculer et dessiner les têtes d\'ouvrage',t:'chk',redessine:1},
-    {k:'tetes.type',l:'Type de murs en aile',t:'sel',o:[['radier','Ailes sur radier de tête avec bêche (pratique AGEROUTE)'],['semelle','Murs en T sur semelle, par tronçons (méthode CYPE)']],si:aT},
+    {k:'tetes.type',l:'Type de murs en aile',t:'sel',o:[['radier','Ailes sur radier de tête avec bêche'],['semelle','Murs en T sur semelle, par tronçons']],si:aT},
     {k:'tetes.angle',l:'Angle des ailes avec l\'axe de l\'ouvrage',u:'°',p:1,si:aT},
     {k:'tetes.longueurAuto',l:'Longueur des ailes proposée d\'après le talus',t:'chk',si:aT},
     {k:'tetes.longueur',l:'Longueur d\'une aile',u:'m',p:0.05,si:function(){return aT()&&!P.tetes.longueurAuto;}},
     {k:'tetes.plat',l:'Partie horizontale en tête de l\'aile',u:'m',p:0.05,si:aT},
     {k:'tetes.hFin',l:'Hauteur de l\'aile en bout',u:'cm',m:100,p:5,si:aT},
     {k:'tetes.talus',l:'Pente du talus de remblai',u:'°',p:0.5,si:aT,a:'3/2 = 33,7° ; 2/1 = 26,6°. Fixe la longueur proposée.'},
-    {k:'tetes.betaPoussee',l:'Inclinaison du remblai derrière le voile',u:'°',p:1,si:aT,a:'0° si le talus suit l\'aile. CYPE prend l\'angle du talus, limité à φ.'},
+    {k:'tetes.betaPoussee',l:'Inclinaison du remblai derrière le voile',u:'°',p:1,si:aT,a:'0° si le talus suit l\'aile. Sinon l\'angle du talus, limité à φ.'},
     {k:'tetes.deltaPct',l:'Frottement terre-mur',u:'% de φ',p:5,si:aT},
     {k:'tetes.epAuto',l:'Épaisseur du voile proposée (H/12 sur radier, H/10 sur semelle)',t:'chk',si:aT},
     {k:'tetes.ep',l:'Épaisseur du voile',u:'cm',m:100,p:1,si:function(){return aT()&&!P.tetes.epAuto;}},
-    {k:'tetes.qAuto',l:'Surcharge sur remblai = surcharge routière × sin(angle) (règle CYPE)',t:'chk',si:aT},
+    {k:'tetes.qAuto',l:'Surcharge sur remblai = surcharge routière × sin(angle de l\'aile)',t:'chk',si:aT},
     {k:'tetes.q',l:'Surcharge sur le remblai des ailes',u:'kPa',p:0.5,si:function(){return aT()&&!P.tetes.qAuto;}},
     {k:'tetes.eRadier',l:'Épaisseur du radier de tête',u:'cm',m:100,p:1,si:function(){return aT()&&P.tetes.type==='radier';}},
     {k:'tetes.becheProf',l:'Profondeur de la bêche (depuis le dessus du radier)',u:'cm',m:100,p:5,si:function(){return aT()&&P.tetes.type==='radier';}},
@@ -536,15 +536,14 @@ function prelim(){ return R && R.ok ? '' : '<div class="alerte">'+(R ? R.erreurs
 
 var VUES = {
   projet:function(){ return bloc('Identification du projet', formulaire('projet'), 'Ces informations figurent dans le cartouche de la note de calcul et des plans.') +
-    bloc('Exemple de la vidéo CYPE', '<div class="actions-plans"><button id="bVideo">Charger l\'exemple de la vidéo CYPE</button></div>', 'Reprend les données saisies dans la vidéo « Étude complète d\'un pont-cadre avec CYPE » : 2 cellules sous 4,50 m de gabarit, dalle et radier de 60 cm, piédroits de 50 cm, cloison de 20 cm, convoi Bt, sol k = 50 000 kN/m³ et 300 kPa. Les résultats CYPE de la vidéo sont comparés dans la rubrique Méthode de vérification.') +
     bloc('Déroulement', '<div class="prose"><ol><li><b>Hydraulique</b> : vérifier que l\'ouverture choisie évacue le débit de projet.</li><li><b>Normes et matériaux</b>, <b>Géométrie</b>, <b>Sol et remblai</b>, <b>Charges</b> : décrire l\'ouvrage.</li><li><b>Combinaisons</b> : contrôler les coefficients de pondération.</li><li><b>Efforts</b>, <b>Ferraillage</b>, <b>Métré</b> : lire les résultats, recalculés à chaque modification.</li><li><b>Note de calcul</b> : imprimer ou exporter vers Word.</li></ol></div>'); },
   hydro:function(){ return bloc('Écoulement dans l\'ouvrage', formulaire('hydro'), 'Formule de Manning-Strickler en régime uniforme à surface libre, par cellule. La section saisie à l\'étape Géométrie est utilisée.') +
     '<div id="res"></div>' + bloc('Estimation rapide du débit (méthode rationnelle)', formulaire('rationnel')+'<div id="res2"></div>', 'Valable pour les petits bassins versants, de l\'ordre de quelques km². Au-delà, employer les méthodes ORSTOM ou CIEH de l\'étude hydrologique.'); },
   normes:function(){ return bloc('Règlement et matériaux', formulaire('normes')) + '<div id="res"></div>'; },
-  geo:function(){ return bloc('Section transversale', '<div class="puces">'+[[1,1,1,20],[1,1.5,1.5,20],[1,2,2,25],[2,2,1.5,25],[2,2,2,25],[3,3,2,30],[3,3,3,35]].map(function(q){ return '<button data-gabarit="'+q.join(',')+'">'+q[0]+' × '+nf(q[1],2)+' × '+nf(q[2],2)+'</button>'; }).join('')+'<button id="bPredim">Épaisseurs de départ (règle de l\'assistant CYPE)</button></div>'+formulaire('geo'), 'Gabarits courants (cellules × ouverture × hauteur, en mètres). Les épaisseurs proposées sont un point de départ que le calcul confirme ou non.') + '<div id="res"></div>'; },
+  geo:function(){ return bloc('Section transversale', '<div class="puces">'+[[1,1,1,20],[1,1.5,1.5,20],[1,2,2,25],[2,2,1.5,25],[2,2,2,25],[3,3,2,30],[3,3,3,35]].map(function(q){ return '<button data-gabarit="'+q.join(',')+'">'+q[0]+' × '+nf(q[1],2)+' × '+nf(q[2],2)+'</button>'; }).join('')+'<button id="bPredim">Épaisseurs de départ (règle de prédimensionnement)</button></div>'+formulaire('geo'), 'Gabarits courants (cellules × ouverture × hauteur, en mètres). Les épaisseurs proposées sont un point de départ que le calcul confirme ou non.') + '<div id="res"></div>'; },
   sol:function(){ return bloc('Sol de fondation et remblai', formulaire('sol'), 'Le radier repose sur des appuis élastiques (modèle de Winkler). Les piédroits reçoivent la poussée du remblai.') + '<div id="res"></div>'; },
   charges:function(){ return bloc('Charges d\'exploitation', formulaire('charges'), 'Le Fascicule 61 titre II reste la référence des marchés routiers ivoiriens. Le modèle LM1 de l\'Eurocode 1 est proposé pour les projets financés aux Eurocodes.') + '<div id="res"></div>'; },
-  tetes:function(){ return bloc('Murs en aile', formulaire('tetes'), 'Deux dispositions : les ailes minces sur radier de tête avec bêche des dossiers AGEROUTE, ou les murs en T sur semelle découpés en tronçons de la vidéo CYPE. Poussée de Coulomb, voile calculé en console à sa base.') +
+  tetes:function(){ return bloc('Murs en aile', formulaire('tetes'), 'Deux dispositions : les ailes minces sur radier de tête avec bêche, ou les murs en T sur semelle découpés en tronçons. Poussée de Coulomb, voile calculé en console à sa base.') +
     bloc('Garde-corps', formulaire('gc'), 'Garde-corps en béton armé posé sur une longrine en bout de tablier. Ferraillage constructif, non calculé.') + '<div id="res"></div>'; },
   resTetes:function(){ return '<div id="res"></div>'; },
   coef:function(){ return bloc('Coefficients de pondération', '<div><button id="bCoef">Rétablir les valeurs du règlement</button></div>'+formulaire('coef'), 'Chaque action variable est tantôt présente, tantôt absente. Les actions permanentes prennent leur valeur défavorable ou favorable. L\'enveloppe couvre toutes ces combinaisons.') + '<div id="res"></div>'; },
@@ -609,7 +608,7 @@ var RESULTATS = {
     bloc('Valeurs extrêmes', tabEfforts()) + bloc('Pression sur le sol', svgSol()) + reserve(); },
   ferraillage:function(){ return alertes(R.alertes) + bloc('Armatures par mètre de longueur d\'ouvrage', tabFerraillage()+'<p class="pied">Sections en cm² par mètre. Calcul en flexion simple : l\'effort normal de compression, favorable, est négligé.</p>') +
     bloc('Schéma de ferraillage', svgCoupe({aciers:true,cotes:false})+'<div class="legende"><span><i style="background:var(--accent)"></i>Faces intérieures</span><span><i style="background:var(--navy)"></i>Faces extérieures</span><span>Les numéros renvoient au tableau.</span></div>') +
-    bloc('Rapport de vérification par nappe', tabVerifications(), 'Présentation du rapport « Vérification complète » de CYPE : chaque règle avec sa limite, la valeur obtenue et son état.') +
+    bloc('Rapport de vérification par nappe', tabVerifications(), 'Chaque règle avec sa limite, la valeur obtenue et son état.') +
     bloc('Contraintes en service', tabContraintes()) + bloc('Effort tranchant', tabTranchant()) +
     bloc('Dispositions constructives', document.getElementById('tplDispositions').innerHTML) + reserve(); },
   metre:function(){ var d = dossier(); return bloc('Avant-métré', tabMetre()) + bloc('Nomenclature des aciers du module', tabNomenclature(d.nomenclature)) + (d.nomenclatureTetes ? bloc('Nomenclature des aciers des têtes', tabNomenclature(d.nomenclatureTetes)) : '') + (d.nomenclatureGC ? bloc('Nomenclature des aciers des garde-corps', tabNomenclature(d.nomenclatureGC)) : ''); },
@@ -741,26 +740,7 @@ document.addEventListener('click', function(ev){
   if (el.id === 'bWord') exporterWord();
   if (el.id === 'bDXF' && dossier()) telecharger(PL.versDXF(dossier().planches), 'Plans_'+nomFichier()+'.dxf', 'application/dxf');
   if (el.id === 'bImpPlans') { modeImpressionPlans(true); setTimeout(function(){ window.print(); }, 100); }
-  if (el.id === 'bVideo') { if (el.getAttribute('data-sur')) { P = exempleVideo(); recalculer(); aller('geo'); } else { el.setAttribute('data-sur','1'); el.textContent = 'Confirmer : remplacer la saisie par l\'exemple'; setTimeout(function(){ el.removeAttribute('data-sur'); el.textContent = 'Charger l\'exemple de la vidéo CYPE'; }, 4000); } }
 });
-/* Données relevées dans la vidéo « Étude complète d'un pont-cadre (dalot) avec CYPE » (Ponts-cadres PICF 2017).
-   Approximation : cellules de 4,00 et 3,80 m ramenées à deux cellules égales de 3,90 m. */
-function exempleVideo(){
-  var p = nouveau();
-  p.projet.nom = 'Pont-cadre 2 cellules — exemple vidéo CYPE'; p.projet.lieu = 'Exemple de formation'; p.projet.maitre = '—';
-  p.norme = 'BAEL'; p.coef = M.coefficientsDefaut('BAEL');
-  p.mat.fc = 25; p.mat.fe = 500; p.mat.enrobageExt = 0.035; p.mat.enrobageInt = 0.035; p.mat.dmax = 25; p.mat.fissuration = 'prejudiciable'; p.mat.env = 'humide';
-  p.geo.n = 2; p.geo.L = 3.90; p.geo.H = 4.50; p.geo.es = 0.60; p.geo.er = 0.60; p.geo.ep = 0.50; p.geo.ec = 0.20; p.geo.gousset = 0;
-  p.geo.longueur = 6.00; p.geo.Hr = 0.30; p.geo.ech = 0;
-  p.sol.type = 'libre'; p.sol.ks = 50000; p.sol.sigmaAdm = 300; p.sol.gammaR = 19; p.sol.phi = 33; p.sol.modeK = 'K0'; p.sol.angleDiff = 45;
-  p.charges.reglement = 'F61'; p.charges.classe = 1; p.charges.largeurRoulable = 5; p.charges.nFiles = 1;
-  p.charges.A = false; p.charges.Bc = false; p.charges.Bt = true; p.charges.Br = false; p.charges.Mc120 = false;
-  p.charges.surface = true; p.charges.qSurface = 9.81; p.charges.fond = true; p.charges.qFond = 4; p.charges.eau = false; p.charges.hEau = 0;
-  p.hydro.Q = 40;
-  p.tetes.type = 'semelle'; p.tetes.angle = 15; p.tetes.longueurAuto = false; p.tetes.longueur = 12.80; p.tetes.plat = 0.70; p.tetes.hFin = 0.50;
-  p.tetes.talus = 26; p.tetes.betaPoussee = 26; p.tetes.epAuto = false; p.tetes.ep = 0.50; p.tetes.eSemelle = 0.50; p.tetes.mu = 0.58; p.tetes.gc.actif = false;
-  return p;
-}
 function nomFichier(){ return (P.projet.nom || 'dalot').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\w]+/g,'_').replace(/^_|_$/g,'') || 'dalot'; }
 function telecharger(texte, nom, type){
   var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([texte],{type:type})); a.download = nom;
@@ -826,27 +806,11 @@ document.addEventListener('DOMContentLoaded', function(){ recalculer(); rendreEt
 <li><b>Charges</b> : cocher les systèmes exigés par le CCTP (A, Bc, Bt, Br, Mc120).</li>
 <li><b>Combinaisons</b> : les coefficients du règlement sont proposés et restent modifiables.</li>
 <li><b>Efforts, Ferraillage</b> : lire les résultats et le rapport de vérification par nappe. Un point rouge signale une vérification non satisfaite, avec la correction à apporter.</li>
-<li><b>Têtes et garde-corps</b> : choisir les ailes sur radier de tête avec bêche (dossiers AGEROUTE) ou les murs en T sur semelle par tronçons (méthode CYPE), puis le garde-corps. Les résultats sont dans « Murs en aile ».</li>
+<li><b>Têtes et garde-corps</b> : choisir les ailes sur radier de tête avec bêche ou les murs en T sur semelle par tronçons, puis le garde-corps. Les résultats sont dans « Murs en aile ».</li>
 <li><b>Plans</b> : dossier d'exécution en 8 planches A3 au cartouche « République de Côte d'Ivoire » : coffrage général et coupes, têtes, ferraillage de la section, du tablier et du radier, nomenclature du module, ferraillage et nomenclature des têtes, garde-corps. « Exporter en DXF » ouvre les planches dans AutoCAD ; « Imprimer les plans » produit un PDF A3 paysage.</li>
 <li><b>Métré</b> : quantités de béton, coffrage et aciers ; la masse d'acier vient de la nomenclature.</li>
 <li><b>Note de calcul</b> : imprimer en PDF ou exporter vers Word.</li>
 </ol></div></section>
-<section class="bloc"><h3>Correspondance avec CYPE (StruBIM Box Culverts)</h3><div class="prose">
-<p>Les étapes suivent l'assistant et les fenêtres « Matériaux », « Données générales », « Armature » et « Composition de plans » du module dalot de CYPE (Ponts-cadres PICF), d'après son manuel officiel et la vidéo « Étude complète d'un pont-cadre (dalot) avec CYPE ». Le bouton « Charger l'exemple de la vidéo CYPE » de l'étape Projet reprend les données de cette vidéo.</p></div>
-<div class="tableau"><table><thead><tr><th>Dans CYPE</th><th>Dans Dalot Pro CI</th></tr></thead><tbody>
-<tr><td>Matériaux : béton, acier, type d'environnement</td><td>Normes et matériaux</td></tr>
-<tr><td>Terrain : module de réaction, contrainte admissible</td><td>Sol et remblai : module de réaction k, contrainte admissible</td></tr>
-<tr><td>Remblai : poids volumique, angle de frottement, angle de transmission des charges</td><td>Sol et remblai : poids volumique, angle de frottement, angle de diffusion</td></tr>
-<tr><td>Poussée au repos par la formule de Jaky</td><td>Poussée des terres « au repos » (choix par défaut)</td></tr>
-<tr><td>Assistant : hauteur intérieure, portée libre, longueur ; épaisseurs déduites</td><td>Géométrie, bouton « Épaisseurs de départ »</td></tr>
-<tr><td>Charge uniforme supérieure, charge uniforme sur radier, charge hydraulique</td><td>Charges : surcharge en surface, surcharge sur radier, dalot en eau</td></tr>
-<tr><td>Trains de charges (Fascicule 61, Eurocode), charges en bande</td><td>Charges : A, Bc, Bt, Br, Mc120 ou LM1</td></tr>
-<tr><td>Enrobage extérieur, enrobage intérieur, taille maximale du granulat</td><td>Normes et matériaux : mêmes trois champs</td></tr>
-<tr><td>Calcul : vérifier, dimensionner ; décollement, contrainte du sol</td><td>Calcul automatique à chaque saisie ; panneau « Verdict »</td></tr>
-<tr><td>Vérification complète (rapport par élément)</td><td>Ferraillage : rapport de vérification par nappe</td></tr>
-<tr><td>Armature : tablier, radier, section ; composition de plans, cartouche, nomenclature, export DWG</td><td>Plans : 4 planches A3, cartouche, nomenclature, export DXF</td></tr>
-</tbody></table></div>
-<div class="prose"><p>Différences à connaître : CYPE calcule en éléments finis de coque en trois dimensions, traite les dalots biais, les joints et les murs en aile. Dalot Pro CI calcule une tranche de 1 m en portique plan, pour un dalot droit, sans murs en aile.</p></div></section>
 <section class="bloc"><h3>Unités</h3><div class="prose"><ul>
 <li>Longueurs en mètres, épaisseurs et enrobage en centimètres, diamètres en millimètres.</li>
 <li>Forces en kN, moments en kN.m par mètre de longueur d'ouvrage, pressions en kPa (100 kPa = 1 bar ≈ 10 t/m²).</li>
@@ -930,24 +894,11 @@ EC2 § 6.2.2 : VRd,c = max( 0,12 k (100 ρ fck)^(1/3) ; 0,035 k^1,5 √fck ) b d
 <tr><td>Plans</td><td>Toutes les barres dessinées restent dans le béton ; DXF et SVG bien formés</td><td>géométrique</td></tr>
 <tr><td>Murs en aile</td><td>Ka de Coulomb, moment d'encastrement, renversement et glissement recalculés indépendamment</td><td>1e-9 à 0,02 kN.m</td></tr>
 </tbody></table></div></section>
-<section class="bloc"><h3>Comparaison avec CYPE sur l'exemple de la vidéo</h3><div class="prose">
-<p>Ferraillage affiché par CYPE à la fin de la vidéo (lu sur l'image, résolution 720 × 480) et ferraillage obtenu ici avec les mêmes données. Les cellules de 4,00 et 3,80 m de la vidéo sont ramenées à deux cellules de 3,90 m.</p></div>
-<div class="tableau"><table><thead><tr><th>Nappe</th><th>CYPE (vidéo)</th><th>Dalot Pro CI</th><th>Écart de section</th></tr></thead><tbody>
-<tr><td>Dalle, nappe supérieure</td><td>HA12 e=15 (7,54 cm²)</td><td>HA10 e=12,5 (6,28 cm²)</td><td>−17 %</td></tr>
-<tr><td>Dalle, nappe inférieure</td><td>HA12 e=15 (7,54 cm²)</td><td>HA14 e=25 (6,16 cm²)</td><td>−18 %</td></tr>
-<tr><td>Radier, nappe supérieure</td><td>HA12 e=15 (7,54 cm²)</td><td>HA14 e=25 (6,16 cm²)</td><td>−18 %</td></tr>
-<tr><td>Radier, nappe inférieure</td><td>HA12 e=15 (7,54 cm²)</td><td>HA16 e=20 (10,05 cm²)</td><td>+33 %</td></tr>
-<tr><td>Piédroits, côté terre</td><td>HA12 e=15 (7,54 cm²)</td><td>HA14 e=12,5 (12,32 cm²)</td><td>+63 %</td></tr>
-<tr><td>Piédroits, côté eau</td><td>HA12 e=20 (5,65 cm²)</td><td>HA12 e=25 (4,52 cm²)</td><td>−20 %</td></tr>
-<tr><td>Cloison</td><td>HA10 e=25 (3,14 cm²)</td><td>HA10 e=25 (3,14 cm²)</td><td>0 %</td></tr>
-</tbody></table></div>
-<div class="prose"><p><span class="etat av">Comparaison partielle</span> Les écarts dépassent ce qu'on accepterait d'un recoupement : la comparaison ne valide pas le logiciel. Causes probables, non démontrées : modèle de coques 3D de CYPE contre tranche de 1 m en portique ici, positions des charges en bande et du convoi Bt différentes, angles d'encastrement des piédroits sur le radier plus chargés dans un portique plan. La vidéo n'affiche ni les moments ni les combinaisons de CYPE, ce qui empêche de localiser l'écart.</p></div></section>
 <section class="bloc"><h3>Réserves</h3><div class="prose"><ul>
-<li>Aucune comparaison avec un logiciel indépendant (CYPE, Robot, SCIA) n'a encore été faite sur un dalot complet. Un dossier de reproduction est décrit dans la fiche de validation du dépôt.</li>
+<li>Aucune comparaison avec un logiciel indépendant n'a encore été faite sur un dalot complet. Un dossier de reproduction est décrit dans la fiche de validation du dépôt.</li>
 <li>La répartition transversale des roues, le calcul d'ouverture des fissures EC2 et les charges LM1 sont implantés d'après les textes, sans cas de référence publié recalculé.</li>
 <li>Les coefficients de pondération de l'eau intérieure sont des valeurs par défaut à confirmer par le projeteur.</li>
 <li>Les valeurs de sol proposées dans la liste déroulante sont des ordres de grandeur, sans valeur contractuelle.</li>
-<li>Murs en T sur la vidéo CYPE : semelle du tronçon 1 de 3,95 m contre 3,70 m, moment du patin avant du tronçon 2 de 63,4 contre 63,8 kN.m/m, mais moment du talon environ deux fois celui de CYPE. Garde-corps et bêches : ferraillage constructif, non calculé.</li>
 <li>Les plans sont des plans types générés automatiquement : façonnage simplifié (U, barres droites, barres de gousset pliées), murs en aile, joints, réservations et barres de montage non dessinés. Ils doivent être relus par le projeteur avant diffusion.</li>
 <li>Les textes réglementaires ne sont pas reproduits. Les formules citées doivent être confrontées aux documents officiels détenus par le bureau d'études.</li>
 </ul></div></section>
